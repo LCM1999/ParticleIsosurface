@@ -1,0 +1,35 @@
+# read build type
+build_type="release"
+while getopts "m:" opt; do
+    case $opt in
+        m) build_type="$OPTARG";;
+        *) echo "Unrecognized parameter detected."
+        exit 1;;
+    esac
+done
+
+case $build_type in
+    "debug")
+    folder_name="Debug";;
+    "release")
+    folder_name="Release";;
+    *)
+    echo "Unrecognized parameter detected."
+    exit 1;;
+esac
+
+echo "Build type(-m) is ${build_type}."
+
+# make build folder
+if [ -d "build" ]; then
+    rm -r build
+fi
+mkdir build
+cd build
+
+# build .exe
+cmake ..
+cmake --build . --config $build_type
+
+# run .exe
+# ./${folder_name}/Isosurface_smiplify.exe
