@@ -11,4 +11,5 @@ If you wanna run this program, you need to do the following:
     $\qquad$ 7. .obj files and record files will be output to the directory where the controlData.json is located.  
     $\qquad$ 8. In the terminal, enter the following command:  
     $\qquad$ $\qquad$     ./Isosurface_smiplify.exe [Path to controlData.json]  
+    $\qquad$ 9. If you got "METIS ERROR, USE DEFAULT SINGLE THREAD" during a run, that is because the parallelization modification of Mesh Generate phase has not been completed, you will end up with normal results.
 
