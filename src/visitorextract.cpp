@@ -1,7 +1,7 @@
+#include <array>
 #include "visitorextract.h"
 #include "iso_method_ours.h"
 #include "tet_arrays.h"
-#include <array>
 
 
 template <class T, class U>
@@ -23,55 +23,53 @@ TraversalData::TraversalData(TNode *t)
 }
 	
 void TraversalData::gen_trav(TraversalData &c, Index i)
+{
+	if (!n->is_leaf())
 	{
-		if (!n->is_leaf())
-		{
-			c.n = n->children[i];
-			c.depth = depth+1;
-		}
-		else
-		{
-			c = *this;
-		}
+		c.n = n->children[i];
+		c.depth = depth+1;
 	}
-
-	VisitorExtract::VisitorExtract(Mesh* m_)
+	else
 	{
-		m = m_;
+		c = *this;
 	}
+}
 
-	VisitorExtract::VisitorExtract(char cdepth, Graph* g_)
+VisitorExtract::VisitorExtract(Mesh* m_)
+{
+	m = m_;
+}
+
+VisitorExtract::VisitorExtract(char cdepth, Graph* g_)
+{
+	constrained_depth = cdepth;
+	g = g_;
+}
+
+VisitorExtract::VisitorExtract(Mesh* m_, std::vector<TNode*>* part_)
+{
+	m = m_;
+	part = part_;
+}
+
+bool VisitorExtract::belong2part(TraversalData& td)
+{
+	for (TNode* n: *part)
 	{
-		constrained_depth = cdepth;
-		g = g_;
 	}
+	return false;
+}
 
-	VisitorExtract::VisitorExtract(Mesh* m_, std::vector<TNode*>* part_)
+bool VisitorExtract::on_vert(TraversalData& a, TraversalData& b, TraversalData& c, TraversalData& d, TraversalData& aa, TraversalData& ba, TraversalData& ca, TraversalData& da)
+{
+	struct procedure
 	{
-		m = m_;
-		part = part_;
-	}
-
-	bool VisitorExtract::belong2part(TraversalData& td)
+		int trans[8];
+		bool flip;
+		int code;
+	};
+	static procedure table[256] =
 	{
-		for (TNode* n: *part)
-		{
-
-		}
-		return false;
-	}
-
-	bool VisitorExtract::on_vert(TraversalData& a, TraversalData& b, TraversalData& c, TraversalData& d, TraversalData& aa, TraversalData& ba, TraversalData& ca, TraversalData& da)
-	{
-		struct procedure
-		{
-			int trans[8];
-			bool flip;
-			int code;
-		};
-
-		static procedure table[256] =
-		{
 			/* 00000000 */ {{0, 1, 2, 3, 4, 5, 6, 7}, false, 0b00000000},
 			/* 00000001 */ {{0, 1, 2, 3, 4, 5, 6, 7}, false, 0b00000001},
 			/* 00000010 */ {{1, 0, 3, 2, 5, 4, 7, 6}, true, 0b00000001},
@@ -330,499 +328,245 @@ void TraversalData::gen_trav(TraversalData &c, Index i)
 			/* 11111111 */ {{0, 1, 2, 3, 4, 5, 6, 7}, false, 0b11111111},
 		};
 
-		if (a.n->is_leaf() && b.n->is_leaf() && c.n->is_leaf() && d.n->is_leaf() && aa.n->is_leaf() && ba.n->is_leaf() && ca.n->is_leaf() && da.n->is_leaf())
+	if (a.n->is_leaf() && b.n->is_leaf() && c.n->is_leaf() && d.n->is_leaf() && aa.n->is_leaf() && ba.n->is_leaf() && ca.n->is_leaf() && da.n->is_leaf())
+	{
+		int index = 0;
+		TNode* n[8] = { a.n, b.n, c.n, d.n, aa.n, ba.n, ca.n, da.n };
+		for (int i = 0; i < 8; i++)
 		{
-			int index = 0;
-
-			TNode* n[8] = { a.n, b.n, c.n, d.n, aa.n, ba.n, ca.n, da.n };
-
-			for (int i = 0; i < 8; i++)
+			if (sign(n[i]->node) > 0)
 			{
-				if (sign(n[i]->node) > 0)
-				{
-					index += 1 << i;
-				}
+				index += 1 << i;
 			}
-
-			const auto& proc = table[index];
-
-			if (proc.code == 0b00000000 || proc.code == 0b11111111)
-			{
-				return false;
-			}
-
-			std::array<TNode*, 8> trans_vertices;
-
-			for (int i = 0; i < 8; i++)
-			{
-				trans_vertices[i] = n[proc.trans[i]];
-			}
-
-			std::array<vect3f, 12> points;
-
-			auto calculate_point = [&](int e_index, int v_index1, int v_index2) {
-				auto& v1 = *trans_vertices[v_index1];
-				auto& v2 = *trans_vertices[v_index2];
-				
-
-				if ((v1.node.v[3] > 0 ? 1 : -1) != (v2.node.v[3] > 0 ? 1 : -1))
-				{
-					vect4f tmpv1 = v1.node, tmpv2 = v2.node, tmpv;
-					vect3f tmpg;
-					while (vect3f((tmpv1 - tmpv2)).length() > (P_RADIUS / 2))
-					{
-						tmpv = vect3f(tmpv1 + tmpv2) / 2;
-						evaluator->SingleEval((vect3f&)tmpv, tmpv[3], tmpg);
-						if ((tmpv[3] > 0 ? 1 : -1) == (tmpv1[3] > 0 ? 1 : -1))
-						{
-							tmpv1 = tmpv;
-							tmpv.zero();
-						}
-						else if ((tmpv[3] > 0 ? 1 : -1) == (tmpv2[3] > 0 ? 1 : -1))
-						{
-							tmpv2 = tmpv;
-							tmpv.zero();
-						}
-					}
-					auto ratio = invlerp(tmpv1[3], tmpv2[3], 0.0f);
-					if (ratio < RATIO_TOLERANCE)
-						points[e_index] = vect3f(tmpv1);
-					else if (ratio > (1 - RATIO_TOLERANCE))
-						points[e_index] = vect3f(tmpv2);
-					else
-						points[e_index] = lerp((vect3f&)tmpv1, (vect3f&)tmpv2, ratio);
-				}
-			};
-
-			calculate_point(0, 0, 1);
-			calculate_point(1, 2, 3);
-			calculate_point(2, 4, 5);
-			calculate_point(3, 6, 7);
-			calculate_point(4, 0, 2);
-			calculate_point(5, 1, 3);
-			calculate_point(6, 4, 6);
-			calculate_point(7, 5, 7);
-			calculate_point(8, 0, 4);
-			calculate_point(9, 1, 5);
-			calculate_point(10, 2, 6);
-			calculate_point(11, 3, 7);
-
-			auto append = [&](int index1, int index2, int index3) {
-				const auto& p1 = points[index1];
-				const auto& p2 = points[index2];
-				const auto& p3 = points[index3];
-#ifndef JOIN_VERTS
-#ifdef USE_DMT
-				if (proc.flip)
-				{
-					m->tris.push_back(vect<3, vect3f>(p1, p2, p3));
-				}
-				else
-				{
-					m->tris.push_back(vect<3, vect3f>(p3, p2, p1));
-				}
-#endif // USE_DMT
-
-#ifdef USE_DMC
-				int pIdx1 = m->insert_vert(p1);
-				int pIdx2 = m->insert_vert(p2);
-				int pIdx3 = m->insert_vert(p3);
-				if (proc.flip)
-				{
-					m->insert_tri(pIdx1, pIdx2, pIdx3);
-				}
-				else
-				{
-					m->insert_tri(pIdx3, pIdx2, pIdx1);
-				}
-				
-#endif // USE_DMC
-
-#else
-				if (proc.flip)
-				{
-					m->tris.push_back(vect<3, vect3f>(p1, p2, p3));
-				}
-				else
-				{
-					m->tris.push_back(vect<3, vect3f>(p3, p2, p1));
-				}
-#endif // !JOIN_VERTS
-			};
-
-			switch (proc.code)
-			{
-			case 0b00000001:
-				append(0, 4, 8);
-				break;
-			case 0b00000011:
-				append(4, 8, 9);
-				append(5, 4, 9);
-				break;
-			case 0b00000110:
-				append(0, 9, 4);
-				append(4, 9, 10);
-				append(10, 9, 5);
-				append(10, 5, 1);
-				break;
-			case 0b00000111:
-				append(8, 9, 10);
-				append(1, 10, 9);
-				append(5, 1, 9);
-				break;
-			case 0b00001111:
-				append(8, 9, 10);
-				append(9, 11, 10);
-				break;
-			case 0b00010110:
-				append(0, 8, 4);
-				append(1, 10, 5);
-				append(5, 10, 9);
-				append(9, 10, 2);
-				append(2, 10, 6);
-				break;
-			case 0b00010111:
-				append(1, 10, 5);
-				append(5, 10, 9);
-				append(2, 9, 10);
-				append(2, 10, 6);
-				break;
-			case 0b00011000:
-				append(1, 5, 11);
-				append(2, 8, 6);
-				break;
-			case 0b00011001:
-				append(1, 4, 6);
-				append(1, 6, 11);
-				append(11, 6, 2);
-				append(11, 2, 5);
-				append(5, 2, 0);
-				break;
-			case 0b00011011:
-				append(2, 9, 6);
-				append(6, 9, 11);
-				append(6, 11, 1);
-				append(1, 4, 6);
-				break;
-			case 0b00011110:
-				append(0, 8, 4);
-				append(2, 9, 6);
-				append(6, 9, 10);
-				append(10, 9, 11);
-				break;
-			case 0b00011111:
-				append(2, 9, 6);
-				append(6, 9, 10);
-				append(10, 9, 11);
-				break;
-			case 0b00111100:
-				append(4, 5, 8);
-				append(8, 5, 9);
-				append(10, 6, 11);
-				append(11, 6, 7);
-				break;
-			case 0b00111101:
-				append(6, 7, 10);
-				append(10, 7, 11);
-				append(0, 5, 9);
-				break;
-			case 0b00111111:
-				append(6, 7, 10);
-				append(10, 7, 11);
-				break;
-			case 0b01101001:
-				append(0, 5, 9);
-				append(1, 4, 10);
-				append(2, 6, 8);
-				append(3, 7, 11);
-				break;
-			case 0b01101011:
-				append(1, 4, 8);
-				append(1, 8, 11);
-				append(11, 8, 7);
-				append(7, 8, 2);
-				append(3, 6, 10);
-				break;
-			case 0b01101111:
-				append(2, 6, 8);
-				append(3, 7, 11);
-				break;
-			case 0b01111110:
-				append(0, 8, 4);
-				append(3, 7, 11);
-				break;
-			case 0b01111111:
-				append(3, 7, 11);
-				break;
-			}
-
+		}
+		const auto& proc = table[index];
+		if (proc.code == 0b00000000 || proc.code == 0b11111111)
+		{
 			return false;
 		}
-		return true;
-	}
-
-	bool VisitorExtract::on_node(TraversalData &td)
-	{
-		if (constrained_depth != 0)
+		std::array<TNode*, 8> trans_vertices;
+		for (int i = 0; i < 8; i++)
 		{
-			if ((td.depth == constrained_depth || td.n->is_leaf()))
+			trans_vertices[i] = n[proc.trans[i]];
+		}
+		std::array<Eigen::Vector3f, 12> points;
+		
+		auto calculate_point = [&](int e_index, int v_index1, int v_index2) {
+			auto& v1 = *trans_vertices[v_index1];
+			auto& v2 = *trans_vertices[v_index2];
+			
+			if ((v1.node[3] > 0 ? 1 : -1) != (v2.node[3] > 0 ? 1 : -1))
 			{
-				return false;
+				Eigen::Vector4f tmpv1 = v1.node, tmpv2 = v2.node, tmpv = Eigen::Vector4f::Zero();
+				Eigen::Vector3f tmpg = Eigen::Vector3f::Zero();
+				while ((tmpv1 - tmpv2).head(3).norm() > (P_RADIUS / 2))
+				{
+					tmpv[0] =  (tmpv1[0] + tmpv2[0]) / 2;
+					tmpv[1] =  (tmpv1[1] + tmpv2[1]) / 2;
+					tmpv[2] =  (tmpv1[2] + tmpv2[2]) / 2;
+					evaluator->SingleEval(tmpv.head(3), tmpv[3], tmpg);
+					if ((tmpv[3] > 0 ? 1 : -1) == (tmpv1[3] > 0 ? 1 : -1))
+					{
+						tmpv1 = tmpv;
+						tmpv.setZero();
+					}
+					else if ((tmpv[3] > 0 ? 1 : -1) == (tmpv2[3] > 0 ? 1 : -1))
+					{
+						tmpv2 = tmpv;
+						tmpv.setZero();
+					}
+				}
+				auto ratio = invlerp(tmpv1[3], tmpv2[3], 0.0f);
+				if (ratio < RATIO_TOLERANCE)
+					points[e_index] = tmpv1.head(3);
+				else if (ratio > (1 - RATIO_TOLERANCE))
+					points[e_index] = tmpv2.head(3);
+				else
+					points[e_index] = lerp((Eigen::Vector3f&)tmpv1, (Eigen::Vector3f&)tmpv2, ratio);
+			}
+		};
+
+		calculate_point(0, 0, 1);
+		calculate_point(1, 2, 3);
+		calculate_point(2, 4, 5);
+		calculate_point(3, 6, 7);
+		calculate_point(4, 0, 2);
+		calculate_point(5, 1, 3);
+		calculate_point(6, 4, 6);
+		calculate_point(7, 5, 7);
+		calculate_point(8, 0, 4);
+		calculate_point(9, 1, 5);
+		calculate_point(10, 2, 6);
+		calculate_point(11, 3, 7);
+
+		auto append = [&](int index1, int index2, int index3) {
+			const auto& p1 = points[index1];
+			const auto& p2 = points[index2];
+			const auto& p3 = points[index3];
+			int pIdx1 = m->insert_vert(p1);
+			int pIdx2 = m->insert_vert(p2);
+			int pIdx3 = m->insert_vert(p3);
+			if (proc.flip)
+			{
+				m->insert_tri(pIdx1, pIdx2, pIdx3);
 			}
 			else
 			{
-				return true;
+				m->insert_tri(pIdx3, pIdx2, pIdx1);
 			}
+		};
+
+		switch (proc.code)
+		{
+		case 0b00000001:
+			append(0, 4, 8);
+			break;
+		case 0b00000011:
+			append(4, 8, 9);
+			append(5, 4, 9);
+			break;
+		case 0b00000110:
+			append(0, 9, 4);
+			append(4, 9, 10);
+			append(10, 9, 5);
+			append(10, 5, 1);
+			break;
+		case 0b00000111:
+			append(8, 9, 10);
+			append(1, 10, 9);
+			append(5, 1, 9);
+			break;
+		case 0b00001111:
+			append(8, 9, 10);
+			append(9, 11, 10);
+			break;
+		case 0b00010110:
+			append(0, 8, 4);
+			append(1, 10, 5);
+			append(5, 10, 9);
+			append(9, 10, 2);
+			append(2, 10, 6);
+			break;
+		case 0b00010111:
+			append(1, 10, 5);
+			append(5, 10, 9);
+			append(2, 9, 10);
+			append(2, 10, 6);
+			break;
+		case 0b00011000:
+			append(1, 5, 11);
+			append(2, 8, 6);
+			break;
+		case 0b00011001:
+			append(1, 4, 6);
+			append(1, 6, 11);
+			append(11, 6, 2);
+			append(11, 2, 5);
+			append(5, 2, 0);
+			break;
+		case 0b00011011:
+			append(2, 9, 6);
+			append(6, 9, 11);
+			append(6, 11, 1);
+			append(1, 4, 6);
+			break;
+		case 0b00011110:
+			append(0, 8, 4);
+			append(2, 9, 6);
+			append(6, 9, 10);
+			append(10, 9, 11);
+			break;
+		case 0b00011111:
+			append(2, 9, 6);
+			append(6, 9, 10);
+			append(10, 9, 11);
+			break;
+		case 0b00111100:
+			append(4, 5, 8);
+			append(8, 5, 9);
+			append(10, 6, 11);
+			append(11, 6, 7);
+			break;
+		case 0b00111101:
+			append(6, 7, 10);
+			append(10, 7, 11);
+			append(0, 5, 9);
+			break;
+		case 0b00111111:
+			append(6, 7, 10);
+			append(10, 7, 11);
+			break;
+		case 0b01101001:
+			append(0, 5, 9);
+			append(1, 4, 10);
+			append(2, 6, 8);
+			append(3, 7, 11);
+			break;
+		case 0b01101011:
+			append(1, 4, 8);
+			append(1, 8, 11);
+			append(11, 8, 7);
+			append(7, 8, 2);
+			append(3, 6, 10);
+			break;
+		case 0b01101111:
+			append(2, 6, 8);
+			append(3, 7, 11);
+			break;
+		case 0b01111110:
+			append(0, 8, 4);
+			append(3, 7, 11);
+			break;
+		case 0b01111111:
+			append(3, 7, 11);
+			break;
 		}
-		else if (part != nullptr)
+		return false;
+	}
+	return true;
+}
+
+bool VisitorExtract::on_node(TraversalData &td)
+{
+	if (constrained_depth != 0)
+	{
+		if ((td.depth == constrained_depth || td.n->is_leaf()))
 		{
 			return false;
-		} 
+		}
 		else
 		{
-			return !td.n->is_leaf();
-		}
-	}
-
-#ifdef USE_DMT
-	bool VisitorExtract::on_edge(TraversalData &td00, TraversalData &td10, TraversalData &td01, TraversalData &td11, char orient)
-	{
-		if (td00.n->is_leaf() && td10.n->is_leaf() && td01.n->is_leaf() && td11.n->is_leaf())
-		{
-			// determine which node is smallest (ordered bitwise)
-			TNode *n[4] = {td00.n, td10.n, td01.n, td11.n};
-			int depths[4] = {td00.depth, td10.depth, td01.depth, td11.depth};
-			int small = 0;
-			for (int i = 1; i < 4; i++)
-			{
-				if (depths[i] > depths[small])
-					small = i;
-			}
-
-			// calc edge vertex
-			int edge_idx = cube_orient2edge[orient][small ^ 3];
-
-			vect4f &edgeMid = n[small]->edges[edge_idx];
-			vect4f &edgeLow = n[small]->verts[cube_edge2vert[edge_idx][0]];
-			vect4f &edgeHigh = n[small]->verts[cube_edge2vert[edge_idx][1]];
-
-			// init common tetrahedron points
-			vect4f p[6];
-			p[0] = edgeLow; 
-			p[1] = edgeMid;
-			p[4] = edgeMid; 
-			p[5] = edgeHigh;
-
-#ifdef JOIN_VERTS
-			vect3f topoLow = n[small]->verts[cube_edge2vert[edge_idx][0]];
-			vect3f topoHigh = n[small]->verts[cube_edge2vert[edge_idx][1]];
-			vect3f topoMid = (topoLow + topoHigh) * .5;
-
-			vect3f topo[6];
-			topo[0] = topoLow; 
-			topo[1] = topoMid;
-			topo[4] = topoMid; 
-			topo[5] = topoHigh;
-#endif
-
-			// create pyramids in each cell
-			for (int i = 0; i < 4; i++)
-			{
-				// if (n[i]->is_outside())
-				// 	continue;
-
-				static int faceTable[3][4][2] =
-				{
-					{
-						{1,0},{4,0},{1,5},{4,5}
-					},
-					{
-						{2,0},{3,0},{2,5},{3,5}
-					},
-					{
-						{2,1},{3,1},{2,4},{3,4}
-					}
-				};
-
-				static bool flipTable[3][4] =
-				{
-					{true,false,false,true},
-					{false,true,true,false},
-					{true,false,false,true}
-				};
-
-				// find min size face
-				const int i1 = i ^ 1;
-				const int i2 = i ^ 2;
-				bool do1 = n[i] != n[i1];
-				bool do2 = n[i] != n[i2];
-				vect4f face1, face2;
-
-				if (depths[i] == depths[i1])
-					face1 = (n[i]->faces[faceTable[orient][i^3][0]] + n[i1]->faces[cube_face2opposite[faceTable[orient][i^3][0]]]) * .5;
-				else if (depths[i] > depths[i1])
-					face1 = n[i]->faces[faceTable[orient][i^3][0]];
-				else
-					face1 = n[i1]->faces[cube_face2opposite[faceTable[orient][i^3][0]]];
-
-				if (depths[i] == depths[i2])
-					face2 = (n[i]->faces[faceTable[orient][i^3][1]] + n[i2]->faces[cube_face2opposite[faceTable[orient][i^3][1]]]) * .5;
-				else if (depths[i] > depths[i2])
-					face2 = n[i]->faces[faceTable[orient][i^3][1]];
-				else
-					face2 = n[i2]->faces[cube_face2opposite[faceTable[orient][i^3][1]]];
-
-#ifdef JOIN_VERTS
-				vect3f topoFace1, topoFace2;
-
-				if (depths[i] > depths[i1])
-				{
-					int face = faceTable[orient][i^3][0];
-					topoFace1 = (n[i]->verts[cube_face2vert[face][0]] + n[i]->verts[cube_face2vert[face][2]]) * .5;
-				}
-				else
-				{
-					int face = cube_face2opposite[faceTable[orient][i^3][0]];
-					topoFace1 = (n[i1]->verts[cube_face2vert[face][0]] + n[i1]->verts[cube_face2vert[face][2]]) * .5;
-				}
-
-				if (depths[i] > depths[i2])
-				{
-					int face = faceTable[orient][i^3][1];
-					topoFace2 = (n[i]->verts[cube_face2vert[face][0]] + n[i]->verts[cube_face2vert[face][2]]) * .5;
-				}
-				else
-				{
-					int face = cube_face2opposite[faceTable[orient][i^3][1]];
-					topoFace2 = (n[i2]->verts[cube_face2vert[face][0]] + n[i2]->verts[cube_face2vert[face][2]]) * .5;
-				}
-#endif
-
-				if (flipTable[orient][i])
-				{
-					if (do1)
-					{
-						p[2] = face1; p[3] = n[i]->node;		
-#ifdef JOIN_VERTS
-						topo[2] = topoFace1; topo[3] = n[i]->node;
-						processTet(p, topo);
-						processTet(p + 2, topo + 2);
-#else
-						processTet(p);
-						processTet(p + 2);
-#endif
-					}
-					if (do2)
-					{
-						p[2] = n[i]->node; p[3] = face2;	
-#ifdef JOIN_VERTS
-						topo[2] = n[i]->node; topo[3] = topoFace2;
-						processTet(p, topo);
-						processTet(p + 2, topo + 2);
-#else
-						processTet(p);
-						processTet(p + 2);
-#endif
-					}
-				}
-				else
-				{
-					if (do1)
-					{
-						p[2] = n[i]->node; p[3] = face1;	
-#ifdef JOIN_VERTS
-						topo[2] = n[i]->node; topo[3] = topoFace1;
-						processTet(p, topo);
-						processTet(p + 2, topo + 2);
-#else
-						processTet(p);
-						processTet(p + 2);
-#endif
-					}
-					if (do2)
-					{
-						p[2] = face2; p[3] = n[i]->node;
-#ifdef JOIN_VERTS
-						topo[2] = topoFace2; topo[3] = n[i]->node;
-						processTet(p, topo);
-						processTet(p + 2, topo + 2);
-#else
-						processTet(p);
-						processTet(p + 2);
-#endif
-					}
-				}
-
-			}
-			return false;
-		}
-
-		return true;
-	}
-#endif // USE_DMT
-
-#ifdef USE_DMC
-	bool VisitorExtract::on_edge(TraversalData& td00, TraversalData& td10, TraversalData& td01, TraversalData& td11)
-	{
-		return !(td00.n->is_leaf() && td10.n->is_leaf() && td01.n->is_leaf() && td11.n->is_leaf());
-	}
-#endif // USE_DMC
-
-	bool VisitorExtract::on_face(TraversalData &td0, TraversalData &td1, char orient)
-	{
-		if (constrained_depth != 0)
-		{
-			if ((td0.depth == constrained_depth || td0.n->is_leaf()) && (td1.depth == constrained_depth || td1.n->is_leaf()))
-			{
-				g->appendEdge(td0.n->nId, td1.n->nId);
-				return false;
-			}
 			return true;
 		}
-		else
-		{
-			return !(td0.n->is_leaf() && td1.n->is_leaf());
-		}
 	}
-#ifdef USE_DMT
-
-
-#ifdef JOIN_VERTS
-	void VisitorExtract::processTet(vect4f *p, vect3f *topo)
-#else
-	void VisitorExtract::processTet(vect4f *p)
-#endif
+	else if (part != nullptr)
 	{
-		// determine index in lookup table
-		int idx = (p[0].v[3] >= 0 ? 1 : 0) | 
-				  (p[1].v[3] >= 0 ? 2 : 0) | 
-				  (p[2].v[3] >= 0 ? 4 : 0) | 
-				  (p[3].v[3] >= 0 ? 8 : 0);
-
-		for (int i = 0; tet_tris[idx][i] != -1; i += 3)
-		{
-			vect< 3, vect3f > verts;
-#ifdef JOIN_VERTS
-			vect< 3, TopoEdge > topoEdges;
-#endif
-			for (int j = 0; j < 3; j++)
-			{
-				int edge = tet_tris[idx][i+j];
-				verts[j] = findZero(
-					p[ tet_edge2vert[edge][0] ], 
-					p[ tet_edge2vert[edge][1] ]);
-				
-#ifdef JOIN_VERTS
-				topoEdges[j].v[0] = topo[ tet_edge2vert[edge][0] ];
-				topoEdges[j].v[1] = topo[ tet_edge2vert[edge][1] ];
-				topoEdges[j].fix();
-#endif
-			}
-
-			m->tris.push_back(verts);
-#ifdef JOIN_VERTS
-			m->topoTris.push_back(topoEdges);
-#endif
-		}
+		return false;
+	} 
+	else
+	{
+		return !td.n->is_leaf();
 	}
-#endif // USE_DMT
+}
+
+bool VisitorExtract::on_edge(TraversalData& td00, TraversalData& td10, TraversalData& td01, TraversalData& td11)
+{
+	return !(td00.n->is_leaf() && td10.n->is_leaf() && td01.n->is_leaf() && td11.n->is_leaf());
+}
+
+bool VisitorExtract::on_face(TraversalData &td0, TraversalData &td1, char orient)
+{
+	if (constrained_depth != 0)
+	{
+		if ((td0.depth == constrained_depth || td0.n->is_leaf()) && (td1.depth == constrained_depth || td1.n->is_leaf()))
+		{
+			g->appendEdge(td0.n->nId, td1.n->nId);
+			return false;
+		}
+		return true;
+	}
+	else
+	{
+		return !(td0.n->is_leaf() && td1.n->is_leaf());
+	}
+}

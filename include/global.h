@@ -1,38 +1,74 @@
 #pragma once
 
-#include <string>
 #include <vector>
 #include <math.h>
-#include "iso_common.h"
-#include "vect.h"
-#include "visitorextract.h"
 #include <map>
 #include <iterator>
-using namespace std;
-
+#include <algorithm>
+#include <assert.h>
+#include <Eigen/Dense>
+#include "iso_common.h"
+#include "iso_method_ours.h"
 
 struct TNode;
-struct Graph;
+
+struct vect3i
+{
+	int v[3];
+
+	vect3i() {}
+
+	vect3i(Eigen::Vector3i& e)
+	{
+		for (size_t i = 0; i < 3; i++)
+		{
+			v[i] = e.data()[i];
+		}
+	}
+
+	int &operator[](const int i)
+	{
+		assert(i >= 0 && i < 3);
+		return v[i];
+	}
+
+	bool operator<(const vect3i &a) const 
+	{
+		return std::lexicographical_compare(v, v+3, a.v, a.v+3);
+	}
+};
+
+
+template<class T>
+struct Triangle
+{
+	Triangle() {};
+	Triangle(const T& a, const T& b, const T& c)
+	{
+		v[0] = a;
+		v[1] = b;
+		v[2] = c;
+	}
+
+	T v[3];
+
+	bool operator<(const Triangle<T>& t) const
+	{
+		return std::lexicographical_compare(v, v+3, t.v, t.v+3);
+	}
+};
+
 
 struct Mesh
 {
-#ifdef USE_DMT
-	vector< vect<3, vect3f> > tris;
-#endif // USE_DMT
-
-#ifdef JOIN_VERTS
-	vector< vect<3, TopoEdge> > topoTris;
-#endif
-
-#ifdef USE_DMC
-	map<vect3i, int> vertices_map;
-	vector<vect3f> vertices;
-	map<Triangle<vect3i>, int> tris_map;
-	vector<Triangle<int>> tris;
+	std::map<vect3i, int> vertices_map;
+	std::vector<Eigen::Vector3f> vertices;
+	std::map<Triangle<vect3i>, int> tris_map;
+	std::vector<Triangle<int>> tris;
 	unsigned int verticesNum = 0;
 	unsigned int trianglesNum = 0;
 
-	int insert_vert(const vect3f& p)
+	int insert_vert(const Eigen::Vector3f& p)
 	{
 		vect3i tmp = vect3f2vect3i(p);
 		if (vertices_map.find(tmp) == vertices_map.end())
@@ -44,19 +80,19 @@ struct Mesh
 		return vertices_map[tmp];
 	}
 
-	vect3i vect3f2vect3i(const vect3f& a)
+	vect3i vect3f2vect3i(const Eigen::Vector3f& a)
 	{
 		vect3i r;
 		for (size_t i = 0; i < 3; i++)
 		{
-			r[i] = int(round(a.v[i] * MESH_TOLERANCE));
+			r[i] = int(round(a[i] * MESH_TOLERANCE));
 		}
 		return r;
 	}
 
-	vect3f vect3i2vect3f(const vect3i& a)
+	Eigen::Vector3f vect3i2vect3f(const vect3i& a)
 	{
-		vect3f r;
+		Eigen::Vector3f r;
 		for (size_t i = 0; i < 3; i++)
 		{
 			r[i] = a.v[i] / MESH_TOLERANCE;
@@ -64,7 +100,7 @@ struct Mesh
 		return r;
 	}
 
-	bool similiar_point(vect3f& v1, vect3f& v2)
+	bool similiar_point(Eigen::Vector3f& v1, Eigen::Vector3f& v2)
 	{
 		for (size_t i = 0; i < 3; i++)
 		{
@@ -86,7 +122,7 @@ struct Mesh
 		vect3i t0_i = vect3f2vect3i(vertices[(t0 - 1)]);
 		vect3i t1_i = vect3f2vect3i(vertices[(t1 - 1)]);
 		vect3i t2_i = vect3f2vect3i(vertices[(t2 - 1)]);
-		Triangle<vect3i> ti = Triangle<vect3i>(t0_i, t1_i, t2_i);
+		Triangle<vect3i> ti(t0_i, t1_i, t2_i);
 		//float length[3];
 		//int top, bottom1, bottom2;
 		//float height, half;
@@ -136,10 +172,62 @@ struct Mesh
 	}
 
 	const int triangle_edge2vert[3][2] = { {1, 2}, {2, 0}, {0, 1} };
-	
-#endif // USE_DMC
 
-	vector<vect3f> norms;
+	std::vector<Eigen::Vector3f> norms;
+};
+
+
+struct Graph
+{
+	Graph() {};
+	int vNum;
+	int eNum;
+	int ncon;
+	std::map<unsigned __int64, int> vidx_map;
+	std::vector<std::vector<int>> gAdj;
+	std::vector<int> vwgt;
+	std::vector<int> ewgt;
+
+	Graph(std::vector<TNode*>& layer_nodes, int vwn = 1)
+	{
+		vNum = 0;
+		eNum = 0;
+		ncon = vwn;
+		for (size_t i = 0; i < layer_nodes.size(); i++)
+		{
+			vidx_map[layer_nodes[i]->nId] = vNum;
+			vNum++;
+			for (size_t j = 0; j < ncon; j++)
+			{
+				vwgt.push_back(layer_nodes[i]->getWeight());
+			}
+		}
+		gAdj.resize(vNum);
+	}
+
+	void appendEdge(const unsigned __int64 nId1, const unsigned __int64 nId2)
+	{
+		gAdj[vidx_map[nId1]].push_back(vidx_map[nId2]);
+		eNum++;
+		gAdj[vidx_map[nId2]].push_back(vidx_map[nId1]);
+		eNum++;
+	}
+
+	void getXAdjAdjncy(int* xadj, int* adjncy)
+	{
+		int adjncyIdx = 0;
+		for (size_t i = 0; i < vNum; i++)
+		{
+			xadj[i] = adjncyIdx;
+			for (size_t j = 0; j < gAdj[i].size(); j++)
+			{
+				adjncy[xadj[i] + j] = gAdj[i][j];
+			}
+			adjncyIdx += gAdj[i].size();
+		}
+		xadj[vNum] = adjncyIdx;
+		ewgt.resize(eNum, 1);
+	}
 };
 
 struct Global
@@ -147,7 +235,7 @@ struct Global
 	Global();
 	int method;
 	TNode* ourRoot;
-	Mesh ourMesh, rootsMesh, dmcMesh, dcMesh;
+	Mesh ourMesh;
 };
 
 extern Global g;
