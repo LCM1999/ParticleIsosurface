@@ -1,9 +1,9 @@
 {
-  "CSV_PATH": "inlet_0.csv,inlet_1.csv",
-  "NEED_RECORD": false,
+  "CSV_PATH": "inlet_0.csv,inlet_1.csv,inlet_10.csv",
   "CSV_TYPE": 0,
   "P_RADIUS": 2.5e-4,
-  "RECORD_STEP": 5000,
+  "NEED_RECORD": false,
+  "RECORD_STEP": 100000,
   "OUTPUT_PREFIX": "inlet_",
   "RECORD_PREFIX": "r_inlet_"
 }

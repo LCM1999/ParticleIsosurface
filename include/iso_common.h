@@ -35,8 +35,8 @@ extern bool USE_ANI;
 extern bool USE_XMEAN;
 extern float XMEAN_DELTA;
 
-extern int USE_DYNAMIC_THREADS;
-extern int THREAD_NUMS;
+extern int OMP_USE_DYNAMIC_THREADS;
+extern int OMP_THREADS_NUM;
 
 extern std::string CASE_PATH;
 extern bool LOAD_RECORD;
@@ -54,8 +54,3 @@ extern float RootCenter[3];
 extern int INDEX;
 extern int STATE;
 
-
-//#define JOIN_VERTS
-//#define USE_DMT
-#define USE_DMC
-#define USE_DMC_ERR

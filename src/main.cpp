@@ -1,19 +1,21 @@
 #include <iostream>
 #include <fstream>
-#include "global.h"
-#include "iso_common.h"
-#include "iso_method_ours.h"
-#include "mctable.h"
-#include "hash_grid.h"
-#include "evaluator.h"
-#include "timer.h"
-#include "parse.h"
-
-#include "json.hpp"
-
 #include <stack>
 #include <iterator>
 #include <omp.h>
+#include "global.h"
+#include "iso_common.h"
+#include "timer.h"
+
+#include "json.hpp"
+#include "hdf5.h"
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include "unistd.h"
+#endif
+
 
 int OVERSAMPLE_QEF = 4;
 float BORDER = (1.0 / 4096.0);
@@ -45,25 +47,23 @@ float VARIANCE_TOLERANCE = 100.0;
 HashGrid* hashgrid = NULL;
 Evaluator* evaluator = NULL;
 
-using namespace std;
-
-string CASE_PATH = "F:\\BaiduNetdiskDownload\\inlet_csv\\";
-vector<string> CSV_PATHES;
-string CSV_PATH = "";
+std::string CASE_PATH = "F:\\BaiduNetdiskDownload\\inlet_csv\\";
+std::vector<std::string> CSV_PATHES;
+std::string CSV_PATH = "";
 int CSV_TYPE = 0;
-string OUTPUT_PREFIX = "";
-string RECORD_PREFIX = "";
+std::string OUTPUT_PREFIX = "";
+std::string RECORD_PREFIX = "";
 
-int USE_DYNAMIC_THREADS = 0;
-int THREAD_NUMS = 16;
+int OMP_USE_DYNAMIC_THREADS = 0;
+int OMP_THREADS_NUM = 16;
 
 bool LOAD_RECORD = false;
 bool NEED_RECORD = false;
 int RECORD_STEP = 50000;
 
-static vector<vect3f> GlobalParticles;
-static vector<float> GlobalDensity;
-static vector<float> GlobalMass;
+static std::vector<Eigen::Vector3f> GlobalParticles;
+static std::vector<float> GlobalDensity;
+static std::vector<float> GlobalMass;
 
 static int GlobalParticlesNum = 0;
 
@@ -78,18 +78,18 @@ void loadConfig()
 {
 	// read parameters from json file
 	nlohmann::json readInJSON;
-	ifstream inJSONFile(CASE_PATH + "//controlData.json", fstream::in);
+	std::ifstream inJSONFile(CASE_PATH + "//controlData.json", std::fstream::in);
 
 	if (inJSONFile.good())
 	{
 		inJSONFile >> readInJSON;
 		inJSONFile.close();
-		const string filePath = readInJSON.at("CSV_PATH");
-		string csv_pathes = filePath;
+		const std::string filePath = readInJSON.at("CSV_PATH");
+		std::string csv_pathes = filePath;
 		parseString(&CSV_PATHES, csv_pathes, ",");
-		NEED_RECORD = readInJSON.at("NEED_RECORD");
 		CSV_TYPE = readInJSON.at("CSV_TYPE");
 		P_RADIUS = readInJSON.at("P_RADIUS");
+		NEED_RECORD = readInJSON.at("NEED_RECORD");
 		RECORD_STEP = readInJSON.at("RECORD_STEP");
 		OUTPUT_PREFIX = readInJSON.at("OUTPUT_PREFIX");
 		RECORD_PREFIX = readInJSON.at("RECORD_PREFIX");
@@ -98,13 +98,13 @@ void loadConfig()
 	}
 	else
 	{
-		cout << "Cannot open case!" << endl;
+		std::cout << "Cannot open case!" << std::endl;
 	}
 }
 
 void loadParticles()
 {
-	ifstream ifn;
+	std::ifstream ifn;
 	ifn.open(CSV_PATH.c_str());
 
 	GlobalParticles.clear();
@@ -114,10 +114,10 @@ void loadParticles()
 	MAX_VALUE = -1.0f;
 	MIN_VALUE = 0.0f;
 
-	string line;
-	vector<float> elements;
-	getline(ifn, line);
-	getline(ifn, line);
+	std::string line;
+	std::vector<float> elements;
+	std::getline(ifn, line);
+	std::getline(ifn, line);
 
 	float xmax = -1e10f, ymax = -1e10f, zmax = -1e10f;
 	float xmin = 1e10f, ymin = 1e10f, zmin = 1e10f;
@@ -125,7 +125,7 @@ void loadParticles()
 	while (!line.empty())
 	{
 		elements.clear();
-		string lines = line + ",";
+		std::string lines = line + ",";
 		size_t pos = lines.find(",");
 
 		while (pos != lines.npos)
@@ -143,7 +143,7 @@ void loadParticles()
 			if (elements[0] < xmin) { xmin = elements[0]; }
 			if (elements[1] < ymin) { ymin = elements[1]; }
 			if (elements[2] < zmin) { zmin = elements[2]; }
-			GlobalParticles.push_back(vect3f(elements[0], elements[1], elements[2]));
+			GlobalParticles.push_back(Eigen::Vector3f(elements[0], elements[1], elements[2]));
 			GlobalMass.push_back(elements[6]);
 			GlobalDensity.push_back(elements[7] + 1000.0f);
 			break;
@@ -154,7 +154,7 @@ void loadParticles()
 			if (elements[1] < xmin) { xmin = elements[1]; }
 			if (elements[2] < ymin) { ymin = elements[2]; }
 			if (elements[3] < zmin) { zmin = elements[3]; }
-			GlobalParticles.push_back(vect3f(elements[1], elements[2], elements[3]));
+			GlobalParticles.push_back(Eigen::Vector3f(elements[1], elements[2], elements[3]));
 			GlobalMass.push_back(1.0f);
 			GlobalDensity.push_back(elements[0] + 1000.0f);
 			break;
@@ -165,7 +165,7 @@ void loadParticles()
 			if (elements[0] < xmin) { xmin = elements[0]; }
 			if (elements[1] < ymin) { ymin = elements[1]; }
 			if (elements[2] < zmin) { zmin = elements[2]; }
-			GlobalParticles.push_back(vect3f(elements[0], elements[1], elements[2]));
+			GlobalParticles.push_back(Eigen::Vector3f(elements[0], elements[1], elements[2]));
 			GlobalMass.push_back(1.0f);
 			GlobalDensity.push_back(elements[3] + 1000.0f);
 			break;
@@ -186,53 +186,10 @@ void loadParticles()
 	BoundingBox[5] = zmax;
 }
 
-void writeFile(Mesh &m, string fn)
+void writeFile(Mesh &m, std::string fn)
 {
 	FILE *f = fopen(fn.c_str(), "w");
-
-#ifdef JOIN_VERTS
-	map<TopoEdge, int> vt;
-
-	int vert_num = 0;
-	for (int i = 0; i < m.tris.size(); i++)
-	{
-		for (int j = 0; j < 3; j++)
-		{
-			map<TopoEdge, int>::iterator it = vt.find(m.topoTris[i][j]);
-			if (it == vt.end())
-			{
-				vert_num++;
-
-				vt[m.topoTris[i][j]] = vert_num;
-				
-				vect3f pos = m.tris[i][j];
-				fprintf(f, "v %f %f %f\n", pos[0], pos[1], pos[2]);
-			}
-		}
-	}
-
-	set<vect<2, TopoEdge> > edges; // only for genus
-	for (int i = 0; i < m.tris.size(); i++)
-	{
-		fprintf(f, "f %d %d %d\n", vt[m.topoTris[i][0]], vt[m.topoTris[i][1]], vt[m.topoTris[i][2]]);
-		
-		for (int j = 0; j < 3; j++)
-		{
-			vect<2, TopoEdge> e;
-			e[0] = m.topoTris[i][j];
-			e[1] = m.topoTris[i][(j+1) % 3];
-			if (e[1] < e[0])
-				swap(e[0], e[1]);
-			edges.insert(e);
-		}
-	}
-
-	// check genus
-	int edge_num = edges.size();
-	int face_num = m.tris.size();
-	printf("verts = %d, edges = %d, faces = %d, genus = %d\n", vert_num, edge_num, face_num, vert_num - edge_num + face_num);
-#else
-	for (vect3f& p : m.vertices)
+	for (Eigen::Vector3f& p : m.vertices)
 	{
 		fprintf(f, "v %f %f %f\n", p[0], p[1], p[2]);
 	}
@@ -240,7 +197,6 @@ void writeFile(Mesh &m, string fn)
 	{
 		fprintf(f, "f %d %d %d\n", t.v[0], t.v[1], t.v[2]);
 	}
-#endif
 	fclose(f);
 }
 
@@ -259,28 +215,6 @@ void init()
 	temp_time = get_time();
 
 	printf("Load Particles Time = %f \n", temp_time - last_temp_time);
-	//double diameter = INFLUENCE;
-	// Rect Box
-	//for (size_t i = 0; i < 3; i++)
-	//{
-	//	int temp_depth_max = int(ceil(log2(ceil((BoundingBox[i * 2 + 1] - BoundingBox[i * 2]) / P_RADIUS))));
-	//	
-	//	double length = pow(2, temp_depth_max) * P_RADIUS;
-	//	while (length - (BoundingBox[i * 2 + 1] - BoundingBox[i * 2]) < 2 * INFLUENCE)
-	//	{
-	//		temp_depth_max++;
-	//		length = pow(2, temp_depth_max) * P_RADIUS;
-	//	}
-	//	if (DEPTH_MAX < temp_depth_max)
-	//	{
-	//		DEPTH_MAX = temp_depth_max;
-	//	}
-	//	length *= 0.99;
-	//	double center = (BoundingBox[i * 2] + BoundingBox[i * 2 + 1]) / 2;
-	//	BoundingBox[i * 2] = center - length / 2;
-	//	BoundingBox[i * 2 + 1] = center + length / 2;
-	//}
-	//DEPTH_MIN = DEPTH_MAX - 1;
 	// Cube Box
 	double maxLen, resizeLen;
 	maxLen = (std::max)({ 
@@ -294,7 +228,7 @@ void init()
 		DEPTH_MAX++;
 		resizeLen = pow(2, DEPTH_MAX) * P_RADIUS;
 	}
-	//resizeLen *= 0.99;
+	resizeLen *= 0.99;
 	RootHalfLength = resizeLen / 2;
 	for (size_t i = 0; i < 3; i++)
 	{
@@ -306,7 +240,7 @@ void init()
 	
 	//DEPTH_MIN = DEPTH_MAX - 2;
 	DEPTH_MIN = (DEPTH_MAX - int(DEPTH_MAX / 3));
-	
+
 	printf("-= Build Hash Grid =-\n");
 
 	hashgrid = new HashGrid(GlobalParticles, BoundingBox, INFLUENCE);
@@ -317,46 +251,52 @@ void init()
 
 	printf("-= Initialize Evaluator =-\n");
 
-	evaluator = new Evaluator(GlobalParticles, GlobalDensity, GlobalMass);
+	evaluator = new Evaluator(&GlobalParticles, &GlobalDensity, &GlobalMass);
 	last_temp_time = temp_time;
 	temp_time = get_time();
 
 	printf("Initialize Evaluator Time = %f \n", temp_time - last_temp_time);
 
 	int max_density_index = std::distance(GlobalDensity.begin(), std::max_element(GlobalDensity.begin(), GlobalDensity.end()));
-	evaluator->SingleEval(GlobalParticles[max_density_index], MAX_VALUE, *(vect3f*)NULL);
+	evaluator->SingleEval(GlobalParticles[max_density_index], MAX_VALUE, *(Eigen::Vector3f*)NULL);
 
 	ISO_VALUE = evaluator->RecommendIsoValue();
-#ifdef USE_DMT
-	initMCTable();
-#endif // USE_DMT
 
-	gen_iso_ours(); // pregenerate tree
-	gen_iso_ours();
-	gen_iso_ours();
+	gen_iso_ours(); // generate tree
+	gen_iso_ours();	// check tree
+	gen_iso_ours();	// generate mesh
 
 	writeFile(g.ourMesh, CASE_PATH + "//" + OUTPUT_PREFIX + std::to_string(INDEX) + ".obj");
 }
 
 int main(int argc, char **argv)
 {
+
+#ifdef _WIN32
+	SYSTEM_INFO sysinfo;
+	GetSystemInfo(&sysinfo);
+	std::cout << "SYSINFO Threads: " << sysinfo.dwNumberOfProcessors << std::endl;
+	OMP_THREADS_NUM = sysinfo.dwNumberOfProcessors;
+#else
+	OMP_THREADS_NUM = sysconf(_SC_NPROCESSORS_CONF);
+#endif
+	std::cout << "Threads: " << OMP_THREADS_NUM << std::endl;
+
 	if (argc > 1)
 	{
-		CASE_PATH = string(argv[1]);
+		CASE_PATH = std::string(argv[1]);
 	}
 
 	loadConfig();
 
-	omp_set_dynamic(USE_DYNAMIC_THREADS);
-	omp_set_num_threads(THREAD_NUMS);
-
-	cout << "Threads: " << omp_get_num_threads() << endl;
+	omp_set_dynamic(OMP_USE_DYNAMIC_THREADS);
+	omp_set_num_threads(OMP_THREADS_NUM);
 
 	double frameStart = 0;
 
-	for (string p: CSV_PATHES)
+	for (std::string p: CSV_PATHES)
 	{
-		cout << "-=   Frame " << INDEX << "   =-" << endl;
+		std::cout << "-=   Frame " << INDEX << "   =-" << std::endl;
 		CSV_PATH = CASE_PATH + "//" + p;
 		frameStart = get_time();
 		::init();

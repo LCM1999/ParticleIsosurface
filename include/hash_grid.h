@@ -3,8 +3,8 @@
 #include <iostream>
 #include <vector>
 #include <map>
+#include <Eigen/Dense>
 #include "iso_common.h"
-#include "vect.h"
 
 class HashGrid
 {
@@ -12,9 +12,9 @@ public:
 	HashGrid();
 	~HashGrid();
 
-	HashGrid(std::vector<vect3f>& particles, double* bounding, double cellsize);
+	HashGrid(std::vector<Eigen::Vector3f>& particles, double* bounding, double cellsize);
 
-	std::vector<vect3f>* Particles;
+	std::vector<Eigen::Vector3f>* Particles;
 	double CellSize;
 	double Bounding[6];
 	unsigned int XYZCellNum[3];
@@ -23,9 +23,9 @@ public:
 	std::vector<int> IndexList;
 	std::map<__int64, int> StartList;
 	std::map<__int64, int> EndList;
-	void GetPIdxList(const vect3f& pos, std::vector<int>& pIdxList);
-	void CalcXYZIdx(const vect3f& pos, vect3i& xyzIdx);
-	__int64 CalcCellHash(const vect3i& xyzIdx);
+	void GetPIdxList(const Eigen::Vector3f& pos, std::vector<int>& pIdxList);
+	void CalcXYZIdx(const Eigen::Vector3f& pos, Eigen::Vector3i& xyzIdx);
+	__int64 CalcCellHash(const Eigen::Vector3i& xyzIdx);
 	// void FindParticlesNeighbor(const int& pIdx, std::vector<int>& pIdxList);
 private:
 	void BuildTable();
@@ -34,7 +34,7 @@ private:
 	// void GetNeighborHashs(vect3d* pos, int* neighborHashs);
 };
 
-inline HashGrid::HashGrid(std::vector<vect3f>& particles, double* bounding, double cellsize)
+inline HashGrid::HashGrid(std::vector<Eigen::Vector3f>& particles, double* bounding, double cellsize)
 {
 	Particles = &particles;
 	CellSize = cellsize;
@@ -57,8 +57,6 @@ inline HashGrid::HashGrid(std::vector<vect3f>& particles, double* bounding, doub
 
 	HashList.resize(GlobalParticlesNum, 0);
 	IndexList.resize(GlobalParticlesNum, 0);
-	// StartList.resize(CellNum, 0);
-	// EndList.resize(CellNum, 0);
 
 	BuildTable();
 	HashList.clear();
@@ -82,7 +80,7 @@ inline void HashGrid::BuildTable()
 
 inline void HashGrid::CalcHashList()
 {
-	vect3i xyzIdx;
+	Eigen::Vector3i xyzIdx;
 	for (size_t index = 0; index < GlobalParticlesNum; index++)
 	{
 		CalcXYZIdx((Particles->at(index)), xyzIdx);
@@ -112,27 +110,27 @@ inline void HashGrid::FindStartEnd()
 	}
 }
 
-inline void HashGrid::CalcXYZIdx(const vect3f& pos, vect3i& xyzIdx)
+inline void HashGrid::CalcXYZIdx(const Eigen::Vector3f& pos, Eigen::Vector3i& xyzIdx)
 {
-	xyzIdx.zero();
+	xyzIdx.setZero();
 	for (int i = 0; i < 3; i++)
-		xyzIdx[i] = int((pos.v[i] - Bounding[i * 2]) / CellSize);
+		xyzIdx[i] = int((pos[i] - Bounding[i * 2]) / CellSize);
 }
 
-inline __int64 HashGrid::CalcCellHash(const vect3i& xyzIdx)
+inline __int64 HashGrid::CalcCellHash(const Eigen::Vector3i& xyzIdx)
 {
-	if (xyzIdx.v[0] < 0 || xyzIdx.v[0] >= XYZCellNum[0] ||
-		xyzIdx.v[1] < 0 || xyzIdx.v[1] >= XYZCellNum[1] ||
-		xyzIdx.v[2] < 0 || xyzIdx.v[2] >= XYZCellNum[2])
+	if (xyzIdx[0] < 0 || xyzIdx[0] >= XYZCellNum[0] ||
+		xyzIdx[1] < 0 || xyzIdx[1] >= XYZCellNum[1] ||
+		xyzIdx[2] < 0 || xyzIdx[2] >= XYZCellNum[2])
 		return -1;
-	return (__int64)xyzIdx.v[2] * (__int64)XYZCellNum[0] * (__int64)XYZCellNum[1] + 
-		(__int64)xyzIdx.v[1] * (__int64)XYZCellNum[0] + (__int64)xyzIdx.v[0];
+	return (__int64)xyzIdx[2] * (__int64)XYZCellNum[0] * (__int64)XYZCellNum[1] + 
+		(__int64)xyzIdx[1] * (__int64)XYZCellNum[0] + (__int64)xyzIdx[0];
 }
 
-inline void HashGrid::GetPIdxList(const vect3f& pos, std::vector<int>& pIdxList)
+inline void HashGrid::GetPIdxList(const Eigen::Vector3f& pos, std::vector<int>& pIdxList)
 {
 	pIdxList.clear();
-	vect3i xyzIdx;
+	Eigen::Vector3i xyzIdx;
 	__int64 neighbor_hash;
 	int countIndex, startIndex, endIndex;
 	CalcXYZIdx(pos, xyzIdx);
@@ -142,7 +140,7 @@ inline void HashGrid::GetPIdxList(const vect3f& pos, std::vector<int>& pIdxList)
 		{
 			for (int x = -1; x <= 1; x++)
 			{
-				neighbor_hash = CalcCellHash((xyzIdx + vect3i(x, y, z)));
+				neighbor_hash = CalcCellHash((xyzIdx + Eigen::Vector3i(x, y, z)));
 				if (neighbor_hash < 0)
 					continue;
 				if ((StartList.find(neighbor_hash) != StartList.end()) && (EndList.find(neighbor_hash) != EndList.end()))
