@@ -9,7 +9,6 @@
 #include <Eigen/Dense>
 
 
-class SurfReconstructor;
 struct TNode;
 
 struct vect3i

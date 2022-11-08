@@ -124,10 +124,9 @@ void testWithCSV(std::string& csvDirPath)
 	std::vector<Eigen::Vector3f> particles;
     std::vector<float> density;
     std::vector<float> mass;
-	Mesh mesh;
     for (std::string frame: CSV_PATHES)
 	{
-		mesh.reset();
+		Mesh mesh;
 		std::cout << "-=   Frame " << index << " " << frame << "   =-" << std::endl;
 		std::string csvPath = csvDirPath + "\\" + frame;
 		frameStart = get_time();
@@ -136,8 +135,8 @@ void testWithCSV(std::string& csvDirPath)
 
 		SurfReconstructor constructor(particles, density, mass, mesh, P_RADIUS);
 		constructor.Run();
-		index++;
 		writeFile(mesh, csvDirPath + "\\" + OUTPUT_PREFIX + std::to_string(index) + ".obj");
+		index++;
 	}
 }
 

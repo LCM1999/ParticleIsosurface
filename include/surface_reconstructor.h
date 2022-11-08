@@ -30,7 +30,7 @@ private:
 
     float _MAX_SCALAR = -1.0f;
     float _MIN_SCALAR = 0.0f;
-    float _BAD_QEF = 0.001f;
+    float _BAD_QEF = 0.0001f;
     float _FLATNESS = 0.99f;
     int _MIN_NEIGHBORS_NUM = 5;
 
@@ -39,7 +39,7 @@ private:
     float _XMEAN_DELTA = 0.3;
 
     float _TOLERANCE = 1e-8;
-    float _RATIO_TOLERANCE = 0.15f;
+    float _RATIO_TOLERANCE = 0.1f;
     //float _LOW_MESH_QUALITY = 0.17320508075688772935274463415059;
     float _MESH_TOLERANCE = 1e4;
 
@@ -62,7 +62,6 @@ private:
 protected:
     void loadRootBox();
 
-    void csvModeRun();
     void generalModeRun();
 
     void resizeRootBox();

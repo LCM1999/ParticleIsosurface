@@ -59,12 +59,12 @@ void SurfReconstructor::resizeRootBox()
 	for (size_t i = 0; i < 3; i++)
 	{
 		double center = (_BoundingBox[i * 2] + _BoundingBox[i * 2 + 1]) / 2;
-		_BoundingBox[i * 2] = center - resizeLen / 2;
-		_BoundingBox[i * 2 + 1] = center + resizeLen / 2;
+		_BoundingBox[i * 2] = center - _RootHalfLength;
+		_BoundingBox[i * 2 + 1] = center + _RootHalfLength;
 		_RootCenter[i] = center;
 	}
 	
-	//DEPTH_MIN = DEPTH_MAX - 2;
+	//_DEPTH_MIN = _DEPTH_MAX - 2;
 	_DEPTH_MIN = (_DEPTH_MAX - int(_DEPTH_MAX / 3));
 }
 /*
@@ -452,7 +452,6 @@ void SurfReconstructor::genIsoOurs()
 		//}
 		double t_alldone = get_time();
 		printf("Time generating polygons = %f\n", t_alldone - t_gen_mesh);
-		printf("Time total = %f\n", t_alldone - t_start);
 		return;
 	}
 
