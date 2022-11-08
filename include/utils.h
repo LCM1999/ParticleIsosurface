@@ -2,7 +2,6 @@
 #include <vector>
 #include <string.h>
 #include <Eigen/Dense>
-#include "iso_common.h"
 
 
 template <class T>

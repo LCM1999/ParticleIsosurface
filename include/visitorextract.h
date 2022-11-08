@@ -4,9 +4,12 @@
 #include <algorithm>
 #include <Eigen/Dense>
 #include "iso_common.h"
-#include "iso_method_ours.h"
-#include "global.h"
 #include "index.h"
+
+class SurfReconstructor;
+class TNode;
+class Mesh;
+class Graph;
 
 struct TraversalData
 {
@@ -21,9 +24,10 @@ struct TraversalData
 
 struct VisitorExtract
 {
-	VisitorExtract(Mesh* m_);
-	VisitorExtract(const char cdepth, Graph* g_);
-	VisitorExtract(Mesh* m_, std::vector<TNode*>* part_);
+	VisitorExtract(SurfReconstructor* surf_constructor, Mesh* m_);
+	VisitorExtract(SurfReconstructor* surf_constructor, const char cdepth, Graph* g_);
+	VisitorExtract(SurfReconstructor* surf_constructor, Mesh* m_, std::vector<TNode*>* part_);
+	SurfReconstructor* constructor;
 	Mesh* m;
 	Graph* g;
 	char constrained_depth = 0;

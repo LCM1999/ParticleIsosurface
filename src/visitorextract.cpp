@@ -1,8 +1,11 @@
 #include <array>
 #include "visitorextract.h"
 #include "iso_method_ours.h"
+#include "surface_reconstructor.h"
 #include "tet_arrays.h"
-
+#include "iso_method_ours.h"
+#include "evaluator.h"
+#include "global.h"
 
 template <class T, class U>
 auto lerp(T x1, T x2, U ratio)
@@ -35,19 +38,22 @@ void TraversalData::gen_trav(TraversalData &c, Index i)
 	}
 }
 
-VisitorExtract::VisitorExtract(Mesh* m_)
+VisitorExtract::VisitorExtract(SurfReconstructor* surf_constructor, Mesh* m_)
 {
+	constructor = surf_constructor;
 	m = m_;
 }
 
-VisitorExtract::VisitorExtract(char cdepth, Graph* g_)
+VisitorExtract::VisitorExtract(SurfReconstructor* surf_constructor, char cdepth, Graph* g_)
 {
+	constructor = surf_constructor;
 	constrained_depth = cdepth;
 	g = g_;
 }
 
-VisitorExtract::VisitorExtract(Mesh* m_, std::vector<TNode*>* part_)
+VisitorExtract::VisitorExtract(SurfReconstructor* surf_constructor, Mesh* m_, std::vector<TNode*>* part_)
 {
+	constructor = surf_constructor;
 	m = m_;
 	part = part_;
 }
@@ -359,12 +365,13 @@ bool VisitorExtract::on_vert(TraversalData& a, TraversalData& b, TraversalData& 
 			{
 				Eigen::Vector4f tmpv1 = v1.node, tmpv2 = v2.node, tmpv = Eigen::Vector4f::Zero();
 				Eigen::Vector3f tmpg = Eigen::Vector3f::Zero();
-				while ((tmpv1 - tmpv2).head(3).norm() > (P_RADIUS / 2))
+
+				while ((tmpv1 - tmpv2).head(3).norm() > (constructor->getPRadius() / 2))
 				{
 					tmpv[0] =  (tmpv1[0] + tmpv2[0]) / 2;
 					tmpv[1] =  (tmpv1[1] + tmpv2[1]) / 2;
 					tmpv[2] =  (tmpv1[2] + tmpv2[2]) / 2;
-					evaluator->SingleEval(tmpv.head(3), tmpv[3], tmpg);
+					constructor->getEvaluator()->SingleEval(tmpv.head(3), tmpv[3], tmpg);
 					if ((tmpv[3] > 0 ? 1 : -1) == (tmpv1[3] > 0 ? 1 : -1))
 					{
 						tmpv1 = tmpv;
@@ -377,9 +384,9 @@ bool VisitorExtract::on_vert(TraversalData& a, TraversalData& b, TraversalData& 
 					}
 				}
 				auto ratio = invlerp(tmpv1[3], tmpv2[3], 0.0f);
-				if (ratio < RATIO_TOLERANCE)
+				if (ratio < constructor->getRatioTolerance())
 					points[e_index] = tmpv1.head(3);
-				else if (ratio > (1 - RATIO_TOLERANCE))
+				else if (ratio > (1 - constructor->getRatioTolerance()))
 					points[e_index] = tmpv2.head(3);
 				else
 					points[e_index] = lerp((Eigen::Vector3f&)tmpv1, (Eigen::Vector3f&)tmpv2, ratio);
