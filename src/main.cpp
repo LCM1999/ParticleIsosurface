@@ -155,9 +155,12 @@ int main(int argc, char **argv)
 	omp_set_dynamic(OMP_USE_DYNAMIC_THREADS);
 	omp_set_num_threads(OMP_THREADS_NUM);
 
+	std::cout << std::to_string(argc) << std::endl;
+
 	if (argc == 2)
 	{
 		std::string csvDirPath = std::string(argv[1]);
+		std::cout << csvDirPath << std::endl;
 		testWithCSV(csvDirPath);
 	} 
 	else 

@@ -299,7 +299,7 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 		}
 		else
 		{
-#pragma omp parallel for
+//#pragma omp parallel for
 			for (int t = 0; t < 8; t++)
 			{
 				Index i = t;
@@ -312,6 +312,7 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 				{
 					grad[j] = g[i.x + j.x][i.y + j.y][i.z + j.z];
 				}
+				#pragma omp task
 				eval(tnode->children[i], grad, 0);
 			}
 		}
@@ -416,6 +417,7 @@ void SurfReconstructor::genIsoOurs()
 	else if (_STATE == 2)
 	{
 		/*----------Make Graph----------*/
+		/*
 		char cdepth = 0;
 		std::vector<TNode*> layer_nodes;
 		get_division_depth(_OurRoot, cdepth, layer_nodes);
@@ -435,8 +437,6 @@ void SurfReconstructor::genIsoOurs()
 		int ret = METIS_PartGraphRecursive(&layerGraph.vNum, &layerGraph.ncon, xadj, adjncy, layerGraph.vwgt.data(),
 			NULL, layerGraph.ewgt.data(), &nParts, NULL, NULL, NULL, &obj_val, part.data());
 		
-		printf("-= Generate Surface =-\n");
-		double t_gen_mesh = get_time();
 		if (ret == rstatus_et::METIS_OK)
 		{
 			printf("-= METIS DIVISION SUCCESS =-\n");
@@ -445,6 +445,9 @@ void SurfReconstructor::genIsoOurs()
 //		else
 //		{
 			printf("-= METIS ERROR, USE DEFAULT SINGLE THREAD =-\n");
+		*/
+		printf("-= Generate Surface =-\n");
+		double t_gen_mesh = get_time();
 			m->tris.reserve(1000000);
 			VisitorExtract v(this, m);
 			TraversalData td(_OurRoot);
@@ -454,8 +457,14 @@ void SurfReconstructor::genIsoOurs()
 		printf("Time generating polygons = %f\n", t_alldone - t_gen_mesh);
 		return;
 	}
-
-	eval(root, grad, guide);
+#pragma omp parallel
+{
+	#pragma omp single
+	{
+		#pragma omp task
+		eval(root, grad, guide);
+	}
+}
 
 	double t_finish = get_time();
 	printf("Time generating tree = %f\n", t_finish - t_start);

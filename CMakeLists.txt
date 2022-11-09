@@ -41,6 +41,8 @@ endif()
 ################################################################################
 # Target
 ################################################################################
+add_compile_options("-openmp:llvm")
+
 add_executable(${PROJECT_NAME}
     src/cube_arrays.cpp
     src/iso_method_ours.cpp
