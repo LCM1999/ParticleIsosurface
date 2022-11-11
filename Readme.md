@@ -1,4 +1,6 @@
-If you build this project with cmake, you need to modify the MEDIS path in CMakeList.
+Set cmake variables for HDF5 and eigen:
+-DHDF5_ROOT:PATH=/binaries/hdf5/share/cmake/hdf5
+-DEIGEN3_DIR:PATH=/usr/include/eigen3
 
 If you wanna run this program, you need to do the following:  
     $\qquad$ 1. Save shonDy's result as csv files sequence in a dir and only retain only "number density", you can do this with paraview easily.  

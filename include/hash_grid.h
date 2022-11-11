@@ -18,14 +18,14 @@ public:
 	double CellSize;
 	double Bounding[6];
 	unsigned int XYZCellNum[3];
-	unsigned __int64 CellNum;
-	std::vector<__int64> HashList;
+	unsigned long long CellNum;
+	std::vector<long long> HashList;
 	std::vector<int> IndexList;
-	std::map<__int64, int> StartList;
-	std::map<__int64, int> EndList;
+	std::map<long long, int> StartList;
+	std::map<long long, int> EndList;
 	void GetPIdxList(const Eigen::Vector3f& pos, std::vector<int>& pIdxList);
 	void CalcXYZIdx(const Eigen::Vector3f& pos, Eigen::Vector3i& xyzIdx);
-	__int64 CalcCellHash(const Eigen::Vector3i& xyzIdx);
+	long long CalcCellHash(const Eigen::Vector3i& xyzIdx);
 	// void FindParticlesNeighbor(const int& pIdx, std::vector<int>& pIdxList);
 private:
 	void BuildTable();
@@ -53,7 +53,7 @@ inline HashGrid::HashGrid(std::vector<Eigen::Vector3f>& particles, double* bound
 	XYZCellNum[0] = int(ceil((Bounding[1] - Bounding[0]) / CellSize));
 	XYZCellNum[1] = int(ceil((Bounding[3] - Bounding[2]) / CellSize));
 	XYZCellNum[2] = int(ceil((Bounding[5] - Bounding[4]) / CellSize));
-	CellNum = (__int64)XYZCellNum[0] * (__int64)XYZCellNum[1] * (__int64)XYZCellNum[2];
+	CellNum = (long long)XYZCellNum[0] * (long long)XYZCellNum[1] * (long long)XYZCellNum[2];
 
 	HashList.resize(GlobalParticlesNum, 0);
 	IndexList.resize(GlobalParticlesNum, 0);
@@ -70,7 +70,7 @@ inline void HashGrid::BuildTable()
 			return (HashList[a] < HashList[b]);
 		}
 	);
-	std::vector<__int64> temp(HashList);
+	std::vector<long long> temp(HashList);
 	for (int i = 0; i < GlobalParticlesNum; i++)
 	{
 		HashList[i] = temp[IndexList[i]];
@@ -117,21 +117,21 @@ inline void HashGrid::CalcXYZIdx(const Eigen::Vector3f& pos, Eigen::Vector3i& xy
 		xyzIdx[i] = int((pos[i] - Bounding[i * 2]) / CellSize);
 }
 
-inline __int64 HashGrid::CalcCellHash(const Eigen::Vector3i& xyzIdx)
+inline long long HashGrid::CalcCellHash(const Eigen::Vector3i& xyzIdx)
 {
 	if (xyzIdx[0] < 0 || xyzIdx[0] >= XYZCellNum[0] ||
 		xyzIdx[1] < 0 || xyzIdx[1] >= XYZCellNum[1] ||
 		xyzIdx[2] < 0 || xyzIdx[2] >= XYZCellNum[2])
 		return -1;
-	return (__int64)xyzIdx[2] * (__int64)XYZCellNum[0] * (__int64)XYZCellNum[1] + 
-		(__int64)xyzIdx[1] * (__int64)XYZCellNum[0] + (__int64)xyzIdx[0];
+	return (long long)xyzIdx[2] * (long long)XYZCellNum[0] * (long long)XYZCellNum[1] +
+		(long long)xyzIdx[1] * (long long)XYZCellNum[0] + (long long)xyzIdx[0];
 }
 
 inline void HashGrid::GetPIdxList(const Eigen::Vector3f& pos, std::vector<int>& pIdxList)
 {
 	pIdxList.clear();
 	Eigen::Vector3i xyzIdx;
-	__int64 neighbor_hash;
+    long long neighbor_hash;
 	int countIndex, startIndex, endIndex;
 	CalcXYZIdx(pos, xyzIdx);
 	for (int z = -1; z <= 1; z++)

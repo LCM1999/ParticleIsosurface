@@ -178,7 +178,7 @@ void eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 			hashgrid->CalcXYZIdx((tnode->center + Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length)), max_xyz_idx);
 			min_xyz_idx -= Eigen::Vector3i(1, 1, 1);
 			max_xyz_idx += Eigen::Vector3i(1, 1, 1);
-			__int64 temp_hash;
+			long long temp_hash;
 			for (int x = min_xyz_idx[0]; x <= max_xyz_idx[0] && empty; x++)
 			{
 				for (int y = min_xyz_idx[1]; y <= max_xyz_idx[1] && empty; y++)

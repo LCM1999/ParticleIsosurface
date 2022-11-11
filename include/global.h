@@ -183,7 +183,7 @@ struct Graph
 	int vNum;
 	int eNum;
 	int ncon;
-	std::map<unsigned __int64, int> vidx_map;
+	std::map<unsigned long long, int> vidx_map;
 	std::vector<std::vector<int>> gAdj;
 	std::vector<int> vwgt;
 	std::vector<int> ewgt;
@@ -205,7 +205,7 @@ struct Graph
 		gAdj.resize(vNum);
 	}
 
-	void appendEdge(const unsigned __int64 nId1, const unsigned __int64 nId2)
+	void appendEdge(const unsigned long long nId1, const unsigned long long nId2)
 	{
 		gAdj[vidx_map[nId1]].push_back(vidx_map[nId2]);
 		eNum++;
