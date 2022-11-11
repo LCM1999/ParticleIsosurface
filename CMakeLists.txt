@@ -1,15 +1,11 @@
 cmake_minimum_required(VERSION 3.16.0 FATAL_ERROR)
 
-project(Isosurface_smiplify CXX)
+project(Isosurface_smiplify CXX C)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(METIS_INCLUDE_DIR "F:/RepoCpp/Isosurface_smiplify_cmake/include")
-set(METIS_LIB "F:/RepoCpp/Isosurface_smiplify_cmake/lib/metis.lib")
-#set(HDF5_ROOT "C:/Program Files/HDF_Group/HDF5/1.10.7/")
-#set(AEC_LIB "C:/Program Files/HDF_Group/HDF5/1.10.7/lib/libaec.lib")
-#set(SZIP_LIB "C:/Program Files/HDF_Group/HDF5/1.10.7/lib/libsz.lib")
-#set(ZLIB_LIB "C:/Program Files/HDF_Group/HDF5/1.10.7/lib/libzlib.lib")
-#set(HDF5_INCLUDE_DIR "C:/Program Files/HDF_Group/HDF5/1.10.7/include")
-#set(HDF5_LIB "C:/Program Files/HDF_Group/HDF5/1.10.7/hdf5.lib")
+#set(METIS_INCLUDE_DIR "F:/RepoCpp/Isosurface_smiplify_cmake/include")
+#set(METIS_LIB "F:/RepoCpp/Isosurface_smiplify_cmake/lib/metis.lib")
 
 set(PROJECT_NAME Isosurface_smiplify)
 #SET(HDF5_USE_STATIC_LIBRARIES ON)
@@ -17,6 +13,9 @@ set(PROJECT_NAME Isosurface_smiplify)
 ################################################################################
 # Find packages
 ################################################################################
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
+
+
 find_package(OpenMP REQUIRED)
 if(NOT OpenMP_FOUND)
     message(FATAL_ERROR "OpenMP not found!")
@@ -27,7 +26,8 @@ endif()
 #    message(FATAL_ERROR "MPI not found!")
 #endif()#
 
-#find_package(HDF5 REQUIRED COMPONENTS CXX)
+#set(HDF5_PREFER_PARALLEL "ON")
+#find_package(HDF5 REQUIRED COMPONENTS C HL)
 #if(NOT HDF5_FOUND)
 #    message(FATAL_ERROR "HDF5 not found!")
 #endif()
@@ -35,6 +35,11 @@ endif()
 find_package(EIGEN3 REQUIRED)
 if(NOT EIGEN3_FOUND)
     message(FATAL_ERROR "Eigen3 not found!")
+endif()
+
+find_package(Metis REQUIRED)
+if(NOT Metis_FOUND)
+    message(FATAL_ERROR "metis not found!")
 endif()
 
 
@@ -67,13 +72,8 @@ target_include_directories(${PROJECT_NAME}
 )
 target_link_libraries(${PROJECT_NAME} 
     PUBLIC
-    ${METIS_LIB}
-    #${AEC_LIB}
-    #${SZIP_LIB}
-    #${ZLIB_LIB}
-    #${MPI_LIBRARIES}
-    #${HDF5_CXX_LIBRARIES}
-    ${HDF5_LIBRARIES}
+    Metis::metis
+    #${HDF5_LIBRARIES}
     Eigen3::Eigen
     OpenMP::OpenMP_CXX
 )
