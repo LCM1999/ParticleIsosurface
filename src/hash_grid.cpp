@@ -22,7 +22,7 @@ HashGrid::HashGrid(SurfReconstructor* surf_constructor, std::vector<Eigen::Vecto
 	XYZCellNum[0] = int(ceil((Bounding[1] - Bounding[0]) / CellSize));
 	XYZCellNum[1] = int(ceil((Bounding[3] - Bounding[2]) / CellSize));
 	XYZCellNum[2] = int(ceil((Bounding[5] - Bounding[4]) / CellSize));
-	CellNum = (__int64)XYZCellNum[0] * (__int64)XYZCellNum[1] * (__int64)XYZCellNum[2];
+	CellNum = (long long)XYZCellNum[0] * (long long)XYZCellNum[1] * (long long)XYZCellNum[2];
 
 	HashList.resize(constructor->getGlobalParticlesNum(), 0);
 	IndexList.resize(constructor->getGlobalParticlesNum(), 0);
@@ -39,7 +39,7 @@ inline void HashGrid::BuildTable()
 			return (HashList[a] < HashList[b]);
 		}
 	);
-	std::vector<__int64> temp(HashList);
+	std::vector<long long> temp(HashList);
 	for (int i = 0; i < constructor->getGlobalParticlesNum(); i++)
 	{
 		HashList[i] = temp[IndexList[i]];
@@ -86,21 +86,21 @@ void HashGrid::CalcXYZIdx(const Eigen::Vector3f& pos, Eigen::Vector3i& xyzIdx)
 		xyzIdx[i] = int((pos[i] - Bounding[i * 2]) / CellSize);
 }
 
-__int64 HashGrid::CalcCellHash(const Eigen::Vector3i& xyzIdx)
+long long HashGrid::CalcCellHash(const Eigen::Vector3i& xyzIdx)
 {
 	if (xyzIdx[0] < 0 || xyzIdx[0] >= XYZCellNum[0] ||
 		xyzIdx[1] < 0 || xyzIdx[1] >= XYZCellNum[1] ||
 		xyzIdx[2] < 0 || xyzIdx[2] >= XYZCellNum[2])
 		return -1;
-	return (__int64)xyzIdx[2] * (__int64)XYZCellNum[0] * (__int64)XYZCellNum[1] + 
-		(__int64)xyzIdx[1] * (__int64)XYZCellNum[0] + (__int64)xyzIdx[0];
+	return (long long)xyzIdx[2] * (long long)XYZCellNum[0] * (long long)XYZCellNum[1] + 
+		(long long)xyzIdx[1] * (long long)XYZCellNum[0] + (long long)xyzIdx[0];
 }
 
 void HashGrid::GetPIdxList(const Eigen::Vector3f& pos, std::vector<int>& pIdxList)
 {
 	pIdxList.clear();
 	Eigen::Vector3i xyzIdx;
-	__int64 neighbor_hash;
+	long long neighbor_hash;
 	int countIndex, startIndex, endIndex;
 	CalcXYZIdx(pos, xyzIdx);
 	for (int z = -1; z <= 1; z++)

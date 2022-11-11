@@ -5,7 +5,6 @@
 #include <fstream>
 #include <vector>
 #include <string.h>
-#include <metis.h>
 #include "timer.h"
 #include "utils.h"
 
@@ -98,16 +97,9 @@ public:
     inline float getTolerance() {return _TOLERANCE;}
     inline float getRatioTolerance() {return _RATIO_TOLERANCE;}
     inline float getMeshTolerance() {return _MESH_TOLERANCE;}
-    //inline int getCsvType() {return _CSV_TYPE;}
-    //inline std::string getOutputPrefix() {return _OUTPUT_PREFIX;}
-    //inline std::string getRecordPrefix() {return _RECORD_PREFIX;}
-    //inline bool getLoadRecord() {return _LOAD_RECORD;}
-    //inline bool getNeedRecord() {return _NEED_RECORD;}
-    //inline int getRecordStep() {return _RECORD_STEP;}
     inline HashGrid* getHashGrid() {return _hashgrid;}
     inline Evaluator* getEvaluator() {return _evaluator;}
     inline int getGlobalParticlesNum() {return _GlobalParticlesNum;}
-    //inline int getINDEX() {return _INDEX;}
     inline int getSTATE() {return _STATE;}
 };
 

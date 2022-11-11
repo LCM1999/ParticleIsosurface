@@ -4,9 +4,6 @@ project(Isosurface_smiplify CXX C)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-#set(METIS_INCLUDE_DIR "F:/RepoCpp/Isosurface_smiplify_cmake/include")
-#set(METIS_LIB "F:/RepoCpp/Isosurface_smiplify_cmake/lib/metis.lib")
-
 set(PROJECT_NAME Isosurface_smiplify)
 #SET(HDF5_USE_STATIC_LIBRARIES ON)
 
@@ -37,10 +34,10 @@ if(NOT EIGEN3_FOUND)
     message(FATAL_ERROR "Eigen3 not found!")
 endif()
 
-find_package(Metis REQUIRED)
-if(NOT Metis_FOUND)
-    message(FATAL_ERROR "metis not found!")
-endif()
+#find_package(Metis REQUIRED)
+#if(NOT Metis_FOUND)
+#    message(FATAL_ERROR "metis not found!")
+#endif()
 
 
 ################################################################################
@@ -65,14 +62,15 @@ add_executable(${PROJECT_NAME}
 target_include_directories(${PROJECT_NAME} 
     PUBLIC
     include
-    ${METIS_INCLUDE_DIR}
+    #${METIS_INCLUDE_DIR}
     #${MPI_CXX_INCLUDE_DIRS}
     #${HDF5_INCLUDE_DIR}
     ${EIGEN3_INCLUDE_DIR}
 )
+
 target_link_libraries(${PROJECT_NAME} 
     PUBLIC
-    Metis::metis
+    #Metis::metis
     #${HDF5_LIBRARIES}
     Eigen3::Eigen
     OpenMP::OpenMP_CXX
