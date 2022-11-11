@@ -7,8 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 #set(METIS_INCLUDE_DIR "F:/RepoCpp/Isosurface_smiplify_cmake/include")
 #set(METIS_LIB "F:/RepoCpp/Isosurface_smiplify_cmake/lib/metis.lib")
 
-
 set(PROJECT_NAME Isosurface_smiplify)
+#SET(HDF5_USE_STATIC_LIBRARIES ON)
 
 ################################################################################
 # Find packages
@@ -21,11 +21,16 @@ if(NOT OpenMP_FOUND)
     message(FATAL_ERROR "OpenMP not found!")
 endif()
 
-set(HDF5_PREFER_PARALLEL "ON")
-find_package(HDF5 REQUIRED COMPONENTS C HL)
-if(NOT HDF5_FOUND)
-    message(FATAL_ERROR "HDF5 not found!")
-endif()
+#find_package(MPI REQUIRED)
+#if(NOT MPI_FOUND)
+#    message(FATAL_ERROR "MPI not found!")
+#endif()#
+
+#set(HDF5_PREFER_PARALLEL "ON")
+#find_package(HDF5 REQUIRED COMPONENTS C HL)
+#if(NOT HDF5_FOUND)
+#    message(FATAL_ERROR "HDF5 not found!")
+#endif()
 
 find_package(EIGEN3 REQUIRED)
 if(NOT EIGEN3_FOUND)
@@ -41,28 +46,34 @@ endif()
 ################################################################################
 # Target
 ################################################################################
+add_compile_options("-openmp:llvm")
+
 add_executable(${PROJECT_NAME}
     src/cube_arrays.cpp
-    src/global.cpp
     src/iso_method_ours.cpp
     src/main.cpp
     src/tet_arrays.cpp
     src/timer.cpp
     src/utils.cpp
     src/visitorextract.cpp
+    src/evaluator.cpp
+    src/hash_grid.cpp
+    src/surface_reconstructor.cpp
+    src/global.cpp
 )
 
 target_include_directories(${PROJECT_NAME} 
     PUBLIC
     include
     ${METIS_INCLUDE_DIR}
-    ${HDF5_INCLUDE_DIRS}
+    #${MPI_CXX_INCLUDE_DIRS}
+    #${HDF5_INCLUDE_DIR}
     ${EIGEN3_INCLUDE_DIR}
 )
 target_link_libraries(${PROJECT_NAME} 
     PUBLIC
     Metis::metis
-    ${HDF5_LIBRARIES}
+    #${HDF5_LIBRARIES}
     Eigen3::Eigen
     OpenMP::OpenMP_CXX
 )
