@@ -8,6 +8,7 @@
 #include "utils.h"
 #include "evaluator.h"
 #include "index.h"
+#include <math.h>
 
 typedef Eigen::Vector<float, 5> Vector5f;
 typedef Eigen::Vector<double, 5> Vector5d;
@@ -64,7 +65,7 @@ struct TNode
 	Eigen::Vector4f node = Eigen::Vector4f::Zero();
 
 	short depth = 0;
-	unsigned __int64 nId;
+	unsigned long long nId;
 	short type;
 
 	TNode *children[8];
@@ -102,23 +103,6 @@ struct TNode
 		return type == LEAF || type == EMPTY;
 	}
 
-	template <class T, class U>
-	static double calcError(T& p, U& plane_norms, U& plane_pts)
-	{
-		assert(plane_norms.size() > 0);
-		double err = 0;
-		int plane_num = plane_norms.size();
-		for (int i = 0; i < plane_norms.size(); i++)
-		{
-			if (((Eigen::Vector3f&)plane_norms[i]).isNan())
-			{
-				plane_num--;
-				continue;
-			}
-			err += squared(p[3] - (plane_norms[i] * (p - plane_pts[i]))) / (1 + plane_norms[i].squaredNorm());
-		}
-		return err;
-	}
 
 	template <class T>
 	static auto squared(const T& t)

@@ -45,7 +45,7 @@ extern int RECORD_STEP;
 extern std::string OUTPUT_PREFIX;
 extern std::string RECORD_PREFIX;
 
-extern int GlobalParticlesNum;
+static int GlobalParticlesNum =0;
 extern double BoundingBox[6];
 extern double RootHalfLength;
 

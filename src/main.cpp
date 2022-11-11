@@ -65,7 +65,7 @@ static std::vector<Eigen::Vector3f> GlobalParticles;
 static std::vector<float> GlobalDensity;
 static std::vector<float> GlobalMass;
 
-static int GlobalParticlesNum = 0;
+//static int GlobalParticlesNum = 0;
 
 double BoundingBox[6] = {0.0f};
 double RootHalfLength;
