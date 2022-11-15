@@ -9,7 +9,7 @@
 #include "evaluator.h"
 
 int tree_cells = 0;
-const std::string SAVE_RECORD_NAME = ".\\record_II.txt";
+const std::string SAVE_RECORD_NAME = "./record_II.txt";
 
 TNode::TNode(SurfReconstructor* surf_constructor, int id)
 {

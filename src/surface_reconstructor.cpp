@@ -126,7 +126,7 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 //		{
 //#pragma omp critical
 //			{
-//				recordProgress(_OurRoot, (_OutputPath + "\\" + _RECORD_PREFIX + std::to_string(_INDEX) + "_" + std::to_string(tnode->nId) + ".txt").c_str());
+//				recordProgress(_OurRoot, (_OutputPath + "/" + _RECORD_PREFIX + std::to_string(_INDEX) + "_" + std::to_string(tnode->nId) + ".txt").c_str());
 //			}
 //		}
 //		printf("Record at %llu\n", tnode->nId);

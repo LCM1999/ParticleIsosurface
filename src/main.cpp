@@ -118,7 +118,7 @@ void loadParticlesFromCSV(std::string& csvPath, std::vector<Eigen::Vector3f>& pa
 
 void testWithCSV(std::string& csvDirPath)
 {
-	loadConfigJson(csvDirPath + "\\controlData.json");
+	loadConfigJson(csvDirPath + "/controlData.json");
 	double frameStart = 0;
 	int index = 0;
 	std::vector<Eigen::Vector3f> particles;
@@ -128,14 +128,14 @@ void testWithCSV(std::string& csvDirPath)
 	{
 		Mesh mesh;
 		std::cout << "-=   Frame " << index << " " << frame << "   =-" << std::endl;
-		std::string csvPath = csvDirPath + "\\" + frame;
+		std::string csvPath = csvDirPath + "/" + frame;
 		frameStart = get_time();
 
 		loadParticlesFromCSV(csvPath, particles, density, mass);
 
 		SurfReconstructor constructor(particles, density, mass, mesh, P_RADIUS);
 		constructor.Run();
-		writeFile(mesh, csvDirPath + "\\" + OUTPUT_PREFIX + std::to_string(index) + ".obj");
+		writeFile(mesh, csvDirPath + "/" + OUTPUT_PREFIX + std::to_string(index) + ".obj");
 		index++;
 	}
 }
@@ -165,7 +165,7 @@ int main(int argc, char **argv)
 	} 
 	else 
 	{
-		std::string csvDirPath = "F:\\BaiduNetdiskDownload\\inlet_csv";
+		std::string csvDirPath = "F:/BaiduNetdiskDownload/inlet_csv";
 		testWithCSV(csvDirPath);
 	}
 
