@@ -141,7 +141,7 @@ void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float&
 				for (int j = 0; j < node_n; j++)
 					rvalue[i] += inv(j, i) * node_B[j];
 			}
-			pc << rvalue[0], rvalue[1], rvalue[2];
+			pc << rvalue[0], rvalue[1], rvalue[2], 0.0f;
 			constructor->getEvaluator()->SingleEval((Eigen::Vector3f&)pc, pc[3], pcg);
 			// check bounds
 			if (pc[0] >= node_mine[0] && pc[0] <= node_maxe[0] &&
@@ -182,7 +182,7 @@ void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float&
 					for (int j = 0; j < node_n + 1; j++)
 						rvalue[i] += inv(j, i) * BC[j];
 				}
-				pc << rvalue[0], rvalue[1], rvalue[2];
+				pc << rvalue[0], rvalue[1], rvalue[2], 0.0f;
 				constructor->getEvaluator()->SingleEval((Eigen::Vector3f&)pc, pc[3], pcg);
 				// check bounds
 				int dp = (dir + 1) % 3;
@@ -234,7 +234,7 @@ void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float&
 					for (int j = 0; j < node_n + 2; j++)
 						rvalue[i] += inv(j, i) * BC[j];
 				}
-				pc << rvalue[0], rvalue[1], rvalue[2];
+				pc << rvalue[0], rvalue[1], rvalue[2], 0.0f;
 				constructor->getEvaluator()->SingleEval((Eigen::Vector3f&)pc, pc[3], pcg);
 				// check bounds
 				if (pc[dir] >= node_mine[dir] && pc[dir] <= node_maxe[dir])
@@ -279,7 +279,7 @@ void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float&
 					for (int j = 0; j < node_n + 3; j++)
 						rvalue[i] += inv(j, i) * BC[j];
 				}
-				pc << rvalue[0], rvalue[1], rvalue[2];
+				pc << rvalue[0], rvalue[1], rvalue[2], 0.0f;
 				constructor->getEvaluator()->SingleEval((Eigen::Vector3f&)pc, pc[3], pcg);
 				// check bounds
 				double e = calcErrorDMC(pc, verts, grad);

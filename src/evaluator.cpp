@@ -323,7 +323,7 @@ inline void Evaluator::compute_Gs_xMeans()
                 }
                 cov /= wSum;
 
-                Eigen::JacobiSVD<Eigen::Matrix3d> svd(cov, Eigen::ComputeThinU | Eigen::ComputeThinV);
+                Eigen::JacobiSVD<Eigen::Matrix3d> svd(cov, Eigen::ComputeFullU | Eigen::ComputeFullV);
                 
                 Eigen::Matrix3d u = svd.matrixU();
                 Eigen::Vector3d w = svd.singularValues();

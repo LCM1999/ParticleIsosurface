@@ -175,7 +175,10 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 			}
 			if (empty)
 			{
-				tnode->node << tnode->center;
+				//tnode->node << tnode->center;
+				tnode->node[0] = tnode->center[0];
+				tnode->node[1] = tnode->center[1];
+				tnode->node[2] = tnode->center[2];
 				_evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3], grad[8]);
 				tnode->type = EMPTY;
 				//EMPTY_VOLUME += pow(2 * tnode->half_length, 3);
@@ -184,7 +187,10 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 			}
 			else if (tnode->depth < _DEPTH_MIN)
 			{
-				tnode->node << tnode->center;
+				//tnode->node << tnode->center;
+				tnode->node[0] = tnode->center[0];
+				tnode->node[1] = tnode->center[1];
+				tnode->node[2] = tnode->center[2];
 				_evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3], grad[8]);
 			}
 			else
