@@ -39,7 +39,7 @@ void writeFile(Mesh &m, std::string fn)
 	fclose(f);
 }
 
-void loadConfigJson(std::string& controlJsonPath)
+void loadConfigJson(const std::string controlJsonPath)
 {
     nlohmann::json readInJSON;
 	std::ifstream inJSONFile(controlJsonPath.c_str(), std::fstream::in);

@@ -64,9 +64,9 @@ void Evaluator::SingleEval(const Eigen::Vector3f& pos, float& scalar, Eigen::Vec
 		gradient[1] = ((temp_scalars[3] - temp_scalars[2]) / constructor->getMaxScalar() * 255) / constructor->getPRadius();
 		gradient[2] = ((temp_scalars[5] - temp_scalars[4]) / constructor->getMaxScalar() * 255) / constructor->getPRadius();
 		gradient.normalize();
-		gradient[0] = isnan(gradient[0]) ? 0.0f : gradient[0];
-		gradient[1] = isnan(gradient[1]) ? 0.0f : gradient[1];
-		gradient[2] = isnan(gradient[2]) ? 0.0f : gradient[2];
+		gradient[0] = std::isnan(gradient[0]) ? 0.0f : gradient[0];
+		gradient[1] = std::isnan(gradient[1]) ? 0.0f : gradient[1];
+		gradient[2] = std::isnan(gradient[2]) ? 0.0f : gradient[2];
 	}
 }
 
@@ -169,9 +169,9 @@ void Evaluator::GridEval(
                 }
 
                 gradient.normalize();
-                gradient[0] = isnan(gradient[0]) ? 0.0f : gradient[0];
-                gradient[1] = isnan(gradient[1]) ? 0.0f : gradient[1];
-                gradient[2] = isnan(gradient[2]) ? 0.0f : gradient[2];
+                gradient[0] = std::isnan(gradient[0]) ? 0.0f : gradient[0];
+                gradient[1] = std::isnan(gradient[1]) ? 0.0f : gradient[1];
+                gradient[2] = std::isnan(gradient[2]) ? 0.0f : gradient[2];
                 field_gradients.push_back(gradient);
             }
         }
@@ -181,7 +181,7 @@ void Evaluator::GridEval(
 float Evaluator::RecommendIsoValue()
 {
     double k_value;
-    double recommend_dist = constructor->getPRadius() * 1.5;
+    double recommend_dist = constructor->getPRadius() * 1.1;
     switch (constructor->getKernelType())
     {
     case 0:

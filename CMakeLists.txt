@@ -43,7 +43,12 @@ endif()
 ################################################################################
 # Target
 ################################################################################
-add_compile_options("-openmp:llvm")
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    add_compile_options("-O3")
+elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+    add_compile_options("-openmp:llvm")
+endif()
+
 
 add_executable(${PROJECT_NAME}
     src/cube_arrays.cpp

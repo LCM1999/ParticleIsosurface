@@ -299,7 +299,6 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 		}
 		else
 		{
-//#pragma omp parallel for
 			for (int t = 0; t < 8; t++)
 			{
 				Index i = t;
