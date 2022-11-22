@@ -1,8 +1,7 @@
 #pragma once
 #ifndef SURF_CONSTRUCT_H
 #define SURF_CONSTRUCT_H
-#include <iostream>
-#include <fstream>
+
 #include <vector>
 #include <string.h>
 #include "timer.h"
@@ -31,7 +30,8 @@ private:
     float _MIN_SCALAR = 0.0f;
     float _BAD_QEF = 0.0001f;
     float _FLATNESS = 0.99f;
-    int _MIN_NEIGHBORS_NUM = 5;
+    int _MIN_NEIGHBORS_NUM = 25;
+    int _SPARSE_NEIGHBORS_NUM = 16;
 
     bool _USE_ANI = true;
     bool _USE_XMEAN = true;
@@ -58,6 +58,7 @@ private:
 
     TNode* _OurRoot;
 	Mesh* _OurMesh;
+
 protected:
     void loadRootBox();
 
@@ -67,8 +68,8 @@ protected:
 
     // Method for CSV mode
     void genIsoOurs();
+    void checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& curv);
     void eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide);
-    void recordProgress(TNode* root_node, const char* record_name);
 
 public:
     SurfReconstructor() {};
@@ -91,6 +92,7 @@ public:
     inline float getBadQef() {return _BAD_QEF;}
     inline float getFlatness() {return _FLATNESS;}
     inline int getMinNeighborsNum() {return _MIN_NEIGHBORS_NUM;}
+    inline int getSparseNeighborsNum() {return _SPARSE_NEIGHBORS_NUM;};
     inline bool getUseAni() {return _USE_ANI;}
     inline bool getUseXMean() {return _USE_XMEAN;}
     inline float getXMeanDelta() {return _XMEAN_DELTA;}
@@ -101,6 +103,7 @@ public:
     inline Evaluator* getEvaluator() {return _evaluator;}
     inline int getGlobalParticlesNum() {return _GlobalParticlesNum;}
     inline int getSTATE() {return _STATE;}
+    inline TNode* getRoot() {return _OurRoot;}
 };
 
 #endif

@@ -21,7 +21,7 @@ TNode::TNode(SurfReconstructor* surf_constructor, int id)
 }
 
 
-void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float& qef_error, bool pass_face, bool pass_edge)
+void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float& qef_error)
 {
 	bool origin_sign;
 	signchange = false;
@@ -78,7 +78,13 @@ void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float&
 		norms += n;
 		area += n.norm();
 	}
-	curv = norms.norm() / area;
+	if (curv == 0)
+	{
+		curv = norms.norm() / area;
+	} else {
+		curv = std::min(norms.norm() / area, curv);
+	}
+	
 	/*--------------------VERT NODE-----------------------*/
 	QEFNormal<double, 4> node_q;
 	node_q.zero();
@@ -294,9 +300,6 @@ void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float&
 	constructor->getEvaluator()->SingleEval(node.head(3), node[3], grad[8]);
 	qef_error += err;
 }
-
-
-
 
 bool TNode::changeSignDMC(Eigen::Vector4f* verts)
 {

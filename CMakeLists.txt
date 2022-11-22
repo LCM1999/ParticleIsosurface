@@ -62,6 +62,7 @@ add_executable(${PROJECT_NAME}
     src/hash_grid.cpp
     src/surface_reconstructor.cpp
     src/global.cpp
+    src/recorder.cpp
 )
 
 target_include_directories(${PROJECT_NAME} 

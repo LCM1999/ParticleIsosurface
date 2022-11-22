@@ -2,8 +2,10 @@
 #include <fstream>
 #include <omp.h>
 #include "iso_common.h"
+#include "iso_method_ours.h"
 #include "surface_reconstructor.h"
 #include "global.h"
+#include "recorder.h"
 
 #include "json.hpp"
 
@@ -18,8 +20,7 @@ int OMP_THREADS_NUM = 16;
 
 // variants for test
 std::string OUTPUT_PREFIX;
-//bool NEED_RECORD;
-//std::string RECORD_PREFIX;
+bool NEED_RECORD;
 //int RECORD_STEP;
 std::vector<std::string> CSV_PATHES;
 int CSV_TYPE;
@@ -54,9 +55,8 @@ void loadConfigJson(const std::string controlJsonPath)
 		CSV_TYPE = readInJSON.at("CSV_TYPE");
 		P_RADIUS = readInJSON.at("P_RADIUS");
 		OUTPUT_PREFIX = readInJSON.at("OUTPUT_PREFIX");
-		//NEED_RECORD = readInJSON.at("NEED_RECORD");
+		NEED_RECORD = readInJSON.at("NEED_RECORD");
 		//RECORD_STEP = readInJSON.at("RECORD_STEP");
-		//RECORD_PREFIX = readInJSON.at("RECORD_PREFIX");
     }
     else
     {
@@ -126,7 +126,7 @@ void testWithCSV(std::string& csvDirPath)
     std::vector<float> mass;
     for (std::string frame: CSV_PATHES)
 	{
-		Mesh mesh;
+		Mesh mesh(P_RADIUS);
 		std::cout << "-=   Frame " << index << " " << frame << "   =-" << std::endl;
 		std::string csvPath = csvDirPath + "/" + frame;
 		frameStart = get_time();
@@ -134,7 +134,15 @@ void testWithCSV(std::string& csvDirPath)
 		loadParticlesFromCSV(csvPath, particles, density, mass);
 
 		SurfReconstructor constructor(particles, density, mass, mesh, P_RADIUS);
+		Recorder recorder(csvDirPath, OUTPUT_PREFIX, &constructor);
 		constructor.Run();
+
+		if (NEED_RECORD)
+		{
+			recorder.RecordProgress(index);
+			recorder.RecordParticles(index);
+		}
+		
 		writeFile(mesh, csvDirPath + "/" + OUTPUT_PREFIX + std::to_string(index) + ".obj");
 		index++;
 	}
@@ -165,7 +173,7 @@ int main(int argc, char **argv)
 	} 
 	else 
 	{
-		std::string csvDirPath = "F:/BaiduNetdiskDownload/inlet_csv";
+		std::string csvDirPath = "E:/data/vtk/csv";
 		testWithCSV(csvDirPath);
 	}
 
