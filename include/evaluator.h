@@ -20,7 +20,7 @@ public:
 	std::vector<Eigen::Vector3f>* GlobalPoses;
 	std::vector<float>* GlobalDensity;
 	std::vector<float>* GlobalMass;
-    std::vector<int> GlobalSplash;
+    std::vector<char> GlobalSplash;
     std::map<int, Eigen::Vector3f> SurfaceNormals;
     std::vector<int> SurfaceParticles;
 	Eigen::Vector3f* GlobalxMeans;

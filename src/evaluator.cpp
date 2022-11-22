@@ -11,7 +11,8 @@ Evaluator::Evaluator(SurfReconstructor* surf_constructor,
 	GlobalDensity = global_density;
 	GlobalMass = global_mass;
     SurfaceNormals.clear();
-    GlobalSplash.reserve(constructor->getGlobalParticlesNum());
+    GlobalSplash.resize(constructor->getGlobalParticlesNum(), 0);
+    //GlobalSplash.reserve(constructor->getGlobalParticlesNum());
 
     GlobalxMeans = new Eigen::Vector3f[constructor->getGlobalParticlesNum()];
     GlobalGs = new Eigen::Matrix3f[constructor->getGlobalParticlesNum()];
@@ -21,8 +22,8 @@ Evaluator::Evaluator(SurfReconstructor* surf_constructor,
 	if (constructor->getUseAni())
 	{
         compute_Gs_xMeans();
-        GlobalSplash.shrink_to_fit();
-        printf("   Splash number = %d\n", GlobalSplash.size());
+        //GlobalSplash.shrink_to_fit();
+        //printf("   Splash number = %d\n", GlobalSplash.size());
 	}
 }
 
@@ -187,7 +188,7 @@ void Evaluator::GridEval(
 
 bool Evaluator::CheckSplash(const int& pIdx)
 {
-    if (std::find(GlobalSplash.begin(), GlobalSplash.end(), pIdx) != GlobalSplash.end())
+    if (GlobalSplash[pIdx])
     {
         return true;
     }
@@ -402,7 +403,7 @@ inline void Evaluator::compute_Gs_xMeans()
         if (neighborList.size() < 1)
         {
             G += Eigen::DiagonalMatrix<float, 3>(invH, invH, invH);
-            GlobalSplash.push_back(pIdx);
+            GlobalSplash[pIdx] = 1;
         } 
         else
         {

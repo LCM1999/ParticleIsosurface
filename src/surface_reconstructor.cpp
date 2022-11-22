@@ -449,9 +449,12 @@ void SurfReconstructor::genIsoOurs()
 		TraversalData td(_OurRoot);
 		traverse_node<trav_vert>(v, td);
 		std::vector<Eigen::Vector3f> splash_pos;
-		for (const int& pIdx : _evaluator->GlobalSplash)
+		for (int pIdx = 0; pIdx < getGlobalParticlesNum(); pIdx++)
 		{
-			splash_pos.push_back(_evaluator->GlobalPoses->at(pIdx));
+			if (_evaluator->CheckSplash(pIdx))
+			{
+				splash_pos.push_back(_evaluator->GlobalPoses->at(pIdx));
+			}
 		}
 		m->AppendSplash(splash_pos);
 		//}
