@@ -21,7 +21,6 @@ int OMP_THREADS_NUM = 16;
 // variants for test
 std::string OUTPUT_PREFIX;
 bool NEED_RECORD;
-//int RECORD_STEP;
 std::vector<std::string> CSV_PATHES;
 int CSV_TYPE;
 float P_RADIUS;
@@ -56,7 +55,6 @@ void loadConfigJson(const std::string controlJsonPath)
 		P_RADIUS = readInJSON.at("P_RADIUS");
 		OUTPUT_PREFIX = readInJSON.at("OUTPUT_PREFIX");
 		NEED_RECORD = readInJSON.at("NEED_RECORD");
-		//RECORD_STEP = readInJSON.at("RECORD_STEP");
     }
     else
     {

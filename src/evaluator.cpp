@@ -12,7 +12,6 @@ Evaluator::Evaluator(SurfReconstructor* surf_constructor,
 	GlobalMass = global_mass;
     SurfaceNormals.clear();
     GlobalSplash.reserve(constructor->getGlobalParticlesNum());
-    GlobalParticlesNeigborsNum.resize(constructor->getGlobalParticlesNum());
 
     GlobalxMeans = new Eigen::Vector3f[constructor->getGlobalParticlesNum()];
     GlobalGs = new Eigen::Matrix3f[constructor->getGlobalParticlesNum()];
@@ -22,6 +21,8 @@ Evaluator::Evaluator(SurfReconstructor* surf_constructor,
 	if (constructor->getUseAni())
 	{
         compute_Gs_xMeans();
+        GlobalSplash.shrink_to_fit();
+        printf("   Splash number = %d\n", GlobalSplash.size());
 	}
 }
 
@@ -267,7 +268,7 @@ void Evaluator::GetSurfaceParticles()
 {
     float recommand_surface_threshold = RecommendSurfaceThreshold();
     printf("   Recommend Surface Threshold = %f\n", recommand_surface_threshold);
-#pragma omp parallel for schedule(static, 16) 
+#pragma omp parallel for schedule(static, OMP_THREADS_NUM) 
     for (int pIdx = 0; pIdx < constructor->getGlobalParticlesNum(); pIdx++)
     {
         float tempScalar = 0;
@@ -397,8 +398,6 @@ inline void Evaluator::compute_Gs_xMeans()
         {
             xMean = (GlobalPoses->at(pIdx));
         }
-
-        GlobalParticlesNeigborsNum[pIdx] = neighborList.size();
 
         if (neighborList.size() < 1)
         {

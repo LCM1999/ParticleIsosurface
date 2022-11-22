@@ -11,12 +11,20 @@ Mesh::Mesh(const float p_radius, const float mesh_tolerance)
 
 int Mesh::insert_vert(const Eigen::Vector3f& p)
 {
+	if (abs(p[2]) > 100.0 || abs(p[1]) > 100.0 || abs(p[0]) > 100.0)
+	{
+		printf("");
+	}
 	vect3i tmp = vect3f2vect3i(p);
 	if (vertices_map.find(tmp) == vertices_map.end())
 	{
 		verticesNum++;
 		vertices_map[tmp] = verticesNum;
 		vertices.push_back(p);
+		if (abs(p[2]) > 100.0 || abs(p[1]) > 100.0 || abs(p[0]) > 100.0)
+		{
+			printf("");
+		}
 	}
 	return vertices_map[tmp];
 }
@@ -123,7 +131,7 @@ void Mesh::BuildIcosaTable()
 	float hAngle1 = -PI / 2 - H_ANGLE / 2;  // start from -126 deg at 1st row
 	float hAngle2 = -PI / 2;				// start from -90 deg at 2nd row
 
-	IcosaTable[0](Eigen::Vector3f(0, 0, P_RADIUS));
+	IcosaTable[0] = Eigen::Vector3f(0, 0, P_RADIUS);
 	int i1, i2;
 
 	for (size_t i = 1; i <= 5; i++)

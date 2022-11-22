@@ -23,7 +23,6 @@ public:
     std::vector<int> GlobalSplash;
     std::map<int, Eigen::Vector3f> SurfaceNormals;
     std::vector<int> SurfaceParticles;
-    std::vector<int> GlobalParticlesNeigborsNum;
 	Eigen::Vector3f* GlobalxMeans;
     Eigen::Matrix3f* GlobalGs;
 
