@@ -138,11 +138,11 @@ void Mesh::BuildIcosaTable()
 	{
 		i1 = i;
 		i2 = i + 5;
-		z = P_RADIUS * std::sinf(V_ANGLE);
-		xy = P_RADIUS * std::cosf(V_ANGLE);
+		z = P_RADIUS * std::sin(V_ANGLE);
+		xy = P_RADIUS * std::cos(V_ANGLE);
 
-		IcosaTable[i1] = Eigen::Vector3f(xy * cosf(hAngle1), xy * sinf(hAngle1), z);
-		IcosaTable[i2] = Eigen::Vector3f(xy * cosf(hAngle2), xy * sinf(hAngle2), -z);
+		IcosaTable[i1] = Eigen::Vector3f(xy * cos(hAngle1), xy * sin(hAngle1), z);
+		IcosaTable[i2] = Eigen::Vector3f(xy * cos(hAngle2), xy * sin(hAngle2), -z);
 
 		hAngle1 += H_ANGLE;
 		hAngle2 += H_ANGLE;
