@@ -11,20 +11,12 @@ Mesh::Mesh(const float p_radius, const float mesh_tolerance)
 
 int Mesh::insert_vert(const Eigen::Vector3f& p)
 {
-	if (abs(p[2]) > 100.0 || abs(p[1]) > 100.0 || abs(p[0]) > 100.0)
-	{
-		printf("");
-	}
 	vect3i tmp = vect3f2vect3i(p);
 	if (vertices_map.find(tmp) == vertices_map.end())
 	{
 		verticesNum++;
 		vertices_map[tmp] = verticesNum;
 		vertices.push_back(p);
-		if (abs(p[2]) > 100.0 || abs(p[1]) > 100.0 || abs(p[0]) > 100.0)
-		{
-			printf("");
-		}
 	}
 	return vertices_map[tmp];
 }
