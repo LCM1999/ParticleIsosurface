@@ -149,11 +149,6 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 //		}
 //		printf("Record at %llu\n", tnode->nId);
 //	}
-	//if (tnode->contain(Eigen::Vector3f(0.081, -0.001, -0.022)))
-	//{
-	//	printf("");
-	//}
-	
 	float qef_error = 0, curv = 0;
 	bool signchange = false, recur = false, next = false, empty;
 
