@@ -198,12 +198,14 @@ bool Evaluator::CheckSplash(const int& pIdx)
 float Evaluator::RecommendIsoValue()
 {
     double k_value = 0.0;
-    double recommend_dist = constructor->getPRadius() * 1.0;
-    double rDist2 = recommend_dist * recommend_dist;
+    const double recommend_dist = constructor->getPRadius() * 1.0;
+    const double rDist2 = recommend_dist * recommend_dist;
+    const double sqrt3 = 1.7320508075688772935274463415059;
+
     switch (constructor->getKernelType())
     {
     case 0:
-        k_value += general_kernel(2 * rDist2, influnce2);
+        k_value += general_kernel(2 * rDist2, influnce2) * 2;
         //k_value += general_kernel(5 * rDist2, influnce2) * 2;
         break;
     case 1:
