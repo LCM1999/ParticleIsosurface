@@ -10,7 +10,9 @@ Evaluator::Evaluator(SurfReconstructor* surf_constructor,
 	GlobalPoses = global_particles;
 	GlobalDensity = global_density;
 	GlobalMass = global_mass;
-    SurfaceNormals.clear();
+    PariclesNormals.clear();
+    GlobalSplash.clear();
+    PariclesNormals.resize(constructor->getGlobalParticlesNum(), Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX));
     GlobalSplash.resize(constructor->getGlobalParticlesNum(), 0);
     //GlobalSplash.reserve(constructor->getGlobalParticlesNum());
 
@@ -274,34 +276,34 @@ void Evaluator::GetSurfaceParticles()
 {
     float recommand_surface_threshold = RecommendSurfaceThreshold();
     printf("   Recommend Surface Threshold = %f\n", recommand_surface_threshold);
-//#pragma omp parallel for schedule(static, OMP_THREADS_NUM) 
+#pragma omp parallel for schedule(static, OMP_THREADS_NUM) 
     for (int pIdx = 0; pIdx < constructor->getGlobalParticlesNum(); pIdx++)
     {
         float tempScalar = 0;
         Eigen::Vector3f tempGrad = Eigen::Vector3f::Zero();
         if (!CheckSplash(pIdx))
         {
-            if (SurfaceNormals.find(pIdx) != SurfaceNormals.end())
-            {
-                if (SurfaceNormals[pIdx] == Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX))
-                {
-                    continue;
-                } else {
-                    SingleEval(GlobalPoses->at(pIdx), tempScalar, tempGrad);
-                    SurfaceNormals[pIdx][0] = tempGrad[0];
-                    SurfaceNormals[pIdx][1] = tempGrad[1];
-                    SurfaceNormals[pIdx][2] = tempGrad[2];
-                }
-            } else {
-                SingleEval(GlobalPoses->at(pIdx), tempScalar, tempGrad, true, true, false);
-                if (std::abs(tempGrad.maxCoeff()) > recommand_surface_threshold || std::abs(tempGrad.minCoeff()) > recommand_surface_threshold || tempGrad.norm() > recommand_surface_threshold)
-                {
-                    SurfaceNormals[pIdx] = Eigen::Vector3f(tempGrad.normalized());
-                }
-            }
+            SingleEval(GlobalPoses->at(pIdx), tempScalar, tempGrad);
+            PariclesNormals[pIdx][0] = tempGrad[0];
+            PariclesNormals[pIdx][1] = tempGrad[1];
+            PariclesNormals[pIdx][2] = tempGrad[2];
+            //if (SurfaceNormals.find(pIdx) != SurfaceNormals.end())
+            //{
+            //    if (SurfaceNormals[pIdx] == Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX))
+            //    {
+            //        continue;
+            //    } else {
+            //    }
+            //} else {
+            //    SingleEval(GlobalPoses->at(pIdx), tempScalar, tempGrad, true, true, false);
+            //    if (std::abs(tempGrad.maxCoeff()) > recommand_surface_threshold || std::abs(tempGrad.minCoeff()) > recommand_surface_threshold || tempGrad.norm() > recommand_surface_threshold)
+            //    {
+            //        SurfaceNormals[pIdx] = Eigen::Vector3f(tempGrad.normalized());
+            //    }
+            //}
         }
     }
-    printf("   Surface particles number = %d\n", SurfaceNormals.size());
+    //printf("   Surface particles number = %d\n", SurfaceNormals.size());
 }
 
 inline float Evaluator::general_kernel(double d2, double h2)
@@ -369,7 +371,6 @@ inline void Evaluator::compute_Gs_xMeans()
     {
         std::vector<int> tempNeighborList;
         std::vector<int> neighborList;
-        int closerNeigbors = 0;
         Eigen::Vector3f xMean = Eigen::Vector3f::Zero();
         Eigen::Matrix3f G = Eigen::Matrix3f::Zero();
         constructor->getHashGrid()->GetPIdxList((GlobalPoses->at(pIdx)), tempNeighborList);
@@ -390,10 +391,6 @@ inline void Evaluator::compute_Gs_xMeans()
             wSum += wj;
             xMean += ((GlobalPoses->at(nIdx))) * wj;
             neighborList.push_back(nIdx);
-            if (d2 < D2)
-            {
-                closerNeigbors++;
-            }
         }
         if (constructor->getUseXMean())
         {
@@ -419,14 +416,14 @@ inline void Evaluator::compute_Gs_xMeans()
         } 
         else
         {
-            if (neighborList.size() < constructor->getMinNeighborsNum())
-            {
-                SurfaceNormals[pIdx] = Eigen::Vector3f(0.0, 0.0, 0.0);
-                if (closerNeigbors < 1)
-                {
-                    SurfaceNormals[pIdx] = Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX);
-                }
-            }
+            //if (neighborList.size() < constructor->getMinNeighborsNum())
+            //{
+            //    SurfaceNormals[pIdx] = Eigen::Vector3f(0.0, 0.0, 0.0);
+            //    //if (closerNeigbors < 1)
+            //    //{
+            //    //    SurfaceNormals[pIdx] = Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX);
+            //    //}
+            //}
             Eigen::Vector3f wd = Eigen::Vector3f::Zero();
             Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
             cov += Eigen::DiagonalMatrix<double, 3>(invH, invH, invH);

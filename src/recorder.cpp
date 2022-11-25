@@ -70,13 +70,14 @@ void Recorder::RecordParticles(const int& index)
 	fprintf(f, "\"x\",\"y\",\"z\",\"type\",\"grad_x\",\"grad_y\",\"grad_z\"\n");
 	for (int pIdx = 0; pIdx < constructor->getGlobalParticlesNum(); pIdx++)
 	{
-		if (evaluator->SurfaceNormals.find(pIdx) != evaluator->SurfaceNormals.end())
-		{
-			type = 2;
-			g_x = evaluator->SurfaceNormals[pIdx][0];
-			g_y = evaluator->SurfaceNormals[pIdx][1];
-			g_z = evaluator->SurfaceNormals[pIdx][2];
-		} else if (evaluator->CheckSplash(pIdx))
+		// if (evaluator->SurfaceNormals.find(pIdx) != evaluator->SurfaceNormals.end())
+		// {
+		// 	type = 2;
+		// 	g_x = evaluator->SurfaceNormals[pIdx][0];
+		// 	g_y = evaluator->SurfaceNormals[pIdx][1];
+		// 	g_z = evaluator->SurfaceNormals[pIdx][2];
+		// } else 
+		if (evaluator->CheckSplash(pIdx))
 		{
 			type = 1;
 			g_x = FLT_MAX;
@@ -84,9 +85,9 @@ void Recorder::RecordParticles(const int& index)
 			g_z = FLT_MAX;
 		} else {
 			type = 0;
-			g_x = 0.0;
-			g_y = 0.0;
-			g_z = 0.0;
+			g_x = evaluator->PariclesNormals[pIdx][0];
+			g_y = evaluator->PariclesNormals[pIdx][1];
+			g_z = evaluator->PariclesNormals[pIdx][2];
 		}
 		fprintf(f, "%f,%f,%f,%d,%f,%f,%f\n", evaluator->GlobalPoses->at(pIdx)[0], evaluator->GlobalPoses->at(pIdx)[1], evaluator->GlobalPoses->at(pIdx)[2], type, g_x, g_y, g_z);
 	}

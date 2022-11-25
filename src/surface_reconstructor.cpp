@@ -117,17 +117,17 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 					{
 						for (int countIndex = _hashgrid->StartList[temp_hash]; countIndex < _hashgrid->EndList[temp_hash]; countIndex++)
 						{
-							auto iter = _evaluator->SurfaceNormals.find(_hashgrid->IndexList[countIndex]);
-							if (iter != _evaluator->SurfaceNormals.end())
+							Eigen::Vector3f tempNorm = _evaluator->PariclesNormals[_hashgrid->IndexList[countIndex]];
+							if (tempNorm == Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX))
 							{
-								if (iter->second[0] == FLT_MAX)
-								{
-									curv = -1;
-									return;
-								}
-								norms += iter->second;
-								area += iter->second.norm();
+								continue;
 							}
+							norms += tempNorm;
+							area += tempNorm.norm();
+							// auto iter = _evaluator->SurfaceNormals.find(_hashgrid->IndexList[countIndex]);
+							// if (iter != _evaluator->SurfaceNormals.end())
+							// {
+							// }
 						}
 					}
 				}

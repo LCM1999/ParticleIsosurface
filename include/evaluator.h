@@ -21,7 +21,7 @@ public:
 	std::vector<float>* GlobalDensity;
 	std::vector<float>* GlobalMass;
     std::vector<char> GlobalSplash;
-    std::map<int, Eigen::Vector3f> SurfaceNormals;
+    std::vector<Eigen::Vector3f> PariclesNormals;
     std::vector<int> SurfaceParticles;
 	Eigen::Vector3f* GlobalxMeans;
     Eigen::Matrix3f* GlobalGs;
