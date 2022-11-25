@@ -81,7 +81,11 @@ void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float&
 	if (curv == 0)
 	{
 		curv = norms.norm() / area;
-	} else {
+	}
+	else if (curv < 0) {
+		curv = 0;
+	} 
+	else {
 		curv = std::min(norms.norm() / area, curv);
 	}
 	

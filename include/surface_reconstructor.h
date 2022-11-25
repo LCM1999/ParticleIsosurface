@@ -35,7 +35,7 @@ private:
 
     bool _USE_ANI = true;
     bool _USE_XMEAN = true;
-    float _XMEAN_DELTA = 0.3;
+    float _XMEAN_DELTA = 0.0f;
 
     float _TOLERANCE = 1e-8;
     float _RATIO_TOLERANCE = 0.1f;

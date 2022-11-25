@@ -122,7 +122,8 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 							{
 								if (iter->second[0] == FLT_MAX)
 								{
-									continue;
+									curv = -1;
+									return;
 								}
 								norms += iter->second;
 								area += iter->second.norm();
@@ -189,7 +190,12 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 				tnode->vertAll(curv, signchange, grad, qef_error);
 			}
 		}
-
+		if (std::isnan(curv))
+		{
+			curv = 0;
+		}
+		
+		//printf("%f ", curv);
 		// judge this node need calculate iso-surface
 		float cellsize = 2 * tnode->half_length;
 
@@ -208,7 +214,7 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 				return;
 			}
 			//static float maxsize = dynamic_cast<InternalNode*>(mytree->l)->lenn * pow(.5, DEPTH_MIN);
-			bool isbig = tnode->depth < _DEPTH_MIN;
+			bool isbig = tnode->depth <= _DEPTH_MIN;
 			//
 			//// check for a sign change
 			//if (!isbig)
@@ -279,7 +285,6 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 		// create children
 		if (guide)
 		{
-#pragma omp parallel for
 			for (int t = 0; t < 8; t++)
 			{
 				Index i = t;
@@ -291,6 +296,7 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 				{
 					grad[j] = g[i.x + j.x][i.y + j.y][i.z + j.z];
 				}
+				#pragma omp task
 				eval(tnode->children[i], grad, guide->children[i]);
 			}
 		}
@@ -497,6 +503,7 @@ void SurfReconstructor::generalModeRun()
 	
 	printf("-= Resize Box =-\n");
 	resizeRootBox();
+	printf("   MAX_DEPTH = %d, MIN_DEPTH = %d\n", _DEPTH_MAX, _DEPTH_MIN);
 
 	temp_time = get_time();
 
