@@ -371,6 +371,7 @@ inline void Evaluator::compute_Gs_xMeans()
     {
         std::vector<int> tempNeighborList;
         std::vector<int> neighborList;
+        int closerNeigbors = 0;
         Eigen::Vector3f xMean = Eigen::Vector3f::Zero();
         Eigen::Matrix3f G = Eigen::Matrix3f::Zero();
         constructor->getHashGrid()->GetPIdxList((GlobalPoses->at(pIdx)), tempNeighborList);
@@ -391,6 +392,10 @@ inline void Evaluator::compute_Gs_xMeans()
             wSum += wj;
             xMean += ((GlobalPoses->at(nIdx))) * wj;
             neighborList.push_back(nIdx);
+            if (d2 < D2)
+            {
+                closerNeigbors++;
+            }
         }
         if (constructor->getUseXMean())
         {
@@ -409,21 +414,21 @@ inline void Evaluator::compute_Gs_xMeans()
             xMean = (GlobalPoses->at(pIdx));
         }
 
-        if (neighborList.size() < 1)
+        if (neighborList.size() < 1 || closerNeigbors < 1)
         {
             G += Eigen::DiagonalMatrix<float, 3>(invH, invH, invH);
             GlobalSplash[pIdx] = 1;
         } 
         else
         {
-            //if (neighborList.size() < constructor->getMinNeighborsNum())
-            //{
-            //    SurfaceNormals[pIdx] = Eigen::Vector3f(0.0, 0.0, 0.0);
-            //    //if (closerNeigbors < 1)
-            //    //{
-            //    //    SurfaceNormals[pIdx] = Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX);
-            //    //}
-            //}
+            // if (neighborList.size() < constructor->getMinNeighborsNum())
+            // {
+                // PariclesNormals[pIdx] = Eigen::Vector3f(0.0, 0.0, 0.0);
+                // if (closerNeigbors < 1)
+                // {
+                    // PariclesNormals[pIdx] = Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX);
+                // }
+            // }
             Eigen::Vector3f wd = Eigen::Vector3f::Zero();
             Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
             cov += Eigen::DiagonalMatrix<double, 3>(invH, invH, invH);

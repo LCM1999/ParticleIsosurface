@@ -365,7 +365,7 @@ bool VisitorExtract::on_vert(TraversalData& a, TraversalData& b, TraversalData& 
 			{
 				Eigen::Vector4f tmpv1 = v1.node, tmpv2 = v2.node, tmpv = Eigen::Vector4f::Zero();
 				Eigen::Vector3f tmpg = Eigen::Vector3f::Zero();
-				
+				/*
 				auto ratio = invlerp(tmpv1[3], tmpv2[3], 0.0f);
 				if (ratio < constructor->getRatioTolerance())
 					tmpv = tmpv1;
@@ -400,7 +400,7 @@ bool VisitorExtract::on_vert(TraversalData& a, TraversalData& b, TraversalData& 
 				}
 
 				points[e_index] = tmpv.head(3);
-				/*
+				*/
 				while ((tmpv1 - tmpv2).head(3).norm() > (constructor->getPRadius() / 2))
 				{
 					tmpv[0] =  (tmpv1[0] + tmpv2[0]) / 2;
@@ -425,7 +425,6 @@ bool VisitorExtract::on_vert(TraversalData& a, TraversalData& b, TraversalData& 
 					points[e_index] = tmpv2.head(3);
 				else
 					points[e_index] = lerp((Eigen::Vector3f&)tmpv1, (Eigen::Vector3f&)tmpv2, ratio);
-				*/
 			}
 		};
 
