@@ -6,10 +6,10 @@
 #include "surface_reconstructor.h"
 #include "evaluator.h"
 
-Recorder::Recorder(std::string& output_dir, std::string& output_prefix, SurfReconstructor* surf_constructor)
+Recorder::Recorder(const std::string& output_dir, const std::string& frame_name, SurfReconstructor* surf_constructor)
 {
     _Output_Dir = output_dir;
-    _Frame_Name = output_prefix;
+    _Frame_Name = frame_name;
 	constructor = surf_constructor;
 }
 

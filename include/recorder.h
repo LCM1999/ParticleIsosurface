@@ -13,7 +13,7 @@ private:
     std::string _Frame_Name;
     SurfReconstructor* constructor;
 public:
-    Recorder(std::string& output_dir, std::string& frame_name, SurfReconstructor* surf_constructor);
+    Recorder(const std::string& output_dir, const std::string& frame_name, SurfReconstructor* surf_constructor);
     ~Recorder(){};
 
     void RecordProgress();

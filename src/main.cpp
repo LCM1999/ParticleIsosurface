@@ -120,7 +120,7 @@ void testWithCSV(std::string& csvDirPath)
 	std::vector<Eigen::Vector3f> particles;
     std::vector<float> density;
     std::vector<float> mass;
-    for (std::string frame: CSV_PATHES)
+    for (const std::string frame: CSV_PATHES)
 	{
 		Mesh mesh(P_RADIUS);
 		std::cout << "-=   Frame " << index << " " << frame << "   =-" << std::endl;
