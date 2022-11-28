@@ -9,14 +9,14 @@
 Recorder::Recorder(std::string& output_dir, std::string& output_prefix, SurfReconstructor* surf_constructor)
 {
     _Output_Dir = output_dir;
-    _Output_Prefix = output_prefix;
+    _Frame_Name = output_prefix;
 	constructor = surf_constructor;
 }
 
-void Recorder::RecordProgress(const int& index)
+void Recorder::RecordProgress()
 {
 	//std::cout << record_name << std::endl;
-	FILE* f = fopen((_Output_Dir + "/r_" + _Output_Prefix + std::to_string(index) + ".txt").c_str(), "w");
+	FILE* f = fopen((_Output_Dir + "/r_" + _Frame_Name + ".txt").c_str(), "w");
 	if (constructor->getRoot() == nullptr)
 	{
 		return;
@@ -61,12 +61,12 @@ void Recorder::RecordProgress(const int& index)
 	fclose(f);
 }
 
-void Recorder::RecordParticles(const int& index)
+void Recorder::RecordParticles()
 {
 	Evaluator* evaluator = constructor->getEvaluator();
 	int type = 0;
 	float g_x, g_y, g_z;
-	FILE* f = fopen((_Output_Dir + "/rp_" + _Output_Prefix + std::to_string(index) + ".txt").c_str(), "w");
+	FILE* f = fopen((_Output_Dir + "/rp_" + _Frame_Name + ".txt").c_str(), "w");
 	fprintf(f, "\"x\",\"y\",\"z\",\"type\",\"grad_x\",\"grad_y\",\"grad_z\"\n");
 	for (int pIdx = 0; pIdx < constructor->getGlobalParticlesNum(); pIdx++)
 	{

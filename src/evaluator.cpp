@@ -274,8 +274,8 @@ float Evaluator::RecommendSurfaceThreshold()
 
 void Evaluator::GetSurfaceParticles()
 {
-    float recommand_surface_threshold = RecommendSurfaceThreshold();
-    printf("   Recommend Surface Threshold = %f\n", recommand_surface_threshold);
+    //float recommand_surface_threshold = RecommendSurfaceThreshold();
+    //printf("   Recommend Surface Threshold = %f\n", recommand_surface_threshold);
 #pragma omp parallel for schedule(static, OMP_THREADS_NUM) 
     for (int pIdx = 0; pIdx < constructor->getGlobalParticlesNum(); pIdx++)
     {
@@ -358,9 +358,9 @@ inline float Evaluator::AnisotropicInterpolate(const int pIdx, const Eigen::Vect
 
 inline void Evaluator::compute_Gs_xMeans()
 {
-	const double h = constructor->getPRadius();
-	const double h2 = h * h;
-    const double D = 2 * h;
+	const double R = constructor->getPRadius();
+	const double R2 = R * R;
+    const double D = 2.5 * R;
     const double D2 = D * D;
 	const double I = constructor->getInfluence();
     const double I2 = I * I;

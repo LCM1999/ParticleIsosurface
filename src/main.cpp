@@ -19,7 +19,6 @@ int OMP_USE_DYNAMIC_THREADS = 0;
 int OMP_THREADS_NUM = 16;
 
 // variants for test
-std::string OUTPUT_PREFIX;
 bool NEED_RECORD;
 std::vector<std::string> CSV_PATHES;
 int CSV_TYPE;
@@ -53,7 +52,6 @@ void loadConfigJson(const std::string controlJsonPath)
 		parseString(&CSV_PATHES, csv_pathes, ",");
 		CSV_TYPE = readInJSON.at("CSV_TYPE");
 		P_RADIUS = readInJSON.at("P_RADIUS");
-		OUTPUT_PREFIX = readInJSON.at("OUTPUT_PREFIX");
 		NEED_RECORD = readInJSON.at("NEED_RECORD");
     }
     else
@@ -132,16 +130,16 @@ void testWithCSV(std::string& csvDirPath)
 		loadParticlesFromCSV(csvPath, particles, density, mass);
 
 		SurfReconstructor constructor(particles, density, mass, mesh, P_RADIUS);
-		Recorder recorder(csvDirPath, OUTPUT_PREFIX, &constructor);
+		Recorder recorder(csvDirPath, frame.substr(0, frame.size() - 4), &constructor);
 		constructor.Run();
 
 		if (NEED_RECORD)
 		{
-			recorder.RecordProgress(index);
-			recorder.RecordParticles(index);
+			recorder.RecordProgress();
+			recorder.RecordParticles();
 		}
 		
-		writeFile(mesh, csvDirPath + "/" + OUTPUT_PREFIX + std::to_string(index) + ".obj");
+		writeFile(mesh, csvDirPath + "/" + frame.substr(0, frame.size() - 4) + ".obj");
 		index++;
 	}
 }
