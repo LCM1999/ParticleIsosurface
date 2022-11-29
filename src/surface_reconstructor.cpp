@@ -522,8 +522,9 @@ void SurfReconstructor::generalModeRun()
 
 	printf("   Initialize Evaluator Time = %f \n", temp_time - last_temp_time);
 
-	int max_density_index = std::distance(_GlobalDensity.begin(), std::max_element(_GlobalDensity.begin(), _GlobalDensity.end()));
-	_evaluator->SingleEval(_GlobalParticles[max_density_index], _MAX_SCALAR, *(Eigen::Vector3f*)NULL);
+	//int max_density_index = std::distance(_GlobalDensity.begin(), std::max_element(_GlobalDensity.begin(), _GlobalDensity.end()));
+	// _evaluator->SingleEval(_GlobalParticles[max_density_index], _MAX_SCALAR, *(Eigen::Vector3f*)NULL);
+	_MAX_SCALAR = _evaluator->CalculateMaxScalar();
 
 	_ISO_VALUE = _evaluator->RecommendIsoValue();
     printf("   Recommend Iso Value = %f\n", _ISO_VALUE);

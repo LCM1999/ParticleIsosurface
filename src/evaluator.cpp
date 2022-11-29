@@ -52,32 +52,24 @@ void Evaluator::SingleEval(const Eigen::Vector3f& pos, float& scalar, Eigen::Vec
         IsotropicEval(pos, info, temp_scalars);
     }
 	
-	if (constructor->getMaxScalar() < 0)
-	{
-		scalar = std::isnan(info) ? 255.0 : info;
-		return;
-	}
-	else
-	{
-        if (use_normalize)
-        {
-            scalar = ((info - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
-        }
-        if (use_signed)
-        {
-            scalar = constructor->getIsoValue() - scalar;
-        }
-		gradient[0] = ((temp_scalars[1] - temp_scalars[0]) / constructor->getMaxScalar() * 255) / (constructor->getPRadius() * 2);
-		gradient[1] = ((temp_scalars[3] - temp_scalars[2]) / constructor->getMaxScalar() * 255) / (constructor->getPRadius() * 2);
-		gradient[2] = ((temp_scalars[5] - temp_scalars[4]) / constructor->getMaxScalar() * 255) / (constructor->getPRadius() * 2);
-        if (grad_normalize)
-        {
-            gradient.normalize();
-            gradient[0] = std::isnan(gradient[0]) ? 0.0f : gradient[0];
-            gradient[1] = std::isnan(gradient[1]) ? 0.0f : gradient[1];
-            gradient[2] = std::isnan(gradient[2]) ? 0.0f : gradient[2];
-        }
-	}
+    if (use_normalize)
+    {
+        scalar = ((info - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
+    }
+    if (use_signed)
+    {
+        scalar = constructor->getIsoValue() - scalar;
+    }
+	gradient[0] = ((temp_scalars[1] - temp_scalars[0]) / constructor->getMaxScalar() * 255) / (constructor->getPRadius() * 2);
+	gradient[1] = ((temp_scalars[3] - temp_scalars[2]) / constructor->getMaxScalar() * 255) / (constructor->getPRadius() * 2);
+	gradient[2] = ((temp_scalars[5] - temp_scalars[4]) / constructor->getMaxScalar() * 255) / (constructor->getPRadius() * 2);
+    if (grad_normalize)
+    {
+        gradient.normalize();
+        gradient[0] = std::isnan(gradient[0]) ? 0.0f : gradient[0];
+        gradient[1] = std::isnan(gradient[1]) ? 0.0f : gradient[1];
+        gradient[2] = std::isnan(gradient[2]) ? 0.0f : gradient[2];
+    }
 }
 
 void Evaluator::GridEval(
@@ -197,6 +189,33 @@ bool Evaluator::CheckSplash(const int& pIdx)
     return false;
 }
 
+float Evaluator::CalculateMaxScalar()
+{
+    double k_value = 0;
+    const double radius = constructor->getPRadius();
+    const double radius2 = radius * radius;
+    switch (constructor->getKernelType())
+    {
+    case 0:
+        k_value += general_kernel(3 * radius2, influnce2) * 8;
+        k_value += general_kernel(11 * radius2, influnce2) * 4 * 6;
+        break;
+    case 1:
+        k_value += spiky_kernel(sqrt(3) * radius, constructor->getInfluence()) * 8;
+        k_value += spiky_kernel(sqrt(11) * radius, constructor->getInfluence()) * 4 * 6;
+        break;
+    case 2:
+        k_value+= viscosity_kernel(sqrt(3) * radius, constructor->getInfluence()) * 8;
+        k_value+= viscosity_kernel(sqrt(11) * radius, constructor->getInfluence()) * 4 * 6;
+        break;
+    default:
+        k_value += general_kernel(3 * radius2, influnce2) * 8;
+        k_value += general_kernel(11 * radius2, influnce2) * 4 * 6;
+        break;
+    }
+    return ((1.0 / 1000) * k_value);
+}
+
 float Evaluator::RecommendIsoValue()
 {
     double k_value = 0.0;
@@ -221,10 +240,9 @@ float Evaluator::RecommendIsoValue()
         //k_value += general_kernel(5 * rDist2, influnce2) * 2;
         break;
     }
-    float scalar = (GlobalMass->at(0) / (*std::min_element(GlobalDensity->begin(), GlobalDensity->end())) * k_value);
-    return ((scalar - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
+    return ((((1.0 / 1000) * k_value) - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
 }
-
+/*
 float Evaluator::RecommendSurfaceThreshold()
 {
     double inside = 0, outside = 0;
@@ -236,11 +254,8 @@ float Evaluator::RecommendSurfaceThreshold()
     case 0:
         inside += general_kernel(radius2, influnce2);
         inside += general_kernel((5 - 2 * sqrt3) * radius2, influnce2) * 2;
-        //inside += general_kernel(5 * radius2, influnce2) * 4;
         outside += general_kernel(radius2, influnce2);
-        //outside += general_kernel(5 * radius2, influnce2) * 2;
         outside += general_kernel((5 + 2 * sqrt3) * radius2, influnce2) * 2;
-        //outside += general_kernel(13 * radius2, influnce2) * 2;
         break;
     case 1:
         inside += spiky_kernel(radius, constructor->getInfluence());
@@ -271,6 +286,7 @@ float Evaluator::RecommendSurfaceThreshold()
     outside *= (GlobalMass->at(0) / 1000);
     return (std::abs(((outside - inside) / constructor->getMaxScalar() * 255) / (radius * 2)));
 }
+*/
 
 void Evaluator::GetSurfaceParticles()
 {

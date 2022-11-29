@@ -129,6 +129,8 @@ void testWithCSV(std::string& csvDirPath)
 
 		loadParticlesFromCSV(csvPath, particles, density, mass);
 
+		printf("%d\n", particles.size());
+
 		SurfReconstructor constructor(particles, density, mass, mesh, P_RADIUS);
 		Recorder recorder(csvDirPath, frame.substr(0, frame.size() - 4), &constructor);
 		constructor.Run();
@@ -169,7 +171,7 @@ int main(int argc, char **argv)
 	} 
 	else 
 	{
-		std::string csvDirPath = "E:/data/vtk/csv";
+		std::string csvDirPath = "E:/data/water_manage/water_manage/water_manage";
 		testWithCSV(csvDirPath);
 	}
 

@@ -36,6 +36,7 @@ public:
         bool& signchange, int oversample);
 
     bool CheckSplash(const int& pIdx);
+    float CalculateMaxScalar();
     float RecommendIsoValue();
     float RecommendSurfaceThreshold();
     void GetSurfaceParticles();
