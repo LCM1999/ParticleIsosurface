@@ -39,7 +39,7 @@ public:
     float CalculateMaxScalar();
     float RecommendIsoValue();
     float RecommendSurfaceThreshold();
-    void GetSurfaceParticles();
+    void CalcParticlesNormal();
     float CurvEval(std::vector<int>& p_list);
 private:
     float sample_step;

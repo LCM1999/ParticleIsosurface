@@ -528,7 +528,10 @@ void SurfReconstructor::generalModeRun()
 
 	_ISO_VALUE = _evaluator->RecommendIsoValue();
     printf("   Recommend Iso Value = %f\n", _ISO_VALUE);
-	_evaluator->GetSurfaceParticles();
+	_evaluator->CalcParticlesNormal();
+	last_temp_time = temp_time;
+	temp_time = get_time();
+    printf("   Calculate Particals Normal Time = %f\n", temp_time - last_temp_time);
 
 
 	genIsoOurs();
