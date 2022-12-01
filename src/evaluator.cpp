@@ -288,7 +288,7 @@ float Evaluator::RecommendSurfaceThreshold()
 }
 */
 
-void Evaluator::GetSurfaceParticles()
+void Evaluator::CalcParticlesNormal()
 {
     //float recommand_surface_threshold = RecommendSurfaceThreshold();
     //printf("   Recommend Surface Threshold = %f\n", recommand_surface_threshold);
