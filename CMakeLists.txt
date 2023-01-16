@@ -5,29 +5,29 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(PROJECT_NAME Isosurface_smiplify)
-#SET(HDF5_USE_STATIC_LIBRARIES ON)
 
 ################################################################################
 # Find packages
 ################################################################################
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
-
+set(EIGEN3_DIR C:/Lib/Eigen-3.4.0-MSVC/share/eigen3/cmake)
+set(HDF5_DIR C:/Lib/HDF5-1.10.7-MSVC/cmake/hdf5)
 
 find_package(OpenMP REQUIRED)
 if(NOT OpenMP_FOUND)
     message(FATAL_ERROR "OpenMP not found!")
 endif()
 
-#find_package(MPI REQUIRED)
-#if(NOT MPI_FOUND)
-#    message(FATAL_ERROR "MPI not found!")
-#endif()#
+find_package(MPI REQUIRED)
+if(NOT MPI_FOUND)
+    message(FATAL_ERROR "MPI not found!")
+endif()
 
-#set(HDF5_PREFER_PARALLEL "ON")
-#find_package(HDF5 REQUIRED COMPONENTS C HL)
-#if(NOT HDF5_FOUND)
-#    message(FATAL_ERROR "HDF5 not found!")
-#endif()
+set(HDF5_PREFER_PARALLEL "ON")
+find_package(HDF5 REQUIRED NAMES hdf5 COMPONENTS C static HL)
+if(NOT HDF5_FOUND)
+   message(FATAL_ERROR "HDF5 not found!")
+endif()
 
 find_package(EIGEN3 REQUIRED)
 if(NOT EIGEN3_FOUND)
@@ -63,21 +63,23 @@ add_executable(${PROJECT_NAME}
     src/surface_reconstructor.cpp
     src/global.cpp
     src/recorder.cpp
+    src/pugixml.cpp
+    src/hdf5Utils.cpp
 )
 
 target_include_directories(${PROJECT_NAME} 
     PUBLIC
     include
     #${METIS_INCLUDE_DIR}
-    #${MPI_CXX_INCLUDE_DIRS}
-    #${HDF5_INCLUDE_DIR}
+    ${MPI_CXX_INCLUDE_DIRS}
+    ${HDF5_INCLUDE_DIR}
     ${EIGEN3_INCLUDE_DIR}
 )
 
 target_link_libraries(${PROJECT_NAME} 
     PUBLIC
     #Metis::metis
-    #${HDF5_LIBRARIES}
+    ${HDF5_C_STATIC_LIBRARY}
     Eigen3::Eigen
     OpenMP::OpenMP_CXX
 )
