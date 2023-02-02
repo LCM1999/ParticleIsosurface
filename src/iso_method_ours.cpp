@@ -10,7 +10,11 @@
 
 int tree_cells = 0;
 const std::string SAVE_RECORD_NAME = "./record_II.txt";
-
+/**
+ * @brief 构造函数：八叉树结点，类型为 uncertain
+ * @param surf_constructor 表面生成器
+ * @param id 结点编号
+*/
 TNode::TNode(SurfReconstructor* surf_constructor, int id)
 {
 	constructor = surf_constructor;

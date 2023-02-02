@@ -4,12 +4,12 @@
 
 
 Evaluator::Evaluator(SurfReconstructor* surf_constructor,
-		std::vector<Eigen::Vector3f>* global_particles, std::vector<float>* global_density, std::vector<float>* global_mass)
+    std::vector<Eigen::Vector3f>* global_particles, std::vector<float>* global_density, std::vector<float>* global_mass)
 {
     constructor = surf_constructor;
-	GlobalPoses = global_particles;
-	GlobalDensity = global_density;
-	GlobalMass = global_mass;
+    GlobalPoses = global_particles;
+    GlobalDensity = global_density;
+    GlobalMass = global_mass;
     PariclesNormals.clear();
     GlobalSplash.clear();
     PariclesNormals.resize(constructor->getGlobalParticlesNum(), Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX));
@@ -21,37 +21,38 @@ Evaluator::Evaluator(SurfReconstructor* surf_constructor,
     sample_step = constructor->getPRadius();
     influnce2 = constructor->getInfluence() * constructor->getInfluence();
 
-	if (constructor->getUseAni())
-	{
+    if (constructor->getUseAni())
+    {
         compute_Gs_xMeans();
         //GlobalSplash.shrink_to_fit();
         //printf("   Splash number = %d\n", GlobalSplash.size());
-	}
+    }
 }
 
 void Evaluator::SingleEval(const Eigen::Vector3f& pos, float& scalar, Eigen::Vector3f& gradient, bool use_normalize, bool use_signed, bool grad_normalize)
 {
-	if (constructor->getMaxScalar() >= 0)
-	{
-		scalar = 0;
+    if (constructor->getMaxScalar() >= 0)
+    {
+        scalar = 0;
         if (!gradient.isZero())
         {
             gradient.setZero();
         }
-	}
+    }
 
-	float info = 0.0f;
-	float temp_scalars[6] = {0.0f};
+    float info = 0.0f;
+    float temp_scalars[6] = { 0.0f };
 
     if (constructor->getUseAni())
     {
+        // this is always true
         AnisotropicEval(pos, info, temp_scalars);
     }
     else
     {
         IsotropicEval(pos, info, temp_scalars);
     }
-	
+
     if (use_normalize)
     {
         scalar = ((info - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
@@ -60,9 +61,9 @@ void Evaluator::SingleEval(const Eigen::Vector3f& pos, float& scalar, Eigen::Vec
     {
         scalar = constructor->getIsoValue() - scalar;
     }
-	gradient[0] = ((temp_scalars[1] - temp_scalars[0]) / constructor->getMaxScalar() * 255) / (constructor->getPRadius() * 2);
-	gradient[1] = ((temp_scalars[3] - temp_scalars[2]) / constructor->getMaxScalar() * 255) / (constructor->getPRadius() * 2);
-	gradient[2] = ((temp_scalars[5] - temp_scalars[4]) / constructor->getMaxScalar() * 255) / (constructor->getPRadius() * 2);
+    gradient[0] = ((temp_scalars[1] - temp_scalars[0]) / constructor->getMaxScalar() * 255) / (constructor->getPRadius() * 2);
+    gradient[1] = ((temp_scalars[3] - temp_scalars[2]) / constructor->getMaxScalar() * 255) / (constructor->getPRadius() * 2);
+    gradient[2] = ((temp_scalars[5] - temp_scalars[4]) / constructor->getMaxScalar() * 255) / (constructor->getPRadius() * 2);
     if (grad_normalize)
     {
         gradient.normalize();
@@ -196,22 +197,22 @@ float Evaluator::CalculateMaxScalar()
     const double radius2 = radius * radius;
     switch (constructor->getKernelType())
     {
-    case 0:
-        k_value += general_kernel(3 * radius2, influnce2) * 8;
-        k_value += general_kernel(11 * radius2, influnce2) * 4 * 6;
-        break;
-    case 1:
-        k_value += spiky_kernel(sqrt(3) * radius, constructor->getInfluence()) * 8;
-        k_value += spiky_kernel(sqrt(11) * radius, constructor->getInfluence()) * 4 * 6;
-        break;
-    case 2:
-        k_value+= viscosity_kernel(sqrt(3) * radius, constructor->getInfluence()) * 8;
-        k_value+= viscosity_kernel(sqrt(11) * radius, constructor->getInfluence()) * 4 * 6;
-        break;
-    default:
-        k_value += general_kernel(3 * radius2, influnce2) * 8;
-        k_value += general_kernel(11 * radius2, influnce2) * 4 * 6;
-        break;
+        case 0:
+            k_value += general_kernel(3 * radius2, influnce2) * 8;
+            k_value += general_kernel(11 * radius2, influnce2) * 4 * 6;
+            break;
+        case 1:
+            k_value += spiky_kernel(sqrt(3) * radius, constructor->getInfluence()) * 8;
+            k_value += spiky_kernel(sqrt(11) * radius, constructor->getInfluence()) * 4 * 6;
+            break;
+        case 2:
+            k_value += viscosity_kernel(sqrt(3) * radius, constructor->getInfluence()) * 8;
+            k_value += viscosity_kernel(sqrt(11) * radius, constructor->getInfluence()) * 4 * 6;
+            break;
+        default:
+            k_value += general_kernel(3 * radius2, influnce2) * 8;
+            k_value += general_kernel(11 * radius2, influnce2) * 4 * 6;
+            break;
     }
     return ((1.0 / 1000) * k_value);
 }
@@ -225,20 +226,20 @@ float Evaluator::RecommendIsoValue()
 
     switch (constructor->getKernelType())
     {
-    case 0:
-        k_value += general_kernel(2 * rDist2, influnce2) * 2;
-        //k_value += general_kernel(5 * rDist2, influnce2) * 2;
-        break;
-    case 1:
-        k_value = spiky_kernel(recommend_dist, constructor->getInfluence());
-        break;
-    case 2:
-        k_value = viscosity_kernel(recommend_dist, constructor->getInfluence());
-        break;
-    default:
-        k_value += general_kernel(2 * rDist2, influnce2) * 2;
-        //k_value += general_kernel(5 * rDist2, influnce2) * 2;
-        break;
+        case 0:
+            k_value += general_kernel(2 * rDist2, influnce2) * 2;
+            //k_value += general_kernel(5 * rDist2, influnce2) * 2;
+            break;
+        case 1:
+            k_value = spiky_kernel(recommend_dist, constructor->getInfluence());
+            break;
+        case 2:
+            k_value = viscosity_kernel(recommend_dist, constructor->getInfluence());
+            break;
+        default:
+            k_value += general_kernel(2 * rDist2, influnce2) * 2;
+            //k_value += general_kernel(5 * rDist2, influnce2) * 2;
+            break;
     }
     return ((((1.0 / 1000) * k_value) - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
 }
@@ -292,7 +293,7 @@ void Evaluator::CalcParticlesNormal()
 {
     //float recommand_surface_threshold = RecommendSurfaceThreshold();
     //printf("   Recommend Surface Threshold = %f\n", recommand_surface_threshold);
-#pragma omp parallel for schedule(static, OMP_THREADS_NUM) 
+    #pragma omp parallel for schedule(static, OMP_THREADS_NUM) 
     for (int pIdx = 0; pIdx < constructor->getGlobalParticlesNum(); pIdx++)
     {
         float tempScalar = 0;
@@ -345,10 +346,10 @@ inline float Evaluator::viscosity_kernel(double d, double h)
 
 inline float Evaluator::IsotrpicInterpolate(const int pIdx, const float d)
 {
-	if (d > constructor->getInfluence())
-		return 0.0f;
-	float kernel_value = 315 / (64 * pow(constructor->getInfluence(), 9)) * 0.318309886183790671538 * pow(((constructor->getInfluence() * constructor->getInfluence()) - (d * d)), 3);
-	return (*GlobalMass)[pIdx] / (*GlobalDensity)[pIdx] * kernel_value;
+    if (d > constructor->getInfluence())
+        return 0.0f;
+    float kernel_value = 315 / (64 * pow(constructor->getInfluence(), 9)) * 0.318309886183790671538 * pow(((constructor->getInfluence() * constructor->getInfluence()) - (d * d)), 3);
+    return (*GlobalMass)[pIdx] / (*GlobalDensity)[pIdx] * kernel_value;
 }
 
 inline float Evaluator::AnisotropicInterpolate(const int pIdx, const Eigen::Vector3f& diff)
@@ -356,33 +357,33 @@ inline float Evaluator::AnisotropicInterpolate(const int pIdx, const Eigen::Vect
     double k_value;
     switch (constructor->getKernelType())
     {
-    case 0:
-        k_value = general_kernel((GlobalGs[pIdx] * diff).squaredNorm(), influnce2);
-        break;
-    case 1:
-        k_value = spiky_kernel((GlobalGs[pIdx] * diff).norm(), constructor->getInfluence());
-        break;
-    case 2:
-        k_value = viscosity_kernel((GlobalGs[pIdx] * diff).norm(), constructor->getInfluence());
-        break;
-    default:
-        k_value = general_kernel((GlobalGs[pIdx] * diff).squaredNorm(), influnce2);
-        break;
+        case 0:
+            k_value = general_kernel((GlobalGs[pIdx] * diff).squaredNorm(), influnce2);
+            break;
+        case 1:
+            k_value = spiky_kernel((GlobalGs[pIdx] * diff).norm(), constructor->getInfluence());
+            break;
+        case 2:
+            k_value = viscosity_kernel((GlobalGs[pIdx] * diff).norm(), constructor->getInfluence());
+            break;
+        default:
+            k_value = general_kernel((GlobalGs[pIdx] * diff).squaredNorm(), influnce2);
+            break;
     }
     return (GlobalMass->at(pIdx) / GlobalDensity->at(pIdx)) * (GlobalGs[pIdx].determinant() * k_value);
 }
 
 inline void Evaluator::compute_Gs_xMeans()
 {
-	const double R = constructor->getPRadius();
-	const double R2 = R * R;
+    const double R = constructor->getPRadius();
+    const double R2 = R * R;
     const double D = 2.5 * R;
     const double D2 = D * D;
-	const double I = constructor->getInfluence();
+    const double I = constructor->getInfluence();
     const double I2 = I * I;
     const double invH = 1.0;
 
-#pragma omp parallel for schedule(static, OMP_THREADS_NUM) 
+    #pragma omp parallel for schedule(static, OMP_THREADS_NUM) 
     for (int pIdx = 0; pIdx < constructor->getGlobalParticlesNum(); pIdx++)
     {
         std::vector<int> tempNeighborList;
@@ -434,7 +435,7 @@ inline void Evaluator::compute_Gs_xMeans()
         {
             G += Eigen::DiagonalMatrix<float, 3>(invH, invH, invH);
             GlobalSplash[pIdx] = 1;
-        } 
+        }
         else
         {
             // if (neighborList.size() < constructor->getMinNeighborsNum())
@@ -460,11 +461,11 @@ inline void Evaluator::compute_Gs_xMeans()
             cov /= wSum;
 
             Eigen::JacobiSVD<Eigen::Matrix3d> svd(cov, Eigen::ComputeFullU | Eigen::ComputeFullV);
-            
+
             Eigen::Matrix3d u = svd.matrixU();
             Eigen::Vector3d w = svd.singularValues();
             Eigen::Matrix3d v = svd.matrixV();
-            
+
             w = Eigen::Vector3d(w.array().abs());
             const double maxSingularVal = w.maxCoeff();
 
@@ -486,14 +487,14 @@ inline void Evaluator::compute_Gs_xMeans()
 
 inline double Evaluator::wij(double d, double r)
 {
-	if (d < r)
-	{
-		return (1.0 - pow(d / r, 3));
-	}
-	else
-	{
-		return 0.0;
-	}
+    if (d < r)
+    {
+        return (1.0 - pow(d / r, 3));
+    }
+    else
+    {
+        return 0.0;
+    }
 }
 
 inline void Evaluator::IsotropicEval(const Eigen::Vector3f& pos, float& info, float* temp_scalars)
@@ -504,7 +505,7 @@ inline void Evaluator::IsotropicEval(const Eigen::Vector3f& pos, float& info, fl
         y_down_pos(pos[0], pos[1] - sample_step, pos[2]),
         z_up_pos(pos[0], pos[1], pos[2] + sample_step),
         z_down_pos(pos[0], pos[1], pos[2] - sample_step);
-    
+
     std::vector<int> pIdxList;
     constructor->getHashGrid()->GetPIdxList(pos, pIdxList);
     if (pIdxList.empty())
@@ -518,7 +519,7 @@ inline void Evaluator::IsotropicEval(const Eigen::Vector3f& pos, float& info, fl
         {
             continue;
         }
-        
+
         d = (pos - GlobalPoses->at(pIdx)).norm();
         info += IsotrpicInterpolate(pIdx, d);
 
@@ -564,7 +565,7 @@ inline void Evaluator::AnisotropicEval(const Eigen::Vector3f& pos, float& info, 
         {
             continue;
         }
-        
+
         diff = pos - GlobalxMeans[pIdx];
         info += AnisotropicInterpolate(pIdx, diff);
 

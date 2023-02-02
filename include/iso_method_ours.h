@@ -33,13 +33,10 @@ const short CONTAIN = 0;
 const short CONTAIN_IN = 1;
 const short INTERSECT = 2;
 const short DISJOINT = 3;
-
 struct TNode
 {
 	TNode() {}
-
 	TNode(SurfReconstructor* surf_constructor, int id);
-
 	~TNode()
 	{
 		defoliate();

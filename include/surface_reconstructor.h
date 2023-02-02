@@ -11,16 +11,17 @@ class HashGrid;
 class Evaluator;
 class TNode;
 class Mesh;
+class KDTree;
 
 class SurfReconstructor
-{
+{ 
 private:
     // Global Parameters
     int _OVERSAMPLE_QEF = 4;
     float _BORDER = (1.0 / 4096.0);
     int _DEPTH_MAX = 6; // 7
     int _DEPTH_MIN = 5; // 4
-    float _P_RADIUS = 0.0f;	// 0.00025f;
+    float _P_RADIUS = 0.0f;	// 0.00025f; 粒子半径
     float _INFLUENCE = 0.0f;
     float _ISO_VALUE = 0.0f;
 
@@ -45,9 +46,9 @@ private:
     HashGrid* _hashgrid = NULL;
     Evaluator* _evaluator = NULL;
 
-    std::vector<Eigen::Vector3f> _GlobalParticles;
-    std::vector<float> _GlobalDensity;
-    std::vector<float> _GlobalMass;
+    std::vector<Eigen::Vector3f> _GlobalParticles; // 粒子坐标
+    std::vector<float> _GlobalDensity; // 粒子密度
+    std::vector<float> _GlobalMass; // 粒子质量
 
     int _GlobalParticlesNum = 0;
     int _STATE = 0;
@@ -57,7 +58,9 @@ private:
     float _RootCenter[3] = {0.0f};
 
     TNode* _OurRoot;
-	Mesh* _OurMesh;
+    Mesh* _OurMesh;
+
+    KDTree* kd;
 
 protected:
     void loadRootBox();
@@ -104,6 +107,7 @@ public:
     inline int getGlobalParticlesNum() {return _GlobalParticlesNum;}
     inline int getSTATE() {return _STATE;}
     inline TNode* getRoot() {return _OurRoot;}
+    int evalLeafCalledTimes = 0;
 };
 
 #endif
