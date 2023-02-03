@@ -26,7 +26,7 @@ void KDTree::DeleteTreeNode(KDTreeNode* node)
 /**
  * @brief 构造函数
  * @param _particles 结点坐标
- * @param _index 结点编号，若提供编号请保证个数一致，切编号不会重复；若不提供则从 0 开始依次编号
+ * @param _index 结点编号，若提供编号请保证个数一致，且编号不会重复；若不提供则从 0 开始依次编号
 */
 KDTree::KDTree(std::vector<Eigen::Vector3f>* _particles, std::vector<int>* _index)
 {
@@ -41,9 +41,9 @@ KDTree::KDTree(std::vector<Eigen::Vector3f>* _particles, std::vector<int>* _inde
     for (unsigned int i = 0; i < _particles->size(); ++i)
     {
         if (use_index)
-            particles.push_back(std::make_pair(_particles->at(i), _index->at(i)));
+            particles.push_back((ParticleIDPair){ _particles->at(i), int(_index->at(i)) });
         else
-            particles.push_back(std::make_pair(_particles->at(i), i));
+            particles.push_back((ParticleIDPair) { _particles->at(i), int(i) });
     }
     root = BuildKDTree(0, particles.size() - 1);
     while (!KNearestQueue.empty()) KNearestQueue.pop();
@@ -63,7 +63,7 @@ KDTreeNode* KDTree::BuildKDTree(int range_left, int range_right)
     }
 
     SplitAxis split_axis = NOT_SET;
-    std::pair<Eigen::Vector3f, int> split_point;
+    ParticleIDPair split_point;
     Eigen::Vector3f region_min, region_max;
     GetSplitPoint(range_left, range_right, split_point, split_axis, region_min, region_max);
     int mid = (range_left + range_right) / 2;
@@ -88,24 +88,24 @@ KDTreeNode* KDTree::BuildKDTree(int range_left, int range_right)
  * @param region_min 范围最小坐标（返回）
  * @param region_max 范围最大坐标（返回）
 */
-void KDTree::GetSplitPoint(int range_left, int range_right, std::pair<Eigen::Vector3f, int>& split_point, SplitAxis& split_axis, Eigen::Vector3f& region_min, Eigen::Vector3f& region_max)
+void KDTree::GetSplitPoint(int range_left, int range_right, ParticleIDPair& split_point, SplitAxis& split_axis, Eigen::Vector3f& region_min, Eigen::Vector3f& region_max)
 {
     // 计算方差
     double ave_x = 0, var_x = 0, ave_y = 0, var_y = 0, ave_z = 0, var_z = 0;
     for (int i = range_left; i <= range_right; ++i)
     {
-        ave_x += particles.at(i).first[0];
-        ave_y += particles.at(i).first[1];
-        ave_z += particles.at(i).first[2];
+        ave_x += particles.at(i).coordinate[0];
+        ave_y += particles.at(i).coordinate[1];
+        ave_z += particles.at(i).coordinate[2];
     }
     ave_x /= range_right - range_left + 1;
     ave_y /= range_right - range_left + 1;
     ave_z /= range_right - range_left + 1;
     for (int i = range_left; i <= range_right; ++i)
     {
-        var_x += (particles.at(i).first[0] - ave_x) * (particles.at(i).first[0] - ave_x);
-        var_y += (particles.at(i).first[1] - ave_y) * (particles.at(i).first[1] - ave_y);
-        var_z += (particles.at(i).first[2] - ave_z) * (particles.at(i).first[2] - ave_z);
+        var_x += (particles.at(i).coordinate[0] - ave_x) * (particles.at(i).coordinate[0] - ave_x);
+        var_y += (particles.at(i).coordinate[1] - ave_y) * (particles.at(i).coordinate[1] - ave_y);
+        var_z += (particles.at(i).coordinate[2] - ave_z) * (particles.at(i).coordinate[2] - ave_z);
     }
     var_x /= range_right - range_left + 1;
     var_y /= range_right - range_left + 1;
@@ -129,15 +129,15 @@ void KDTree::GetSplitPoint(int range_left, int range_right, std::pair<Eigen::Vec
     {
         case X:
             sort(particles.begin() + range_left, particles.begin() + range_right + 1,
-                [](std::pair<Eigen::Vector3f, int> a, std::pair<Eigen::Vector3f, int> b) { return a.first[0] < b.first[0]; });
+                [](ParticleIDPair a, ParticleIDPair b) { return a.coordinate[0] < b.coordinate[0]; });
             break;
         case Y:
             sort(particles.begin() + range_left, particles.begin() + range_right + 1,
-                [](std::pair<Eigen::Vector3f, int> a, std::pair<Eigen::Vector3f, int> b) { return a.first[1] < b.first[1]; });
+                [](ParticleIDPair a, ParticleIDPair b) { return a.coordinate[1] < b.coordinate[1]; });
             break;
         case Z:
             sort(particles.begin() + range_left, particles.begin() + range_right + 1,
-                [](std::pair<Eigen::Vector3f, int> a, std::pair<Eigen::Vector3f, int> b) { return a.first[2] < b.first[2]; });
+                [](ParticleIDPair a, ParticleIDPair b) { return a.coordinate[2] < b.coordinate[2]; });
             break;
         default:
             break;
@@ -153,8 +153,8 @@ void KDTree::GetSplitPoint(int range_left, int range_right, std::pair<Eigen::Vec
     {
         for (int j = 0; j < 3; ++j)
         {
-            region_min[j] = std::min(region_min[j], particles.at(i).first[j]);
-            region_max[j] = std::max(region_max[j], particles.at(i).first[j]);
+            region_min[j] = std::min(region_min[j], particles.at(i).coordinate[j]);
+            region_max[j] = std::max(region_max[j], particles.at(i).coordinate[j]);
         }
     }
 }
@@ -166,17 +166,17 @@ void KDTree::GetSplitPoint(int range_left, int range_right, std::pair<Eigen::Vec
  * @param distance 结点距离
  * @param k 返回元素个数，可选
 */
-void KDTree::SaveQueueData(std::vector<unsigned int>* nearest_particle_ids, std::vector<Eigen::Vector3f>* nearest_particles, std::vector<double>* distance, unsigned int k = 0)
+template<typename T> void KDTree::SaveQueueData(std::vector<T>* nearest_particle_ids, std::vector<Eigen::Vector3f>* nearest_particles, std::vector<double>* distance, unsigned int k)
 {
     if (k > 0 && nearest_particle_ids != nullptr) nearest_particle_ids->reserve(k);
     if (k > 0 && nearest_particles != nullptr) nearest_particles->reserve(k);
     if (k > 0 && distance != nullptr) distance->reserve(k);
     while (!KNearestQueue.empty())
     {
-        std::pair<double, std::pair<Eigen::Vector3f, int>> node = KNearestQueue.top();
+        std::pair<double, ParticleIDPair> node = KNearestQueue.top();
         KNearestQueue.pop();
-        if (nearest_particle_ids != nullptr) nearest_particle_ids->push_back(node.second.second);
-        if (nearest_particles != nullptr) nearest_particles->push_back(node.second.first);
+        if (nearest_particle_ids != nullptr) nearest_particle_ids->push_back(node.second.id);
+        if (nearest_particles != nullptr) nearest_particles->push_back(node.second.coordinate);
         if (distance != nullptr) distance->push_back(node.first);
     }
     if (nearest_particle_ids != nullptr) std::reverse(nearest_particle_ids->begin(), nearest_particle_ids->end());
@@ -193,7 +193,7 @@ void KDTree::SaveQueueData(std::vector<unsigned int>* nearest_particle_ids, std:
  * @param distance 最近结点的距离（返回），不需要则使用 nullptr
  * @return 最近结点的个数
 */
-int KDTree::GetKNearest(const Eigen::Vector3f& target, unsigned int k, std::vector<unsigned int>* nearest_particle_ids, std::vector<Eigen::Vector3f>* nearest_particles, std::vector<double>* distance)
+int KDTree::GetKNearest(const Eigen::Vector3f& target, unsigned int k, std::vector<int>* nearest_particle_ids, std::vector<Eigen::Vector3f>* nearest_particles, std::vector<double>* distance)
 {
     while (KNearestQueue.size()) KNearestQueue.pop();
     if (particles.size() < k) k = particles.size();
@@ -215,12 +215,12 @@ void KDTree::GetKNearestSearch(KDTreeNode* node, const Eigen::Vector3f& target, 
         return;
     }
     // 递归找到最近结点
-    if (target[node->axis] < node->particle.first[node->axis])
+    if (target[node->axis] < node->particle.coordinate[node->axis])
         GetKNearestSearch(node->son[0], target, k);
     else
         GetKNearestSearch(node->son[1], target, k);
     // 计算是否要加入最近列表内
-    double dis = (node->particle.first - target).norm();
+    double dis = (node->particle.coordinate - target).norm();
     if (KNearestQueue.size() < k)
     {
         KNearestQueue.push(std::make_pair(dis, node->particle));
@@ -231,10 +231,10 @@ void KDTree::GetKNearestSearch(KDTreeNode* node, const Eigen::Vector3f& target, 
         KNearestQueue.push(std::make_pair(dis, node->particle));
     }
     // 检查是否需要考虑另一个子树
-    double cross_area_dis = abs(target[node->axis] - node->particle.first[node->axis]);
+    double cross_area_dis = abs(target[node->axis] - node->particle.coordinate[node->axis]);
     if (KNearestQueue.top().first > cross_area_dis)
     {
-        if (target[node->axis] < node->particle.first[node->axis])
+        if (target[node->axis] < node->particle.coordinate[node->axis])
             GetKNearestSearch(node->son[1], target, k);
         else
             GetKNearestSearch(node->son[0], target, k);
@@ -250,7 +250,7 @@ void KDTree::GetKNearestSearch(KDTreeNode* node, const Eigen::Vector3f& target, 
  * @param distance 最近结点的距离（返回），不需要则使用 nullptr
  * @return 最近结点的个数
 */
-int KDTree::GetPointWithinRadius(const Eigen::Vector3f& target, double radius, std::vector<unsigned int>* nearest_particle_ids, std::vector<Eigen::Vector3f>* nearest_particles, std::vector<double>* distance)
+int KDTree::GetPointWithinRadius(const Eigen::Vector3f& target, double radius, std::vector<int>* nearest_particle_ids, std::vector<Eigen::Vector3f>* nearest_particles, std::vector<double>* distance)
 {
     while (KNearestQueue.size()) KNearestQueue.pop();
     GetPointWithinRadiusSearch(root, target, radius);
@@ -334,16 +334,16 @@ void KDTree::GetPointWithinRadiusSearch(KDTreeNode* node, const Eigen::Vector3f&
         // 范围内的所有结点都在球内，加入所有点后返回即可
         for (int i = node->id_min; i <= node->id_max; ++i)
         {
-            KNearestQueue.push(std::make_pair((particles[i].first - target).norm(), particles[i]));
+            KNearestQueue.push(std::make_pair((particles[i].coordinate - target).norm(), particles[i]));
         }
         return;
     }
     else if (condition == 0)
     {
         // 有部分重合，判断自身，之后交给左右子树进行搜索
-        if ((node->particle.first - target).norm() <= radius)
+        if ((node->particle.coordinate - target).norm() <= radius)
         {
-            KNearestQueue.push(std::make_pair((node->particle.first - target).norm(), node->particle));
+            KNearestQueue.push(std::make_pair((node->particle.coordinate - target).norm(), node->particle));
         }
         GetPointWithinRadiusSearch(node->son[0], target, radius);
         GetPointWithinRadiusSearch(node->son[1], target, radius);

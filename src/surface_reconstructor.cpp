@@ -554,7 +554,7 @@ void SurfReconstructor::generalModeRun()
 
     printf("-= Test for KD-Tree =-\n");
     kd = new KDTree(&_GlobalParticles);
-    std::vector<unsigned int> p_idx;
+    std::vector<int> p_idx;
     std::vector<double> dis;
     std::vector<Eigen::Vector3f> par;
     srand(time(0));
