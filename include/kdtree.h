@@ -62,7 +62,7 @@ private:
 
     void DeleteTreeNode(KDTreeNode* node);
     KDTreeNode* BuildKDTree(int range_left, int range_right);
-    template<typename T = int> void SaveQueueData(std::vector<T>* nearest_particle_ids, std::vector<Eigen::Vector3f>* nearest_particles, std::vector<double>* distance, unsigned int k = 0);
+    void SaveQueueData(std::vector<int>* nearest_particle_ids, std::vector<Eigen::Vector3f>* nearest_particles, std::vector<double>* distance, unsigned int k = 0);
     void GetSplitPoint(int range_left, int range_right, ParticleIDPair& split_point, SplitAxis& split_axis, Eigen::Vector3f& region_min, Eigen::Vector3f& region_max);
     void GetKNearestSearch(KDTreeNode* node, const Eigen::Vector3f& target, unsigned int k);
     int GetCircleTreeIntersectCondition(KDTreeNode* node, const Eigen::Vector3f& target, double radius);

@@ -5,7 +5,7 @@
 
 #include "surface_reconstructor.h"
 #include "hash_grid.h"
-#include "kdtree.h"
+#include "kdtree_neighborhood_searcher.h"
 #include "evaluator.h"
 #include "iso_method_ours.h"
 #include "global.h"
@@ -551,118 +551,6 @@ void SurfReconstructor::generalModeRun()
     last_temp_time = temp_time;
     temp_time = get_time();
     printf("   Build Hash Grid Time = %f \n", temp_time - last_temp_time);
-
-    printf("-= Test for KD-Tree =-\n");
-    kd = new KDTree(&_GlobalParticles);
-    std::vector<int> p_idx;
-    std::vector<double> dis;
-    std::vector<Eigen::Vector3f> par;
-    srand(time(0));
-    // 验证 KNN
-    Eigen::Vector3f testvec = _GlobalParticles[rand() % _GlobalParticles.size()];
-    printf("Target Point is (%f,%f,%f)\n", testvec[0], testvec[1], testvec[2]);
-    kd->GetKNearest(testvec, 10, &p_idx, &par, &dis);
-    // 暴力 KNN
-    std::vector<std::pair<double, Eigen::Vector3f>> testset;
-    for (int i = 0; i < _GlobalParticles.size(); ++i)
-    {
-        testset.push_back(std::make_pair((_GlobalParticles[i] - testvec).norm(), _GlobalParticles[i]));
-    }
-    sort(testset.begin(), testset.end(), [](std::pair<double, Eigen::Vector3f> a, std::pair<double, Eigen::Vector3f> b)
-        {
-            if (a.first != b.first) return a.first < b.first;
-            else if (a.second[0] != b.second[0]) return a.second[0] < b.second[0];
-            else if (a.second[1] != b.second[1]) return a.second[1] < b.second[1];
-            else return a.second[2] < b.second[2];
-        });
-    // 检查三种返回值
-    for (int i = 0; i < dis.size(); ++i)
-    {
-        if (i < 10)
-        {
-            printf("Point %d, index = %d, Coordinate = (%f,%f,%f), distance = %f\n",
-                i + 1,
-                p_idx[i],
-                par[i][0], par[i][1], par[i][2],
-                dis[i]);
-        }
-        // 检查距离
-        if (dis[i] != testset[i].first)
-        {
-            std::cout << "err: " << dis[i] << " " << testset[i].first << "\n";
-        }
-        // 检查坐标
-        if (par[i] != testset[i].second)
-        {
-            printf("except (%f,%f,%f) got (%f,%f,%f) instead\n", testset[i].second[0], testset[i].second[1], testset[i].second[2], par[i][0], par[i][1], par[i][2]);
-            printf("except %f,%f got %f,%f\n", (testset[i].second - testvec).norm(), testset[i].first, (par[i] - testvec).norm(), dis[i]);
-        }
-        // 检查编号
-        if (_GlobalParticles[p_idx[i]] != par[i])
-        {
-            printf("index error\n");
-        }
-    }
-    // 验证 范围搜索
-    testvec = _GlobalParticles[rand() % _GlobalParticles.size()];
-    printf("Target Point is (%f,%f,%f)\n", testvec[0], testvec[1], testvec[2]);
-    double test_radius = (2.5e-4) * 2;
-    p_idx.clear();
-    par.clear();
-    dis.clear();
-    kd->GetPointWithinRadius(testvec, test_radius, &p_idx, &par, &dis);
-    // 暴力生成
-    testset.clear();
-    for (int i = 0; i < _GlobalParticles.size(); ++i)
-    {
-        if ((_GlobalParticles[i] - testvec).norm() <= test_radius)
-            testset.push_back(std::make_pair((_GlobalParticles[i] - testvec).norm(), _GlobalParticles[i]));
-    }
-    sort(testset.begin(), testset.end(), [](std::pair<double, Eigen::Vector3f> a, std::pair<double, Eigen::Vector3f> b)
-        {
-            if (a.first != b.first) return a.first < b.first;
-            else if (a.second[0] != b.second[0]) return a.second[0] < b.second[0];
-            else if (a.second[1] != b.second[1]) return a.second[1] < b.second[1];
-            else return a.second[2] < b.second[2];
-        });
-    // 检查三种返回值
-    if (dis.size() != testset.size())
-    {
-        printf("Number Error, except %d, got %d instead\n", testset.size(), dis.size());
-        exit(0);
-    }
-    for (int i = 0; i < dis.size(); ++i)
-    {
-        if (i < 10)
-        {
-            printf("Point %d, index = %d, Coordinate = (%f,%f,%f), distance = %f\n",
-                i + 1,
-                p_idx[i],
-                par[i][0], par[i][1], par[i][2],
-                dis[i]);
-        }
-        // 检查距离
-        if (dis[i] != testset[i].first)
-        {
-            std::cout << "err: " << dis[i] << " " << testset[i].first << "\n";
-        }
-        // 检查坐标
-        if (par[i] != testset[i].second)
-        {
-            printf("except (%f,%f,%f) got (%f,%f,%f) instead\n", testset[i].second[0], testset[i].second[1], testset[i].second[2], par[i][0], par[i][1], par[i][2]);
-            printf("except %f,%f got %f,%f\n", (testset[i].second - testvec).norm(), testset[i].first, (par[i] - testvec).norm(), dis[i]);
-        }
-        // 检查编号
-        if (_GlobalParticles[p_idx[i]] != par[i])
-        {
-            printf("index error\n");
-        }
-    }
-
-    // 清除
-    delete(kd);
-
-    printf("-= KD-Tree Test Passed -=\n");
 
     printf("-= Initialize Evaluator =-\n");
 

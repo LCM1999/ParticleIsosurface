@@ -166,7 +166,7 @@ void KDTree::GetSplitPoint(int range_left, int range_right, ParticleIDPair& spli
  * @param distance 结点距离
  * @param k 返回元素个数，可选
 */
-template<typename T> void KDTree::SaveQueueData(std::vector<T>* nearest_particle_ids, std::vector<Eigen::Vector3f>* nearest_particles, std::vector<double>* distance, unsigned int k)
+void KDTree::SaveQueueData(std::vector<int>* nearest_particle_ids, std::vector<Eigen::Vector3f>* nearest_particles, std::vector<double>* distance, unsigned int k)
 {
     if (k > 0 && nearest_particle_ids != nullptr) nearest_particle_ids->reserve(k);
     if (k > 0 && nearest_particles != nullptr) nearest_particles->reserve(k);

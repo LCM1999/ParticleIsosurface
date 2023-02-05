@@ -1,13 +1,15 @@
 #include <iostream>
 #include <fstream>
 #include <omp.h>
+#include <set>
 #include "iso_common.h"
 #include "iso_method_ours.h"
 #include "surface_reconstructor.h"
 #include "global.h"
 #include "recorder.h"
-
 #include "json.hpp"
+
+#include "kdtree_neighborhood_searcher.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -24,9 +26,9 @@ std::vector<std::string> CSV_PATHES;
 int CSV_TYPE;
 float P_RADIUS;
 
-void writeFile(Mesh &m, std::string fn)
+void writeFile(Mesh& m, std::string fn)
 {
-    FILE *f = fopen(fn.c_str(), "w");
+    FILE* f = fopen(fn.c_str(), "w");
     for (Eigen::Vector3f& p : m.vertices)
     {
         fprintf(f, "v %f %f %f\n", p[0], p[1], p[2]);
@@ -61,7 +63,7 @@ void loadConfigJson(const std::string controlJsonPath)
     }
     else
     {
-        std::cout << "Cannot open case!" << std::endl; 
+        std::cout << "Cannot open case!" << std::endl;
     }
 }
 
@@ -103,25 +105,25 @@ void loadParticlesFromCSV(std::string& csvPath, std::vector<Eigen::Vector3f>& pa
         }
         switch (CSV_TYPE)
         {
-        case 0:
-            particles.push_back(Eigen::Vector3f(elements[0], elements[1], elements[2]));
-            mass.push_back(elements[6]);
-            density.push_back(elements[7] + 1000.0f);
-            break;
-        case 1:
-            particles.push_back(Eigen::Vector3f(elements[1], elements[2], elements[3]));
-            mass.push_back(1.0f);
-            density.push_back(elements[0] + 1000.0f);
-            break;
-        case 2:
-            particles.push_back(Eigen::Vector3f(elements[0], elements[1], elements[2]));
-            mass.push_back(1.0f);
-            density.push_back(elements[3] + 1000.0f);
-            break;
-        default:
-            printf("Unknown type of csv format.");
-            exit(1);
-            break;
+            case 0:
+                particles.push_back(Eigen::Vector3f(elements[0], elements[1], elements[2]));
+                mass.push_back(elements[6]);
+                density.push_back(elements[7] + 1000.0f);
+                break;
+            case 1:
+                particles.push_back(Eigen::Vector3f(elements[1], elements[2], elements[3]));
+                mass.push_back(1.0f);
+                density.push_back(elements[0] + 1000.0f);
+                break;
+            case 2:
+                particles.push_back(Eigen::Vector3f(elements[0], elements[1], elements[2]));
+                mass.push_back(1.0f);
+                density.push_back(elements[3] + 1000.0f);
+                break;
+            default:
+                printf("Unknown type of csv format.");
+                exit(1);
+                break;
         }
         getline(ifn, line);
     }
@@ -141,7 +143,7 @@ void testWithCSV(std::string& csvDirPath)
     std::vector<Eigen::Vector3f> particles;
     std::vector<float> density;
     std::vector<float> mass;
-    for (const std::string frame: CSV_PATHES)
+    for (const std::string frame : CSV_PATHES)
     {
         Mesh mesh(P_RADIUS);
         std::cout << "-=   Frame " << index << " " << frame << "   =-" << std::endl;
@@ -162,36 +164,131 @@ void testWithCSV(std::string& csvDirPath)
             recorder.RecordProgress();
             recorder.RecordParticles();
         }
-        
+
         writeFile(mesh, csvDirPath + "/" + frame.substr(0, frame.size() - 4) + ".obj");
         index++;
     }
 }
 
-int main(int argc, char **argv)
+double GenRandomDouble()
 {
-#ifdef _WIN32
+    return 1.0 / (rand() % 100 + 1) * 100000;
+}
+
+void KDTreeTest()
+{
+    printf("-= Test for KD-Tree =-\n");
+    srand(time(0));
+    // 创建粒子数组
+    std::vector<Eigen::Vector3f> _GlobalParticles;
+    std::vector<double> _GlobalRadius;
+    for (int i = 0; i < 1000000; ++i)
+    {
+        _GlobalParticles.push_back({ GenRandomDouble(), GenRandomDouble(), GenRandomDouble() });
+    }
+    for (unsigned int i = 0; i < _GlobalParticles.size(); ++i)
+    {
+        _GlobalRadius.push_back(1.0 / (rand() % 100 + 1));
+    }
+    std::vector<int> p_idx;
+    std::vector<double> dis;
+    std::vector<Eigen::Vector3f> par;
+    Eigen::Vector3f testvec;
+    testvec = { GenRandomDouble(), GenRandomDouble(), GenRandomDouble() };
+    double test_radius = GenRandomDouble() / 10;
+    printf("Target: (%f,%f,%f) r=%f\n", testvec[0], testvec[1], testvec[2], test_radius);
+
+    // 时间测试
+    double start_time = get_time(), out_time, brute_time;
+
+    // 基础生成
+    KDTreeNeighborhoodSearcher* kd_searcher = new KDTreeNeighborhoodSearcher(&_GlobalParticles, &_GlobalRadius);
+    printf("Time generating tree = %f\n", get_time() - start_time);
+    //for (int testcase = 0; testcase < 10000; ++testcase)
+    //{
+    //    testvec = { GenRandomDouble(), GenRandomDouble(), GenRandomDouble() };
+    //    double test_radius = GenRandomDouble() * 10;
+    //}
+    start_time = get_time();
+    kd_searcher->GetNeighborhood(testvec, test_radius, &p_idx, &par);
+    out_time = get_time() - start_time;
+
+    // 暴力生成
+    start_time = get_time();
+    std::vector<int> vec_correct_ids;
+    for (int i = 0; i < _GlobalParticles.size(); ++i)
+    {
+        if ((_GlobalParticles[i] - testvec).norm() <= _GlobalRadius[i] + test_radius)
+        {
+            vec_correct_ids.push_back(i);
+        }
+    }
+    brute_time = get_time() - start_time;
+
+    // 测试结果验证
+    std::set<int> correct_ids;
+    for (int i = 0; i < _GlobalParticles.size(); ++i)
+    {
+        if ((_GlobalParticles[i] - testvec).norm() <= _GlobalRadius[i] + test_radius)
+        {
+            correct_ids.insert(i);
+        }
+    }
+    printf("Neighborhood size: %d\n", int(correct_ids.size()));
+    if (correct_ids.size() != p_idx.size())
+    {
+        printf("Neighborhood Error: size not equal. Expect %d, got %d instead", int(correct_ids.size()), int(p_idx.size()));
+        system("pause");
+    }
+    for (int i = 0; i < p_idx.size(); ++i)
+    {
+        if (!correct_ids.count(p_idx[i]))
+        {
+            printf("Neighborhood Error: %d should not in list", p_idx[i]);
+            system("pause");
+        }
+    }
+    for (int i = 0; i < p_idx.size(); ++i)
+    {
+        if (_GlobalParticles[p_idx[i]] != par[i])
+        {
+            printf("Neighborhood Error: id coordinate not match");
+            system("pause");
+        }
+    }
+
+    printf("Time cost: our = %f  brute force = %f\n", out_time, brute_time);
+
+    printf("KDTree Test Pass\n");
+}
+
+int main(int argc, char** argv)
+{
+    #ifdef _WIN32
     SYSTEM_INFO sysinfo;
     GetSystemInfo(&sysinfo);
     std::cout << "SYSINFO Threads: " << sysinfo.dwNumberOfProcessors << std::endl;
     OMP_THREADS_NUM = sysinfo.dwNumberOfProcessors;
-#else
+    #else
     OMP_THREADS_NUM = sysconf(_SC_NPROCESSORS_CONF);
-#endif
+    #endif
     std::cout << "OMP Threads Num: " << OMP_THREADS_NUM << std::endl;
 
     omp_set_dynamic(OMP_USE_DYNAMIC_THREADS);
     omp_set_num_threads(OMP_THREADS_NUM);
-     
+
     std::cout << std::to_string(argc) << std::endl;
+
+    while (true)
+        KDTreeTest();
 
     if (argc == 2)
     {
         std::string csvDirPath = std::string(argv[1]);
         std::cout << csvDirPath << std::endl;
         testWithCSV(csvDirPath);
-    } 
-    else 
+    }
+    else
     {
         //std::cout << "arguments format error" << "\n";
         std::string csvDirPath = "C:\\csv";
