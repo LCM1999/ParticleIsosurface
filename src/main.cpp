@@ -182,7 +182,7 @@ void KDTreeTest()
     // 创建粒子数组
     std::vector<Eigen::Vector3f> _GlobalParticles;
     std::vector<double> _GlobalRadius;
-    for (int i = 0; i < 1000000; ++i)
+    for (int i = 0; i < 100000; ++i)
     {
         _GlobalParticles.push_back({ GenRandomDouble(), GenRandomDouble(), GenRandomDouble() });
     }
@@ -199,67 +199,75 @@ void KDTreeTest()
     printf("Target: (%f,%f,%f) r=%f\n", testvec[0], testvec[1], testvec[2], test_radius);
 
     // 时间测试
-    double start_time = get_time(), out_time, brute_time;
+    double start_time = get_time(), our_time, brute_time, our_time_all = 0.0, brute_time_all = 0.0;
 
-    // 基础生成
     KDTreeNeighborhoodSearcher* kd_searcher = new KDTreeNeighborhoodSearcher(&_GlobalParticles, &_GlobalRadius);
     printf("Time generating tree = %f\n", get_time() - start_time);
-    //for (int testcase = 0; testcase < 10000; ++testcase)
-    //{
-    //    testvec = { GenRandomDouble(), GenRandomDouble(), GenRandomDouble() };
-    //    double test_radius = GenRandomDouble() * 10;
-    //}
-    start_time = get_time();
-    kd_searcher->GetNeighborhood(testvec, test_radius, &p_idx, &par);
-    out_time = get_time() - start_time;
-
-    // 暴力生成
-    start_time = get_time();
-    std::vector<int> vec_correct_ids;
-    for (int i = 0; i < _GlobalParticles.size(); ++i)
+    for (int testcase = 0; testcase < 100; ++testcase)
     {
-        if ((_GlobalParticles[i] - testvec).norm() <= _GlobalRadius[i] + test_radius)
+        if (testcase % 10 == 0)
         {
-            vec_correct_ids.push_back(i);
+            std::cout << "Test Case #" << testcase << "\n";
         }
-    }
-    brute_time = get_time() - start_time;
+        testvec = { GenRandomDouble(), GenRandomDouble(), GenRandomDouble() };
+        test_radius = GenRandomDouble() / 10;
 
-    // 测试结果验证
-    std::set<int> correct_ids;
-    for (int i = 0; i < _GlobalParticles.size(); ++i)
-    {
-        if ((_GlobalParticles[i] - testvec).norm() <= _GlobalRadius[i] + test_radius)
+        start_time = get_time();
+        std::vector<int> vec_correct_ids;
+        for (int i = 0; i < _GlobalParticles.size(); ++i)
         {
-            correct_ids.insert(i);
+            if ((_GlobalParticles[i] - testvec).norm() <= _GlobalRadius[i] + test_radius)
+            {
+                vec_correct_ids.push_back(i);
+            }
         }
-    }
-    printf("Neighborhood size: %d\n", int(correct_ids.size()));
-    if (correct_ids.size() != p_idx.size())
-    {
-        printf("Neighborhood Error: size not equal. Expect %d, got %d instead", int(correct_ids.size()), int(p_idx.size()));
-        system("pause");
-    }
-    for (int i = 0; i < p_idx.size(); ++i)
-    {
-        if (!correct_ids.count(p_idx[i]))
+        if (vec_correct_ids.size() > 100) continue; // 测试邻居较少情况
+        brute_time = get_time() - start_time;
+        brute_time_all += brute_time;
+
+        start_time = get_time();
+        kd_searcher->GetNeighborhood(testvec, test_radius, &p_idx, &par);
+        our_time = get_time() - start_time;
+        our_time_all += our_time;
+
+        printf("Single time cost: our = %f  brute force = %f\n", our_time, brute_time);
+
+        // 测试结果验证
+        std::set<int> correct_ids;
+        for (int i = 0; i < _GlobalParticles.size(); ++i)
         {
-            printf("Neighborhood Error: %d should not in list", p_idx[i]);
+            if ((_GlobalParticles[i] - testvec).norm() <= _GlobalRadius[i] + test_radius)
+            {
+                correct_ids.insert(i);
+            }
+        }
+        printf("Neighborhood size: %d\n", int(correct_ids.size()));
+        if (correct_ids.size() != p_idx.size())
+        {
+            printf("Neighborhood Error: size not equal. Expect %d, got %d instead", int(correct_ids.size()), int(p_idx.size()));
             system("pause");
         }
-    }
-    for (int i = 0; i < p_idx.size(); ++i)
-    {
-        if (_GlobalParticles[p_idx[i]] != par[i])
+        for (int i = 0; i < p_idx.size(); ++i)
         {
-            printf("Neighborhood Error: id coordinate not match");
-            system("pause");
+            if (!correct_ids.count(p_idx[i]))
+            {
+                printf("Neighborhood Error: %d should not in list", p_idx[i]);
+                system("pause");
+            }
+        }
+        for (int i = 0; i < p_idx.size(); ++i)
+        {
+            if (_GlobalParticles[p_idx[i]] != par[i])
+            {
+                printf("Neighborhood Error: id coordinate not match");
+                system("pause");
+            }
         }
     }
-
-    printf("Time cost: our = %f  brute force = %f\n", out_time, brute_time);
+    printf("Total time cost: our = %f  brute force = %f\n", our_time_all, brute_time_all);
 
     printf("KDTree Test Pass\n");
+    system("pause");
 }
 
 int main(int argc, char** argv)
