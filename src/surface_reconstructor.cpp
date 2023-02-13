@@ -67,57 +67,76 @@ void SurfReconstructor::resizeRootBox()
 	//_DEPTH_MIN = _DEPTH_MAX - 2;
 	_DEPTH_MIN = (_DEPTH_MAX - int(_DEPTH_MAX / 3));
 }
-/*
-void SurfReconstructor::recordProgress(TNode* root_node, const char* record_name)
-{
-	//std::cout << record_name << std::endl;
-	FILE* f = fopen(record_name, "w");
-	if (root_node == nullptr)
-	{
-		return;
-	}
-	TNode* root = root_node;
-	fprintf(f, "%d\n", _STATE);
-	fprintf(f, "%d\n", tree_cells);
 
-	std::stack<TNode*> node_stack;
-	node_stack.push(root);
-	std::vector<TNode*> leaves_and_empty;
-	TNode* temp_node;
-	std::string types = "", ids = "";
-	while (!node_stack.empty())
+void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& curv)
+{
+	empty = true;
+	Eigen::Vector3i min_xyz_idx, max_xyz_idx;
+	_hashgrid->CalcXYZIdx((tnode->center - Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length)), min_xyz_idx);
+	_hashgrid->CalcXYZIdx((tnode->center + Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length)), max_xyz_idx);
+	//min_xyz_idx = origin_xyz_idx - Eigen::Vector3i(1, 1, 1);
+	//max_xyz_idx = origin_xyz_idx + Eigen::Vector3i(1, 1, 1);
+	long long temp_hash;
+	Eigen::Vector3f norms(0, 0, 0);
+	float area = 0;
+	for (int x = min_xyz_idx[0] - 1; x < max_xyz_idx[0] + 1 && empty; x++)
 	{
-		temp_node = node_stack.top();
-		node_stack.pop();
-		if (temp_node == 0)
+		for (int y = min_xyz_idx[1] - 1; y < max_xyz_idx[1] + 1 && empty; y++)
 		{
-			continue;
-		}
-		types += (std::to_string(temp_node->type) + " ");
-		switch (temp_node->type)
-		{
-		case INTERNAL:
-			for (int i = 7; i >= 0; i--)
+			for (int z = min_xyz_idx[2] - 1; z < max_xyz_idx[2] + 1 && empty; z++)
 			{
-				node_stack.push(temp_node->children[i]);
+				if (empty)
+				{
+					temp_hash = _hashgrid->CalcCellHash(Eigen::Vector3i(x, y, z));
+					if (temp_hash < 0)
+						continue;
+					if ((_hashgrid->StartList.find(temp_hash) != _hashgrid->StartList.end()) && (_hashgrid->EndList.find(temp_hash) != _hashgrid->EndList.end()))
+					{
+						if ((_hashgrid->EndList[temp_hash] - _hashgrid->StartList[temp_hash]) == 0)
+						{
+							empty = true;
+						} else {
+							empty = true;
+							for (int countIndex = _hashgrid->StartList[temp_hash]; countIndex < _hashgrid->EndList[temp_hash]; countIndex++)
+							{
+								if (!_evaluator->CheckSplash(_hashgrid->IndexList[countIndex]))
+								{
+									empty = false;
+									break;
+								}
+							}
+						}
+					}
+				} 
+				if (!empty &&
+					x >= min_xyz_idx[0] && x < max_xyz_idx[0] && 
+					y >= min_xyz_idx[1] && y < max_xyz_idx[1] && 
+					z >= min_xyz_idx[2] && z < max_xyz_idx[2])
+				{
+					if ((_hashgrid->StartList.find(temp_hash) != _hashgrid->StartList.end()) && (_hashgrid->EndList.find(temp_hash) != _hashgrid->EndList.end()))
+					{
+						for (int countIndex = _hashgrid->StartList[temp_hash]; countIndex < _hashgrid->EndList[temp_hash]; countIndex++)
+						{
+							Eigen::Vector3f tempNorm = _evaluator->PariclesNormals[_hashgrid->IndexList[countIndex]];
+							if (tempNorm == Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX))
+							{
+								continue;
+							}
+							norms += tempNorm;
+							area += tempNorm.norm();
+							// auto iter = _evaluator->SurfaceNormals.find(_hashgrid->IndexList[countIndex]);
+							// if (iter != _evaluator->SurfaceNormals.end())
+							// {
+							// }
+						}
+					}
+				}
 			}
-			break;
-		case UNCERTAIN:
-			break;
-		default:
-			leaves_and_empty.push_back(temp_node);
-			break;
 		}
 	}
-	fprintf(f, types.c_str());
-	fprintf(f, "\n");
-	for (TNode* n : leaves_and_empty)
-	{
-		fprintf(f, "%f %f %f %f\n", n->node[0], n->node[1], n->node[2], n->node[3]);
-	}
-	fclose(f);
+	curv = (area == 0) ? 0.0 : (norms.norm() / area);
 }
-*/
+
 void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 {
 //	if (tnode->nId % _RECORD_STEP == 0 && _STATE == 0)
@@ -126,7 +145,7 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 //		{
 //#pragma omp critical
 //			{
-//				recordProgress(_OurRoot, (_OutputPath + "/" + _RECORD_PREFIX + std::to_string(_INDEX) + "_" + std::to_string(tnode->nId) + ".txt").c_str());
+//				RecordProgress(_OurRoot, (_OutputPath + "/" + _RECORD_PREFIX + std::to_string(_INDEX) + "_" + std::to_string(tnode->nId) + ".txt").c_str());
 //			}
 //		}
 //		printf("Record at %llu\n", tnode->nId);
@@ -147,35 +166,9 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 		if (!guide || (guide && guide->children[0] == 0))
 		{
 			// evaluate QEF samples
-			empty = true;
-			Eigen::Vector3i min_xyz_idx, max_xyz_idx;
-			_hashgrid->CalcXYZIdx((tnode->center - Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length)), min_xyz_idx);
-			_hashgrid->CalcXYZIdx((tnode->center + Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length)), max_xyz_idx);
-			min_xyz_idx -= Eigen::Vector3i(1, 1, 1);
-			max_xyz_idx += Eigen::Vector3i(1, 1, 1);
-			long long temp_hash;
-			for (int x = min_xyz_idx[0]; x <= max_xyz_idx[0] && empty; x++)
-			{
-				for (int y = min_xyz_idx[1]; y <= max_xyz_idx[1] && empty; y++)
-				{
-					for (int z = min_xyz_idx[2]; z <= max_xyz_idx[2] && empty; z++)
-					{
-						temp_hash = _hashgrid->CalcCellHash(Eigen::Vector3i(x, y, z));
-						if (temp_hash < 0)
-							continue;
-						if ((_hashgrid->StartList.find(temp_hash) != _hashgrid->StartList.end()) && (_hashgrid->EndList.find(temp_hash) != _hashgrid->EndList.end()))
-						{
-							if ((_hashgrid->EndList[temp_hash] - _hashgrid->StartList[temp_hash]) > 0)
-							{
-								empty = false;
-							}
-						}
-					}
-				}
-			}
+			checkEmptyAndCalcCurv(tnode, empty, curv);
 			if (empty)
 			{
-				//tnode->node << tnode->center;
 				tnode->node[0] = tnode->center[0];
 				tnode->node[1] = tnode->center[1];
 				tnode->node[2] = tnode->center[2];
@@ -187,7 +180,6 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 			}
 			else if (tnode->depth < _DEPTH_MIN)
 			{
-				//tnode->node << tnode->center;
 				tnode->node[0] = tnode->center[0];
 				tnode->node[1] = tnode->center[1];
 				tnode->node[2] = tnode->center[2];
@@ -195,10 +187,15 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 			}
 			else
 			{
-				tnode->vertAll(curv, signchange, grad, qef_error, true, true);
+				tnode->vertAll(curv, signchange, grad, qef_error);
 			}
 		}
-
+		if (std::isnan(curv))
+		{
+			curv = 0;
+		}
+		
+		//printf("%f ", curv);
 		// judge this node need calculate iso-surface
 		float cellsize = 2 * tnode->half_length;
 
@@ -217,19 +214,19 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 				return;
 			}
 			//static float maxsize = dynamic_cast<InternalNode*>(mytree->l)->lenn * pow(.5, DEPTH_MIN);
-			bool isbig = tnode->depth < _DEPTH_MIN;
+			bool isbig = tnode->depth <= _DEPTH_MIN;
 			//
 			//// check for a sign change
 			//if (!isbig)
 			//	signchange |= changeSignDMC();
 
 			// check for qef error
-			bool badqef = (qef_error / cellsize) > _BAD_QEF;
+			//bool badqef = (qef_error / cellsize) > _BAD_QEF;
 
 			// check curvature
 			bool badcurv = curv < _FLATNESS;
 
-			recur = isbig || (signchange && (badcurv || badqef));
+			recur = isbig || (signchange && badcurv);	//(badcurv || badqef)
 		}
 		else
 		{
@@ -288,7 +285,6 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 		// create children
 		if (guide)
 		{
-#pragma omp parallel for
 			for (int t = 0; t < 8; t++)
 			{
 				Index i = t;
@@ -300,6 +296,7 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 				{
 					grad[j] = g[i.x + j.x][i.y + j.y][i.z + j.z];
 				}
+				#pragma omp task
 				eval(tnode->children[i], grad, guide->children[i]);
 			}
 		}
@@ -453,10 +450,19 @@ void SurfReconstructor::genIsoOurs()
 		*/
 		printf("-= Generate Surface =-\n");
 		double t_gen_mesh = get_time();
-			m->tris.reserve(1000000);
-			VisitorExtract v(this, m);
-			TraversalData td(_OurRoot);
-			traverse_node<trav_vert>(v, td);
+		m->tris.reserve(1000000);
+		VisitorExtract v(this, m);
+		TraversalData td(_OurRoot);
+		traverse_node<trav_vert>(v, td);
+		std::vector<Eigen::Vector3f> splash_pos;
+		for (int pIdx = 0; pIdx < getGlobalParticlesNum(); pIdx++)
+		{
+			if (_evaluator->CheckSplash(pIdx))
+			{
+				splash_pos.push_back(_evaluator->GlobalPoses->at(pIdx));
+			}
+		}
+		m->AppendSplash(splash_pos);
 		//}
 		double t_alldone = get_time();
 		printf("Time generating polygons = %f\n", t_alldone - t_gen_mesh);
@@ -497,6 +503,7 @@ void SurfReconstructor::generalModeRun()
 	
 	printf("-= Resize Box =-\n");
 	resizeRootBox();
+	printf("   MAX_DEPTH = %d, MIN_DEPTH = %d\n", _DEPTH_MAX, _DEPTH_MIN);
 
 	temp_time = get_time();
 
@@ -515,12 +522,17 @@ void SurfReconstructor::generalModeRun()
 
 	printf("   Initialize Evaluator Time = %f \n", temp_time - last_temp_time);
 
-	int max_density_index = std::distance(_GlobalDensity.begin(), std::max_element(_GlobalDensity.begin(), _GlobalDensity.end()));
-	_evaluator->SingleEval(_GlobalParticles[max_density_index], _MAX_SCALAR, *(Eigen::Vector3f*)NULL);
+	//int max_density_index = std::distance(_GlobalDensity.begin(), std::max_element(_GlobalDensity.begin(), _GlobalDensity.end()));
+	// _evaluator->SingleEval(_GlobalParticles[max_density_index], _MAX_SCALAR, *(Eigen::Vector3f*)NULL);
+	_MAX_SCALAR = _evaluator->CalculateMaxScalar();
 
 	_ISO_VALUE = _evaluator->RecommendIsoValue();
-
     printf("   Recommend Iso Value = %f\n", _ISO_VALUE);
+	_evaluator->CalcParticlesNormal();
+	last_temp_time = temp_time;
+	temp_time = get_time();
+    printf("   Calculate Particals Normal Time = %f\n", temp_time - last_temp_time);
+
 
 	genIsoOurs();
 	genIsoOurs();

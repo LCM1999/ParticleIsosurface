@@ -2,8 +2,10 @@
 #include <fstream>
 #include <omp.h>
 #include "iso_common.h"
+#include "iso_method_ours.h"
 #include "surface_reconstructor.h"
 #include "global.h"
+#include "recorder.h"
 
 #include "json.hpp"
 
@@ -17,10 +19,7 @@ int OMP_USE_DYNAMIC_THREADS = 0;
 int OMP_THREADS_NUM = 16;
 
 // variants for test
-std::string OUTPUT_PREFIX;
-//bool NEED_RECORD;
-//std::string RECORD_PREFIX;
-//int RECORD_STEP;
+bool NEED_RECORD;
 std::vector<std::string> CSV_PATHES;
 int CSV_TYPE;
 float P_RADIUS;
@@ -53,10 +52,7 @@ void loadConfigJson(const std::string controlJsonPath)
 		parseString(&CSV_PATHES, csv_pathes, ",");
 		CSV_TYPE = readInJSON.at("CSV_TYPE");
 		P_RADIUS = readInJSON.at("P_RADIUS");
-		OUTPUT_PREFIX = readInJSON.at("OUTPUT_PREFIX");
-		//NEED_RECORD = readInJSON.at("NEED_RECORD");
-		//RECORD_STEP = readInJSON.at("RECORD_STEP");
-		//RECORD_PREFIX = readInJSON.at("RECORD_PREFIX");
+		NEED_RECORD = readInJSON.at("NEED_RECORD");
     }
     else
     {
@@ -124,18 +120,28 @@ void testWithCSV(std::string& csvDirPath)
 	std::vector<Eigen::Vector3f> particles;
     std::vector<float> density;
     std::vector<float> mass;
-    for (std::string frame: CSV_PATHES)
+    for (const std::string frame: CSV_PATHES)
 	{
-		Mesh mesh;
+		Mesh mesh(P_RADIUS);
 		std::cout << "-=   Frame " << index << " " << frame << "   =-" << std::endl;
 		std::string csvPath = csvDirPath + "/" + frame;
 		frameStart = get_time();
 
 		loadParticlesFromCSV(csvPath, particles, density, mass);
 
+		printf("%d\n", particles.size());
+
 		SurfReconstructor constructor(particles, density, mass, mesh, P_RADIUS);
+		Recorder recorder(csvDirPath, frame.substr(0, frame.size() - 4), &constructor);
 		constructor.Run();
-		writeFile(mesh, csvDirPath + "/" + OUTPUT_PREFIX + std::to_string(index) + ".obj");
+
+		if (NEED_RECORD)
+		{
+			recorder.RecordProgress();
+			recorder.RecordParticles();
+		}
+		
+		writeFile(mesh, csvDirPath + "/" + frame.substr(0, frame.size() - 4) + ".obj");
 		index++;
 	}
 }
@@ -165,7 +171,7 @@ int main(int argc, char **argv)
 	} 
 	else 
 	{
-		std::string csvDirPath = "F:/BaiduNetdiskDownload/inlet_csv";
+		std::string csvDirPath = "E:/data/water_manage/water_manage/water_manage";
 		testWithCSV(csvDirPath);
 	}
 

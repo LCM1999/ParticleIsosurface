@@ -90,6 +90,17 @@ struct TNode
 		return type == LEAF || type == EMPTY;
 	}
 
+	bool contain(const Eigen::Vector3f& pos)
+	{
+		if (std::abs(pos[0] - center[0]) <= half_length &&
+			std::abs(pos[1] - center[1]) <= half_length &&
+			std::abs(pos[2] - center[2]) <= half_length)
+		{
+			return true;
+		}
+		return false;
+	}
+
 
 	template <class T>
 	static auto squared(const T& t)
@@ -108,7 +119,7 @@ struct TNode
 		return err;
 	}
 
-	void vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float& qef_error, bool pass_face, bool pass_edge);
+	void vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float& qef_error);
 
 	int CountLeaves()
 	{

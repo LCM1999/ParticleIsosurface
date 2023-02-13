@@ -20,22 +20,27 @@ public:
 	std::vector<Eigen::Vector3f>* GlobalPoses;
 	std::vector<float>* GlobalDensity;
 	std::vector<float>* GlobalMass;
-    std::vector<int> GlobalSplash;
+    std::vector<char> GlobalSplash;
+    std::vector<Eigen::Vector3f> PariclesNormals;
+    std::vector<int> SurfaceParticles;
 	Eigen::Vector3f* GlobalxMeans;
     Eigen::Matrix3f* GlobalGs;
-	//Array2D<3, float>* GlobalGs;
 
 	Evaluator(SurfReconstructor* surf_constructor,
 		std::vector<Eigen::Vector3f>* global_particles, std::vector<float>* global_density, std::vector<float>* global_mass);
 
-	void SingleEval(const Eigen::Vector3f& pos, float& scalar, Eigen::Vector3f& gradient, bool use_normalize = true, bool use_signed = true);
+	void SingleEval(const Eigen::Vector3f& pos, float& scalar, Eigen::Vector3f& gradient, bool use_normalize = true, bool use_signed = true, bool grad_normalize = true);
 
     void GridEval(
         std::vector<Eigen::Vector3f>& sample_points, std::vector<float>& field_scalars, std::vector<Eigen::Vector3f>& field_gradients,
         bool& signchange, int oversample);
 
+    bool CheckSplash(const int& pIdx);
+    float CalculateMaxScalar();
     float RecommendIsoValue();
-
+    float RecommendSurfaceThreshold();
+    void CalcParticlesNormal();
+    float CurvEval(std::vector<int>& p_list);
 private:
     float sample_step;
     double influnce2;

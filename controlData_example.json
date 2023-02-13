@@ -3,7 +3,5 @@
   "CSV_TYPE": 0,
   "P_RADIUS": 2.5e-4,
   "NEED_RECORD": false,
-  "RECORD_STEP": 100000,
-  "OUTPUT_PREFIX": "inlet_",
-  "RECORD_PREFIX": "r_inlet_"
+  "OUTPUT_PREFIX": "inlet_"
 }
