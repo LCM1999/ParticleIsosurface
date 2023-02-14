@@ -170,6 +170,60 @@ void testWithCSV(std::string& csvDirPath)
     }
 }
 
+void LoadParticlesInfo(std::string& csvPath, std::vector<Eigen::Vector3f>& particles, std::vector<double>& radius)
+{
+    std::ifstream ifn;
+    ifn.open(csvPath.c_str());
+
+    particles.clear();
+    radius.clear();
+
+    std::string line;
+    std::vector<float> elements;
+    std::getline(ifn, line);
+    std::getline(ifn, line);
+
+    while (!line.empty())
+    {
+        elements.clear();
+        std::string lines = line + ",";
+        size_t pos = lines.find(",");
+
+        while (pos != lines.npos)
+        {
+            elements.push_back(atof(lines.substr(0, pos).c_str()));
+            lines = lines.substr(pos + 1, lines.size());
+            pos = lines.find(",");
+        }
+        particles.push_back(Eigen::Vector3f(elements[2], elements[3], elements[4]));
+        radius.push_back(elements[0]);
+        //switch (CSV_TYPE)
+        //{
+        //    case 0:
+        //        particles.push_back(Eigen::Vector3f(elements[0], elements[1], elements[2]));
+        //        mass.push_back(elements[6]);
+        //        density.push_back(elements[7] + 1000.0f);
+        //        break;
+        //    case 1:
+        //        particles.push_back(Eigen::Vector3f(elements[1], elements[2], elements[3]));
+        //        mass.push_back(1.0f);
+        //        density.push_back(elements[0] + 1000.0f);
+        //        break;
+        //    case 2:
+        //        particles.push_back(Eigen::Vector3f(elements[0], elements[1], elements[2]));
+        //        mass.push_back(1.0f);
+        //        density.push_back(elements[3] + 1000.0f);
+        //        break;
+        //    default:
+        //        printf("Unknown type of csv format.");
+        //        exit(1);
+        //        break;
+        //}
+
+        getline(ifn, line);
+    }
+}
+
 double GenRandomDouble()
 {
     return 1.0 / (rand() % 100 + 1) * 100000;
@@ -182,90 +236,123 @@ void KDTreeTest()
     // 创建粒子数组
     std::vector<Eigen::Vector3f> _GlobalParticles;
     std::vector<double> _GlobalRadius;
-    for (int i = 0; i < 100000; ++i)
+    bool random_mode = false; // 随机还是使用数据集
+    if (random_mode)
     {
-        _GlobalParticles.push_back({ GenRandomDouble(), GenRandomDouble(), GenRandomDouble() });
+        for (int i = 0; i < 100000; ++i)
+        {
+            _GlobalParticles.push_back({ GenRandomDouble(), GenRandomDouble(), GenRandomDouble() });
+        }
+        for (unsigned int i = 0; i < _GlobalParticles.size(); ++i)
+        {
+            _GlobalRadius.push_back(1.0 / (rand() % 100 + 1));
+        }
     }
-    for (unsigned int i = 0; i < _GlobalParticles.size(); ++i)
+    else
     {
-        _GlobalRadius.push_back(1.0 / (rand() % 100 + 1));
+        std::string filepath = "C:\\csv with radius\\mr_0.csv";
+        LoadParticlesInfo(filepath, _GlobalParticles, _GlobalRadius);
     }
-    std::vector<int> p_idx;
-    std::vector<double> dis;
-    std::vector<Eigen::Vector3f> par;
-    Eigen::Vector3f testvec;
-    testvec = { GenRandomDouble(), GenRandomDouble(), GenRandomDouble() };
-    double test_radius = GenRandomDouble() / 10;
-    printf("Target: (%f,%f,%f) r=%f\n", testvec[0], testvec[1], testvec[2], test_radius);
+
+    std::vector<int> result_id, verify_id;
+    std::vector<Eigen::Vector3f> result_coordinate, verify_coordinate;
+    Eigen::Vector3f test_coordinate;
+    double test_radius;
 
     // 时间测试
     double start_time = get_time(), our_time, brute_time, our_time_all = 0.0, brute_time_all = 0.0;
 
     KDTreeNeighborhoodSearcher* kd_searcher = new KDTreeNeighborhoodSearcher(&_GlobalParticles, &_GlobalRadius);
-    printf("Time generating tree = %f\n", get_time() - start_time);
-    for (int testcase = 0; testcase < 100; ++testcase)
+    double time_gen_tree = get_time() - start_time;
+    printf("Time generating tree = %f\n", time_gen_tree);
+    for (int testcase = 0; testcase < _GlobalParticles.size(); ++testcase)
     {
-        if (testcase % 10 == 0)
-        {
+        verify_id.clear();
+        verify_coordinate.clear();
+        if (testcase % 1000 == 0)
             std::cout << "Test Case #" << testcase << "\n";
-        }
-        testvec = { GenRandomDouble(), GenRandomDouble(), GenRandomDouble() };
-        test_radius = GenRandomDouble() / 10;
+        test_coordinate = _GlobalParticles[testcase];
+        test_radius = _GlobalRadius[testcase];
 
         start_time = get_time();
-        std::vector<int> vec_correct_ids;
         for (int i = 0; i < _GlobalParticles.size(); ++i)
         {
-            if ((_GlobalParticles[i] - testvec).norm() <= _GlobalRadius[i] + test_radius)
+            if ((_GlobalParticles[i] - test_coordinate).norm() <= _GlobalRadius[i] + test_radius)
             {
-                vec_correct_ids.push_back(i);
+                if (testcase == 1 && i == 6)
+                {
+                    printf("%f, %f\n", (_GlobalParticles[i] - test_coordinate).norm(), _GlobalRadius[i] + test_radius);
+                }
+                verify_id.push_back(i);
             }
         }
-        if (vec_correct_ids.size() > 100) continue; // 测试邻居较少情况
         brute_time = get_time() - start_time;
         brute_time_all += brute_time;
 
         start_time = get_time();
-        kd_searcher->GetNeighborhood(testvec, test_radius, &p_idx, &par);
+        kd_searcher->GetNeighborhood(test_coordinate, test_radius, &result_id, &result_coordinate);
         our_time = get_time() - start_time;
         our_time_all += our_time;
 
-        printf("Single time cost: our = %f  brute force = %f\n", our_time, brute_time);
+        //printf("Single time cost: our = %f  brute force = %f\n", our_time, brute_time);
 
         // 测试结果验证
-        std::set<int> correct_ids;
-        for (int i = 0; i < _GlobalParticles.size(); ++i)
+        for (int i = 0; i < result_id.size(); ++i)
         {
-            if ((_GlobalParticles[i] - testvec).norm() <= _GlobalRadius[i] + test_radius)
+            if (_GlobalParticles[result_id[i]] != result_coordinate[i])
             {
-                correct_ids.insert(i);
+                printf("Neighborhood Error: id coordinate not match\n");
+                printf("Expect %d-(%f,%f,%f), got (%f,%f,%f) instead\n", 
+                    result_id[i],
+                    _GlobalParticles[result_id[i]].x(),
+                    _GlobalParticles[result_id[i]].y(), 
+                    _GlobalParticles[result_id[i]].z(), 
+                    result_coordinate[i].x(),
+                    result_coordinate[i].y(), 
+                    result_coordinate[i].z());
+
+                system("pause");
             }
         }
-        printf("Neighborhood size: %d\n", int(correct_ids.size()));
-        if (correct_ids.size() != p_idx.size())
+        bool neighborhood_error = false;
+        sort(result_id.begin(), result_id.end());
+        sort(verify_id.begin(), verify_id.end());
+        if (verify_id.size() != result_id.size())
         {
-            printf("Neighborhood Error: size not equal. Expect %d, got %d instead", int(correct_ids.size()), int(p_idx.size()));
+            printf("Neighborhood Error: size not equal. Expect %d, got %d instead\n", int(verify_id.size()), int(result_id.size()));
+            neighborhood_error = true;
+        }
+        if (!neighborhood_error)
+            for (int i = 0; i < result_id.size(); ++i)
+            {
+                if (result_id[i] != verify_id[i])
+                {
+                    printf("Neighborhood Error: not match\n");
+                    neighborhood_error = true;
+                }
+            }
+        if (neighborhood_error)
+        {
+            printf("=======\nid = %d, coor = (%f,%f,%f), radius = %f\n", testcase,
+                _GlobalParticles[testcase].x(),
+                _GlobalParticles[testcase].y(),
+                _GlobalParticles[testcase].z(),
+                _GlobalRadius[testcase]);
+            printf("Expect neighborhood are:\n");
+            for (int i = 0; i < verify_id.size(); ++i)
+            {
+                printf("id = %d, coordinate = (%f,%f,%f), radius = %f, distance = %f\n", verify_id[i], _GlobalParticles[verify_id[i]].x(), _GlobalParticles[verify_id[i]].y(), _GlobalParticles[verify_id[i]].z(), _GlobalRadius[verify_id[i]], (_GlobalParticles[verify_id[i]] - test_coordinate).norm());
+            }
+            printf("Got neighborhood are:\n");
+            for (int i = 0; i < result_id.size(); ++i)
+            {
+                printf("id = %d\n", result_id[i]);
+            }
             system("pause");
-        }
-        for (int i = 0; i < p_idx.size(); ++i)
-        {
-            if (!correct_ids.count(p_idx[i]))
-            {
-                printf("Neighborhood Error: %d should not in list", p_idx[i]);
-                system("pause");
-            }
-        }
-        for (int i = 0; i < p_idx.size(); ++i)
-        {
-            if (_GlobalParticles[p_idx[i]] != par[i])
-            {
-                printf("Neighborhood Error: id coordinate not match");
-                system("pause");
-            }
         }
     }
     printf("Total time cost: our = %f  brute force = %f\n", our_time_all, brute_time_all);
-
+    printf("Total time cost(including building tree): our = %f  brute force = %f\n", our_time_all + time_gen_tree, brute_time_all);
     printf("KDTree Test Pass\n");
     system("pause");
 }

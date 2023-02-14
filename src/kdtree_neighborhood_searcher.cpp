@@ -109,7 +109,7 @@ void KDTreeNeighborhoodSearcher::GetNeighborhood(Eigen::Vector3f target, double 
     {
         current_group_ids.clear();
         current_group_coordinates.clear();
-        groups[i].tree->GetPointWithinRadius(target, radius + groups[i].max_radius, &current_group_ids, &current_group_coordinates);
+        groups[i].tree->GetPointWithinRadius(target, radius + groups[i].max_radius + 1e-6, &current_group_ids, &current_group_coordinates);
         for (int j = 0; j < current_group_ids.size(); ++j)
             all_group_ids.push_back(current_group_ids[j]);
         for (int j = 0; j < current_group_coordinates.size(); ++j)
