@@ -38,9 +38,10 @@ private:
     std::vector<ParticleInfo> particles; // 粒子信息
     std::vector<RadiusTreePair> groups; // 粒子分组
     std::vector<int> index_map; // 编号映射，在内部使用的都是 0-n 编号，需要输出时会处理
+    int split_method;
     void InitializeGroups();
 public:
-    KDTreeNeighborhoodSearcher(std::vector<Eigen::Vector3f>* _particles, std::vector<double>* _radius, std::vector<int>* _index = nullptr);
+    KDTreeNeighborhoodSearcher(std::vector<Eigen::Vector3f>* _particles, std::vector<double>* _radius, int _split = 0, std::vector<int>* _index = nullptr);
     ~KDTreeNeighborhoodSearcher();
     void GetNeighborhood(Eigen::Vector3f target, double radius, std::vector<int>* neighborhood_ids = nullptr, std::vector<Eigen::Vector3f>* neighborhood_coordinates = nullptr);
 };

@@ -250,7 +250,7 @@ void KDTreeTest()
     }
     else
     {
-        std::string filepath = "C:\\csv with radius\\mr_0.csv";
+        std::string filepath = "C:\\csv with radius\\mr_10.csv";
         LoadParticlesInfo(filepath, _GlobalParticles, _GlobalRadius);
     }
 
@@ -262,9 +262,13 @@ void KDTreeTest()
     // 时间测试
     double start_time = get_time(), our_time, brute_time, our_time_all = 0.0, brute_time_all = 0.0;
 
-    KDTreeNeighborhoodSearcher* kd_searcher = new KDTreeNeighborhoodSearcher(&_GlobalParticles, &_GlobalRadius);
+    KDTreeNeighborhoodSearcher* kd_searcher = new KDTreeNeighborhoodSearcher(&_GlobalParticles, &_GlobalRadius, 0);
     double time_gen_tree = get_time() - start_time;
     printf("Time generating tree = %f\n", time_gen_tree);
+    
+    std::map<int, int> neighborhood_count;
+    std::map<int, double> neighborhood_count_time;
+    bool need_brute = false; // 是否需要暴力生成验证
     for (int testcase = 0; testcase < _GlobalParticles.size(); ++testcase)
     {
         verify_id.clear();
@@ -274,82 +278,100 @@ void KDTreeTest()
         test_coordinate = _GlobalParticles[testcase];
         test_radius = _GlobalRadius[testcase];
 
-        start_time = get_time();
-        for (int i = 0; i < _GlobalParticles.size(); ++i)
+        if (need_brute)
         {
-            if ((_GlobalParticles[i] - test_coordinate).norm() <= _GlobalRadius[i] + test_radius)
+            start_time = get_time();
+            for (int i = 0; i < _GlobalParticles.size(); ++i)
             {
-                if (testcase == 1 && i == 6)
+                if ((_GlobalParticles[i] - test_coordinate).norm() <= 2 * (_GlobalRadius[i] + test_radius))
                 {
-                    printf("%f, %f\n", (_GlobalParticles[i] - test_coordinate).norm(), _GlobalRadius[i] + test_radius);
+                    verify_id.push_back(i);
                 }
-                verify_id.push_back(i);
             }
+            brute_time = get_time() - start_time;
+            brute_time_all += brute_time;
         }
-        brute_time = get_time() - start_time;
-        brute_time_all += brute_time;
 
         start_time = get_time();
         kd_searcher->GetNeighborhood(test_coordinate, test_radius, &result_id, &result_coordinate);
         our_time = get_time() - start_time;
         our_time_all += our_time;
 
+        if (neighborhood_count.count(int(result_id.size())))
+        {
+            neighborhood_count[int(result_id.size())] = neighborhood_count[int(result_id.size())] + 1;
+            neighborhood_count_time[int(result_id.size())] = our_time;
+        }
+        else
+        {
+            neighborhood_count[int(result_id.size())] = 1;
+            neighborhood_count_time[int(result_id.size())] = neighborhood_count_time[int(result_id.size())] + our_time;
+        }
+
         //printf("Single time cost: our = %f  brute force = %f\n", our_time, brute_time);
 
-        // 测试结果验证
-        for (int i = 0; i < result_id.size(); ++i)
+        if (need_brute)
         {
-            if (_GlobalParticles[result_id[i]] != result_coordinate[i])
+            // 测试结果验证
+            for (int i = 0; i < result_id.size(); ++i)
             {
-                printf("Neighborhood Error: id coordinate not match\n");
-                printf("Expect %d-(%f,%f,%f), got (%f,%f,%f) instead\n", 
-                    result_id[i],
-                    _GlobalParticles[result_id[i]].x(),
-                    _GlobalParticles[result_id[i]].y(), 
-                    _GlobalParticles[result_id[i]].z(), 
-                    result_coordinate[i].x(),
-                    result_coordinate[i].y(), 
-                    result_coordinate[i].z());
+                if (_GlobalParticles[result_id[i]] != result_coordinate[i])
+                {
+                    printf("Neighborhood Error: id coordinate not match\n");
+                    printf("Expect %d-(%f,%f,%f), got (%f,%f,%f) instead\n",
+                        result_id[i],
+                        _GlobalParticles[result_id[i]].x(),
+                        _GlobalParticles[result_id[i]].y(),
+                        _GlobalParticles[result_id[i]].z(),
+                        result_coordinate[i].x(),
+                        result_coordinate[i].y(),
+                        result_coordinate[i].z());
 
+                    system("pause");
+                }
+            }
+            bool neighborhood_error = false;
+            sort(result_id.begin(), result_id.end());
+            sort(verify_id.begin(), verify_id.end());
+            if (verify_id.size() != result_id.size())
+            {
+                printf("Neighborhood Error: size not equal. Expect %d, got %d instead\n", int(verify_id.size()), int(result_id.size()));
+                neighborhood_error = true;
+            }
+            if (!neighborhood_error)
+                for (int i = 0; i < result_id.size(); ++i)
+                {
+                    if (result_id[i] != verify_id[i])
+                    {
+                        printf("Neighborhood Error: not match\n");
+                        neighborhood_error = true;
+                    }
+                }
+            if (neighborhood_error)
+            {
+                printf("=======\nid = %d, coor = (%f,%f,%f), radius = %f\n", testcase,
+                    _GlobalParticles[testcase].x(),
+                    _GlobalParticles[testcase].y(),
+                    _GlobalParticles[testcase].z(),
+                    _GlobalRadius[testcase]);
+                printf("Expect neighborhood are:\n");
+                for (int i = 0; i < verify_id.size(); ++i)
+                {
+                    printf("id = %d, coordinate = (%f,%f,%f), radius = %f, distance = %f\n", verify_id[i], _GlobalParticles[verify_id[i]].x(), _GlobalParticles[verify_id[i]].y(), _GlobalParticles[verify_id[i]].z(), _GlobalRadius[verify_id[i]], (_GlobalParticles[verify_id[i]] - test_coordinate).norm());
+                }
+                printf("Got neighborhood are:\n");
+                for (int i = 0; i < result_id.size(); ++i)
+                {
+                    printf("id = %d\n", result_id[i]);
+                }
                 system("pause");
             }
         }
-        bool neighborhood_error = false;
-        sort(result_id.begin(), result_id.end());
-        sort(verify_id.begin(), verify_id.end());
-        if (verify_id.size() != result_id.size())
-        {
-            printf("Neighborhood Error: size not equal. Expect %d, got %d instead\n", int(verify_id.size()), int(result_id.size()));
-            neighborhood_error = true;
-        }
-        if (!neighborhood_error)
-            for (int i = 0; i < result_id.size(); ++i)
-            {
-                if (result_id[i] != verify_id[i])
-                {
-                    printf("Neighborhood Error: not match\n");
-                    neighborhood_error = true;
-                }
-            }
-        if (neighborhood_error)
-        {
-            printf("=======\nid = %d, coor = (%f,%f,%f), radius = %f\n", testcase,
-                _GlobalParticles[testcase].x(),
-                _GlobalParticles[testcase].y(),
-                _GlobalParticles[testcase].z(),
-                _GlobalRadius[testcase]);
-            printf("Expect neighborhood are:\n");
-            for (int i = 0; i < verify_id.size(); ++i)
-            {
-                printf("id = %d, coordinate = (%f,%f,%f), radius = %f, distance = %f\n", verify_id[i], _GlobalParticles[verify_id[i]].x(), _GlobalParticles[verify_id[i]].y(), _GlobalParticles[verify_id[i]].z(), _GlobalRadius[verify_id[i]], (_GlobalParticles[verify_id[i]] - test_coordinate).norm());
-            }
-            printf("Got neighborhood are:\n");
-            for (int i = 0; i < result_id.size(); ++i)
-            {
-                printf("id = %d\n", result_id[i]);
-            }
-            system("pause");
-        }
+    }
+    std::map<int, int>::iterator iter;
+    for (iter = neighborhood_count.begin(); iter != neighborhood_count.end(); ++iter)
+    {
+        printf("number of neighborhood = %d, number of testcases = %d, average time cost = %f\n", iter->first, iter->second, neighborhood_count_time[iter->first] / iter->second);
     }
     printf("Total time cost: our = %f  brute force = %f\n", our_time_all, brute_time_all);
     printf("Total time cost(including building tree): our = %f  brute force = %f\n", our_time_all + time_gen_tree, brute_time_all);
