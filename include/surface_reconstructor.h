@@ -20,8 +20,7 @@ private:
     float _BORDER = (1.0 / 4096.0);
     int _DEPTH_MAX = 6; // 7
     int _DEPTH_MIN = 5; // 4
-    float _P_RADIUS = 0.0f;	// 0.00025f;
-    float _INFLUENCE = 0.0f;
+    float _INFLUENCE_FACTOR = 0.0f;
     float _ISO_VALUE = 0.0f;
 
     int _KERNEL_TYPE = 0;
@@ -46,8 +45,13 @@ private:
     Evaluator* _evaluator = NULL;
 
     std::vector<Eigen::Vector3f> _GlobalParticles;
-    std::vector<float> _GlobalDensity;
-    std::vector<float> _GlobalMass;
+    std::vector<float>* _GlobalDensities;
+    std::vector<float>* _GlobalMasses;
+    std::vector<float>* _GlobalRadiuses;
+
+    float _DENSITY = 0;
+    float _MASS = 0;
+    float _RADIUS = 0;
 
     int _GlobalParticlesNum = 0;
     int _STATE = 0;
@@ -73,7 +77,12 @@ protected:
 
 public:
     SurfReconstructor() {};
-    SurfReconstructor(std::vector<Eigen::Vector3f>& particles, std::vector<float>& density, std::vector<float>& mass, Mesh& mesh, float particle_radius);
+    SurfReconstructor(
+        std::vector<Eigen::Vector3f>& particles,
+        std::vector<float>* densities, std::vector<float>* masses, std::vector<float>* radiuses, 
+        Mesh& mesh, 
+        float density, float mass, float radius, 
+        float inf_factor = 2.0);
 
     ~SurfReconstructor() {};
 
@@ -83,8 +92,7 @@ public:
     inline float getBorder() {return _BORDER;};
     inline int getDepthMax() {return _DEPTH_MAX;}
     inline int getDepthMin() {return _DEPTH_MIN;}
-    inline float getPRadius() {return _P_RADIUS;}
-    inline float getInfluence() {return _INFLUENCE;}
+    inline float getInfluenceFactor() {return _INFLUENCE_FACTOR;}
     inline float getIsoValue() {return _ISO_VALUE;}
     inline int getKernelType() {return _KERNEL_TYPE;}
     inline float getMaxScalar() {return _MAX_SCALAR;}
@@ -102,8 +110,15 @@ public:
     inline HashGrid* getHashGrid() {return _hashgrid;}
     inline Evaluator* getEvaluator() {return _evaluator;}
     inline int getGlobalParticlesNum() {return _GlobalParticlesNum;}
+    inline float getDensity() {return _DENSITY;}
+    inline float getMass() {return _MASS;}
+    inline float getRadius() {return _RADIUS;}
     inline int getSTATE() {return _STATE;}
     inline TNode* getRoot() {return _OurRoot;}
+
+    inline bool isConstDensity() {return _GlobalDensities == nullptr || _DENSITY != 0;}
+    inline bool isConstMass() {return _GlobalMasses == nullptr || _MASS != 0;} 
+    inline bool isConstRadius() {return _GlobalRadiuses == nullptr || _RADIUS != 0;}
 };
 
 #endif

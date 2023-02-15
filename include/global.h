@@ -60,9 +60,8 @@ struct Triangle
 
 struct Mesh
 {
-	Mesh(float p_radius, float mesh_tolerance = 1e4);
+	Mesh(float mesh_tolerance = 1e4);
     float MESH_TOLERANCE;
-	float P_RADIUS;
 	std::vector<Eigen::Vector3f> IcosaTable;
 	std::map<vect3i, int> vertices_map;
 	std::vector<Eigen::Vector3f> vertices;
@@ -85,7 +84,8 @@ struct Mesh
 	std::vector<Eigen::Vector3f> norms;
 
 	void BuildIcosaTable();
-	void AppendSplash(std::vector<Eigen::Vector3f>& splash_particles);
+	void AppendSplash_ConstR(std::vector<Eigen::Vector3f>& splash_particles, const float radius);
+	void AppendSplash_VarR(std::vector<Eigen::Vector3f>& splash_particles, std::vector<float>& splash_radius);
 };
 
 

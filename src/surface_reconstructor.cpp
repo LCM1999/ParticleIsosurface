@@ -12,14 +12,19 @@
 #include "traverse.h"
 
 
-SurfReconstructor::SurfReconstructor(std::vector<Eigen::Vector3f>& particles, std::vector<float>& density, std::vector<float>& mass, Mesh& mesh, float particle_radius)
+SurfReconstructor::SurfReconstructor(std::vector<Eigen::Vector3f>& particles, 
+std::vector<float>* densities, std::vector<float>* masses, std::vector<float>* radiuses, Mesh& mesh, 
+float density, float mass, float radius, float inf_factor)
 {
 	_GlobalParticles = particles;
 	_GlobalParticlesNum = _GlobalParticles.size();
-	_GlobalDensity = density;
-	_GlobalMass = mass;
-	_P_RADIUS = particle_radius;
-	_INFLUENCE = 4 * _P_RADIUS;
+	_GlobalDensities = densities;
+	_GlobalMasses = masses;
+	_GlobalRadiuses = radiuses;
+	_DENSITY = density;
+	_MASS = mass;
+	_RADIUS = radius;
+	_INFLUENCE_FACTOR = inf_factor;
 
 	_OurMesh = &mesh;
 }
@@ -43,16 +48,17 @@ inline void SurfReconstructor::loadRootBox()
 void SurfReconstructor::resizeRootBox()
 {
     double maxLen, resizeLen;
+	float r = _RADIUS;
 	maxLen = (std::max)({ 
 		(_BoundingBox[1] - _BoundingBox[0]) , 
 		(_BoundingBox[3] - _BoundingBox[2]) , 
 		(_BoundingBox[5] - _BoundingBox[4]) });
-	_DEPTH_MAX = int(ceil(log2(ceil(maxLen / _P_RADIUS))));
-	resizeLen = pow(2, _DEPTH_MAX) * _P_RADIUS;
-	while (resizeLen - maxLen < (2 * _INFLUENCE))
+	_DEPTH_MAX = int(ceil(log2(ceil(maxLen / r))));
+	resizeLen = pow(2, _DEPTH_MAX) * r;
+	while (resizeLen - maxLen < (_INFLUENCE_FACTOR * _RADIUS * 2))
 	{
 		_DEPTH_MAX++;
-		resizeLen = pow(2, _DEPTH_MAX) * _P_RADIUS;
+		resizeLen = pow(2, _DEPTH_MAX) * r;
 	}
 	resizeLen *= 0.99;
 	_RootHalfLength = resizeLen / 2;
@@ -204,7 +210,7 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 			// check max/min sizes of cells
 
 			// static float minsize = dynamic_cast<InternalNode*>(mytree->l)->lenn * pow(.5, DEPTH_MAX);
-			bool issmall = (cellsize - (_P_RADIUS)) < _TOLERANCE;// || depth >= DEPTH_MAX;
+			bool issmall = (cellsize - _RADIUS) < _TOLERANCE;// || depth >= DEPTH_MAX;
 			if (issmall)
 			{
 				// it's a leaf
@@ -462,7 +468,7 @@ void SurfReconstructor::genIsoOurs()
 				splash_pos.push_back(_evaluator->GlobalPoses->at(pIdx));
 			}
 		}
-		m->AppendSplash(splash_pos);
+		m->AppendSplash_ConstR(splash_pos, _RADIUS);
 		//}
 		double t_alldone = get_time();
 		printf("Time generating polygons = %f\n", t_alldone - t_gen_mesh);
@@ -508,7 +514,7 @@ void SurfReconstructor::generalModeRun()
 	temp_time = get_time();
 
 	printf("-= Build Hash Grid =-\n");
-    _hashgrid = new HashGrid(this, _GlobalParticles, _BoundingBox, _INFLUENCE);
+    _hashgrid = new HashGrid(this, _GlobalParticles, _BoundingBox, _INFLUENCE_FACTOR * _RADIUS * 2);
     last_temp_time = temp_time;
     temp_time = get_time();
 
@@ -516,13 +522,13 @@ void SurfReconstructor::generalModeRun()
 
     printf("-= Initialize Evaluator =-\n");
 
-	_evaluator = new Evaluator(this, &_GlobalParticles, &_GlobalDensity, &_GlobalMass);
+	_evaluator = new Evaluator(this, &_GlobalParticles, _GlobalDensities, _GlobalMasses, _GlobalRadiuses, _DENSITY, _MASS, _RADIUS);
 	last_temp_time = temp_time;
 	temp_time = get_time();
 
 	printf("   Initialize Evaluator Time = %f \n", temp_time - last_temp_time);
 
-	//int max_density_index = std::distance(_GlobalDensity.begin(), std::max_element(_GlobalDensity.begin(), _GlobalDensity.end()));
+	//int max_density_index = std::distance(_GlobalDensities.begin(), std::max_element(_GlobalDensities.begin(), _GlobalDensities.end()));
 	// _evaluator->SingleEval(_GlobalParticles[max_density_index], _MAX_SCALAR, *(Eigen::Vector3f*)NULL);
 	_MAX_SCALAR = _evaluator->CalculateMaxScalar();
 
@@ -532,7 +538,6 @@ void SurfReconstructor::generalModeRun()
 	last_temp_time = temp_time;
 	temp_time = get_time();
     printf("   Calculate Particals Normal Time = %f\n", temp_time - last_temp_time);
-
 
 	genIsoOurs();
 	genIsoOurs();

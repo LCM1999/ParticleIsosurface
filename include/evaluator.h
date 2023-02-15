@@ -20,14 +20,19 @@ public:
 	std::vector<Eigen::Vector3f>* GlobalPoses;
 	std::vector<float>* GlobalDensity;
 	std::vector<float>* GlobalMass;
+    std::vector<float>* GlobalRadius;
+    float Density = 0;
+    float Mass = 0;
+    float Radius = 0;
     std::vector<char> GlobalSplash;
     std::vector<Eigen::Vector3f> PariclesNormals;
     std::vector<int> SurfaceParticles;
 	Eigen::Vector3f* GlobalxMeans;
     Eigen::Matrix3f* GlobalGs;
 
-	Evaluator(SurfReconstructor* surf_constructor,
-		std::vector<Eigen::Vector3f>* global_particles, std::vector<float>* global_density, std::vector<float>* global_mass);
+	Evaluator(SurfReconstructor* surf_constructor, std::vector<Eigen::Vector3f>* global_particles, 
+    std::vector<float>* densities, std::vector<float>* masses, std::vector<float>* radiuses,
+    float density, float mass, float radius);
 
 	void SingleEval(const Eigen::Vector3f& pos, float& scalar, Eigen::Vector3f& gradient, bool use_normalize = true, bool use_signed = true, bool grad_normalize = true);
 
@@ -43,6 +48,7 @@ public:
     float CurvEval(std::vector<int>& p_list);
 private:
     float sample_step;
+    double influnce;
     double influnce2;
 
     float general_kernel(double d2, double h2);

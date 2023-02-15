@@ -4,12 +4,17 @@
 
 
 Evaluator::Evaluator(SurfReconstructor* surf_constructor,
-		std::vector<Eigen::Vector3f>* global_particles, std::vector<float>* global_density, std::vector<float>* global_mass)
+		std::vector<Eigen::Vector3f>* global_particles, 
+        std::vector<float>* densities, std::vector<float>* masses, std::vector<float>* radiuses, float density, float mass, float radius)
 {
     constructor = surf_constructor;
 	GlobalPoses = global_particles;
-	GlobalDensity = global_density;
-	GlobalMass = global_mass;
+	GlobalDensity = densities;
+	GlobalMass = masses;
+    GlobalRadius = radiuses;
+    Density = density;
+    Mass = mass;
+    Radius = radius;
     PariclesNormals.clear();
     GlobalSplash.clear();
     PariclesNormals.resize(constructor->getGlobalParticlesNum(), Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX));
@@ -18,8 +23,9 @@ Evaluator::Evaluator(SurfReconstructor* surf_constructor,
 
     GlobalxMeans = new Eigen::Vector3f[constructor->getGlobalParticlesNum()];
     GlobalGs = new Eigen::Matrix3f[constructor->getGlobalParticlesNum()];
-    sample_step = constructor->getPRadius();
-    influnce2 = constructor->getInfluence() * constructor->getInfluence();
+    sample_step = constructor->getRadius();
+    influnce = constructor->getInfluenceFactor() * radius * 2;
+    influnce2 = influnce * influnce;
 
 	if (constructor->getUseAni())
 	{
@@ -60,9 +66,9 @@ void Evaluator::SingleEval(const Eigen::Vector3f& pos, float& scalar, Eigen::Vec
     {
         scalar = constructor->getIsoValue() - scalar;
     }
-	gradient[0] = ((temp_scalars[1] - temp_scalars[0]) / constructor->getMaxScalar() * 255) / (constructor->getPRadius() * 2);
-	gradient[1] = ((temp_scalars[3] - temp_scalars[2]) / constructor->getMaxScalar() * 255) / (constructor->getPRadius() * 2);
-	gradient[2] = ((temp_scalars[5] - temp_scalars[4]) / constructor->getMaxScalar() * 255) / (constructor->getPRadius() * 2);
+	gradient[0] = ((temp_scalars[1] - temp_scalars[0]) / constructor->getMaxScalar() * 255) / (constructor->getRadius() * 2);
+	gradient[1] = ((temp_scalars[3] - temp_scalars[2]) / constructor->getMaxScalar() * 255) / (constructor->getRadius() * 2);
+	gradient[2] = ((temp_scalars[5] - temp_scalars[4]) / constructor->getMaxScalar() * 255) / (constructor->getRadius() * 2);
     if (grad_normalize)
     {
         gradient.normalize();
@@ -192,8 +198,9 @@ bool Evaluator::CheckSplash(const int& pIdx)
 float Evaluator::CalculateMaxScalar()
 {
     double k_value = 0;
-    const double radius = constructor->getPRadius();
+    const double radius = constructor->getRadius();
     const double radius2 = radius * radius;
+
     switch (constructor->getKernelType())
     {
     case 0:
@@ -201,12 +208,12 @@ float Evaluator::CalculateMaxScalar()
         k_value += general_kernel(11 * radius2, influnce2) * 4 * 6;
         break;
     case 1:
-        k_value += spiky_kernel(sqrt(3) * radius, constructor->getInfluence()) * 8;
-        k_value += spiky_kernel(sqrt(11) * radius, constructor->getInfluence()) * 4 * 6;
+        k_value += spiky_kernel(sqrt(3) * radius, influnce) * 8;
+        k_value += spiky_kernel(sqrt(11) * radius, influnce) * 4 * 6;
         break;
     case 2:
-        k_value+= viscosity_kernel(sqrt(3) * radius, constructor->getInfluence()) * 8;
-        k_value+= viscosity_kernel(sqrt(11) * radius, constructor->getInfluence()) * 4 * 6;
+        k_value+= viscosity_kernel(sqrt(3) * radius, influnce) * 8;
+        k_value+= viscosity_kernel(sqrt(11) * radius, influnce) * 4 * 6;
         break;
     default:
         k_value += general_kernel(3 * radius2, influnce2) * 8;
@@ -219,7 +226,7 @@ float Evaluator::CalculateMaxScalar()
 float Evaluator::RecommendIsoValue()
 {
     double k_value = 0.0;
-    const double recommend_dist = constructor->getPRadius() * 1.0;
+    const double recommend_dist = constructor->getRadius() * 1.0;
     const double rDist2 = recommend_dist * recommend_dist;
     const double sqrt3 = 1.7320508075688772935274463415059;
 
@@ -230,10 +237,10 @@ float Evaluator::RecommendIsoValue()
         //k_value += general_kernel(5 * rDist2, influnce2) * 2;
         break;
     case 1:
-        k_value = spiky_kernel(recommend_dist, constructor->getInfluence());
+        k_value = spiky_kernel(recommend_dist, constructor->getInfluenceFactor());
         break;
     case 2:
-        k_value = viscosity_kernel(recommend_dist, constructor->getInfluence());
+        k_value = viscosity_kernel(recommend_dist, constructor->getInfluenceFactor());
         break;
     default:
         k_value += general_kernel(2 * rDist2, influnce2) * 2;
@@ -246,7 +253,7 @@ float Evaluator::RecommendIsoValue()
 float Evaluator::RecommendSurfaceThreshold()
 {
     double inside = 0, outside = 0;
-    const double radius = constructor->getPRadius();
+    const double radius = constructor->getRadius();
     const double radius2 = radius * radius;
     const double sqrt3 = 1.7320508075688772935274463415059;
     switch (constructor->getKernelType())
@@ -325,14 +332,14 @@ void Evaluator::CalcParticlesNormal()
 inline float Evaluator::general_kernel(double d2, double h2)
 {
     double p_dist = (d2 >= h2 ? 0.0 : pow(h2 - d2, 3));
-    double sigma = (315 / (64 * pow(constructor->getInfluence(), 9))) * 0.318309886183790671538;
+    double sigma = (315 / (64 * pow(influnce, 9))) * 0.318309886183790671538;
     return p_dist * sigma;
 }
 
 inline float Evaluator::spiky_kernel(double d, double h)
 {
     double p_dist = (d >= h ? 0.0 : pow(h - d, 3));
-    double sigma = (15 / pow(constructor->getInfluence(), 6)) * 0.318309886183790671538;
+    double sigma = (15 / pow(influnce, 6)) * 0.318309886183790671538;
     return p_dist * sigma;
 }
 
@@ -345,10 +352,10 @@ inline float Evaluator::viscosity_kernel(double d, double h)
 
 inline float Evaluator::IsotrpicInterpolate(const int pIdx, const float d)
 {
-	if (d > constructor->getInfluence())
+	if (d > influnce)
 		return 0.0f;
-	float kernel_value = 315 / (64 * pow(constructor->getInfluence(), 9)) * 0.318309886183790671538 * pow(((constructor->getInfluence() * constructor->getInfluence()) - (d * d)), 3);
-	return (*GlobalMass)[pIdx] / (*GlobalDensity)[pIdx] * kernel_value;
+	float kernel_value = 315 / (64 * pow(influnce, 9)) * 0.318309886183790671538 * pow((influnce2 - (d * d)), 3);
+	return (GlobalMass == nullptr ? Mass : GlobalMass->at(pIdx)) / (GlobalDensity == nullptr ? Density : GlobalDensity->at(pIdx)) * kernel_value;
 }
 
 inline float Evaluator::AnisotropicInterpolate(const int pIdx, const Eigen::Vector3f& diff)
@@ -360,25 +367,25 @@ inline float Evaluator::AnisotropicInterpolate(const int pIdx, const Eigen::Vect
         k_value = general_kernel((GlobalGs[pIdx] * diff).squaredNorm(), influnce2);
         break;
     case 1:
-        k_value = spiky_kernel((GlobalGs[pIdx] * diff).norm(), constructor->getInfluence());
+        k_value = spiky_kernel((GlobalGs[pIdx] * diff).norm(), influnce);
         break;
     case 2:
-        k_value = viscosity_kernel((GlobalGs[pIdx] * diff).norm(), constructor->getInfluence());
+        k_value = viscosity_kernel((GlobalGs[pIdx] * diff).norm(), influnce);
         break;
     default:
         k_value = general_kernel((GlobalGs[pIdx] * diff).squaredNorm(), influnce2);
         break;
     }
-    return (GlobalMass->at(pIdx) / GlobalDensity->at(pIdx)) * (GlobalGs[pIdx].determinant() * k_value);
+    return ((GlobalMass == nullptr ? Mass : GlobalMass->at(pIdx)) / (GlobalDensity == nullptr ? Density : GlobalDensity->at(pIdx))) * (GlobalGs[pIdx].determinant() * k_value);
 }
 
 inline void Evaluator::compute_Gs_xMeans()
 {
-	const double R = constructor->getPRadius();
+	const double R = constructor->getRadius();
 	const double R2 = R * R;
     const double D = 2.5 * R;
     const double D2 = D * D;
-	const double I = constructor->getInfluence();
+	const double I = influnce;
     const double I2 = I * I;
     const double invH = 1.0;
 

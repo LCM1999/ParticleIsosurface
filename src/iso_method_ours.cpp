@@ -39,7 +39,7 @@ void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float&
 	}
 	const float cellsize = 2 * half_length;
 	const float border = constructor->getBorder() * cellsize;
-	float sampling_step = constructor->getPRadius() / 2;
+	float sampling_step = constructor->getRadius() / 2;
 	int oversample = int(ceil(cellsize / sampling_step) + 1);
 	if (depth < constructor->getDepthMin())
 	{
