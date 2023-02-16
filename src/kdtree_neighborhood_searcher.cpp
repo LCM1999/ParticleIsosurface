@@ -59,55 +59,54 @@ void KDTreeNeighborhoodSearcher::InitializeGroups()
     double group_max_radius;
     int group_size;
 
-    switch (split_method)
+    if (split_method <= 0)
     {
-        case 0:
-            group_size = int(sqrt(particles.size())); // 这里设定分组大小为 sqrt(n)，可按需更改
-            if (!group_size) group_size = 1;
-            for (unsigned int i = 0; i < particles.size() / group_size + 1; ++i)
+        group_size = int(sqrt(particles.size())); // 这里设定分组大小为 sqrt(n)，可按需更改
+        if (!group_size) group_size = 1;
+        for (unsigned int i = 0; i < particles.size() / group_size + 1; ++i)
+        {
+            unsigned int
+                l_range = i * group_size,
+                r_range = (i + 1) * group_size - 1;
+            if (r_range > particles.size() - 1) r_range = particles.size() - 1;
+            group_particles.clear();
+            group_ids.clear();
+            group_max_radius = particles[r_range].radius;
+            for (unsigned int j = l_range; j <= r_range; ++j)
             {
-                unsigned int
-                    l_range = i * group_size,
-                    r_range = (i + 1) * group_size - 1;
-                if (r_range > particles.size() - 1) r_range = particles.size() - 1;
+                group_particles.push_back(particles[j].coordinate);
+                group_ids.push_back(particles[j].id);
+            }
+            KDTree* tree = new KDTree(&group_particles, &group_ids);
+            groups.push_back(RadiusTreePair(group_max_radius, tree));
+            printf("Group size: %d\n", r_range - l_range + 1);
+        }
+    }
+    else if (split_method > 0)
+    {
+        group_max_radius = particles[0].radius;
+        group_particles.push_back(particles[0].coordinate);
+        group_ids.push_back(particles[0].id);
+        for (int i = 1; i < particles.size(); ++i)
+        {
+            if (particles[i].radius != group_max_radius && group_particles.size() > split_method)
+            {
+                KDTree* tree = new KDTree(&group_particles, &group_ids);
+                groups.push_back(RadiusTreePair(particles[i].radius, tree));
+                printf("Group size:%d\n", (group_particles.size()));
                 group_particles.clear();
                 group_ids.clear();
-                group_max_radius = particles[r_range].radius;
-                for (unsigned int j = l_range; j <= r_range; ++j)
-                {
-                    group_particles.push_back(particles[j].coordinate);
-                    group_ids.push_back(particles[j].id);
-                }
-                KDTree* tree = new KDTree(&group_particles, &group_ids);
-                groups.push_back(RadiusTreePair(group_max_radius, tree));
+                group_max_radius = particles[i].radius;
             }
-            break;
-        case 1:
-            group_max_radius = -1.0;
-            for (int i = 0; i < particles.size(); ++i)
-            {
-                if (particles[i].radius != group_max_radius)
-                {
-                    if (group_max_radius != -1.0)
-                    {
-                        KDTree* tree = new KDTree(&group_particles, &group_ids);
-                        groups.push_back(RadiusTreePair(group_max_radius, tree));
-                    }
-                    group_particles.clear();
-                    group_ids.clear();
-                    group_max_radius = particles[i].radius;
-                }
-                group_particles.push_back(particles[i].coordinate);
-                group_ids.push_back(particles[i].id);
-            }
-            if (group_particles.size() != 0)
-            {
-                KDTree* tree = new KDTree(&group_particles, &group_ids);
-                groups.push_back(RadiusTreePair(group_max_radius, tree));
-            }
-            break;
-        default:
-            break;
+            group_particles.push_back(particles[i].coordinate);
+            group_ids.push_back(particles[i].id);
+        }
+        if (group_particles.size() != 0)
+        {
+            KDTree* tree = new KDTree(&group_particles, &group_ids);
+            groups.push_back(RadiusTreePair(particles[particles.size() - 1].radius, tree));
+            printf("Group size:%d\n", (group_particles.size()));
+        }
     }
     // 排序完后，变为原数组，方便后续处理
     sort(particles.begin(), particles.end(), [](ParticleInfo a, ParticleInfo b) { return a.id < b.id; });
@@ -161,6 +160,7 @@ void KDTreeNeighborhoodSearcher::GetNeighborhood(Eigen::Vector3f target, double 
     }
 
     // 第二次筛选，对第一步筛出来的粒子逐个进行检查
+    //int error_count = 0;
     for (int i = 0; i < all_group_ids.size(); ++i)
     {
         int cur_id = all_group_ids[i];
@@ -171,5 +171,11 @@ void KDTreeNeighborhoodSearcher::GetNeighborhood(Eigen::Vector3f target, double 
             if (neighborhood_coordinates != nullptr)
                 neighborhood_coordinates->push_back(particles[cur_id].coordinate);
         }
+        //else
+        //{
+        //    ++error_count;
+        //}
     }
+    //if (all_group_ids.size() && error_count)
+    //    printf("Pass rate is: %f\n", 1.0 - 1.0 * error_count / int(all_group_ids.size()));
 }

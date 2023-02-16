@@ -229,7 +229,7 @@ double GenRandomDouble()
     return 1.0 / (rand() % 100 + 1) * 100000;
 }
 
-void KDTreeTest()
+void KDTreeTest(int split_method)
 {
     printf("-= Test for KD-Tree =-\n");
     srand(time(0));
@@ -262,7 +262,7 @@ void KDTreeTest()
     // 时间测试
     double start_time = get_time(), our_time, brute_time, our_time_all = 0.0, brute_time_all = 0.0;
 
-    KDTreeNeighborhoodSearcher* kd_searcher = new KDTreeNeighborhoodSearcher(&_GlobalParticles, &_GlobalRadius, 0);
+    KDTreeNeighborhoodSearcher* kd_searcher = new KDTreeNeighborhoodSearcher(&_GlobalParticles, &_GlobalRadius, split_method);
     double time_gen_tree = get_time() - start_time;
     printf("Time generating tree = %f\n", time_gen_tree);
     
@@ -396,8 +396,7 @@ int main(int argc, char** argv)
 
     std::cout << std::to_string(argc) << std::endl;
 
-    while (true)
-        KDTreeTest();
+    KDTreeTest(10000);
 
     if (argc == 2)
     {
