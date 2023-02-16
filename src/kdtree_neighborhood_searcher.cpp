@@ -11,6 +11,7 @@
  * @brief 构造函数
  * @param _particles 粒子坐标数组
  * @param _radius 粒子半径数组
+ * @param _split 分组方法，若为正整数则按半径每个分组，最小阈值为该值；若为负数则平均分组
  * @param _index 粒子编号数组，若默认 0 开始则为 nullptr
 */
 KDTreeNeighborhoodSearcher::KDTreeNeighborhoodSearcher(std::vector<Eigen::Vector3f>* _particles, std::vector<double>* _radius, int _split, std::vector<int>* _index)
@@ -49,7 +50,7 @@ KDTreeNeighborhoodSearcher::KDTreeNeighborhoodSearcher(std::vector<Eigen::Vector
     InitializeGroups();
 }
 /**
- * @brief 粒子分组，这里每组的大小是 sqrt(n)
+ * @brief 粒子分组
 */
 void KDTreeNeighborhoodSearcher::InitializeGroups()
 {
