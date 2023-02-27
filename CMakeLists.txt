@@ -65,6 +65,7 @@ add_executable(${PROJECT_NAME}
     src/recorder.cpp
     src/pugixml.cpp
     src/hdf5Utils.cpp
+    src/multi_level_reseacher.cpp
 )
 
 target_include_directories(${PROJECT_NAME} 

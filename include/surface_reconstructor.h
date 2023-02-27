@@ -8,6 +8,7 @@
 #include "utils.h"
 
 class HashGrid;
+class MultiLevelSearcher;
 class Evaluator;
 class TNode;
 class Mesh;
@@ -22,8 +23,6 @@ private:
     int _DEPTH_MIN = 5; // 4
     float _INFLUENCE_FACTOR = 0.0f;
     float _ISO_VALUE = 0.0f;
-
-    int _KERNEL_TYPE = 0;
 
     float _MAX_SCALAR = -1.0f;
     float _MIN_SCALAR = 0.0f;
@@ -42,6 +41,7 @@ private:
     float _MESH_TOLERANCE = 1e4;
 
     HashGrid* _hashgrid = NULL;
+    MultiLevelSearcher* _searcher = NULL;
     Evaluator* _evaluator = NULL;
 
     std::vector<Eigen::Vector3f> _GlobalParticles;
@@ -68,11 +68,13 @@ protected:
 
     void generalModeRun();
 
-    void resizeRootBox();
+    void resizeRootBoxConstR();
+
+    void resizeRootBoxVarR();
 
     // Method for CSV mode
     void genIsoOurs();
-    void checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& curv);
+    void checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& curv, float& min_radius, float& avg_radius);
     void eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide);
 
 public:
@@ -82,7 +84,7 @@ public:
         std::vector<float>* densities, std::vector<float>* masses, std::vector<float>* radiuses, 
         Mesh& mesh, 
         float density, float mass, float radius, 
-        float inf_factor = 2.0);
+        float inf_factor = 2.0f);
 
     ~SurfReconstructor() {};
 
@@ -94,7 +96,6 @@ public:
     inline int getDepthMin() {return _DEPTH_MIN;}
     inline float getInfluenceFactor() {return _INFLUENCE_FACTOR;}
     inline float getIsoValue() {return _ISO_VALUE;}
-    inline int getKernelType() {return _KERNEL_TYPE;}
     inline float getMaxScalar() {return _MAX_SCALAR;}
     inline float getMinScalar() {return _MIN_SCALAR;}
     inline float getBadQef() {return _BAD_QEF;}
@@ -108,17 +109,17 @@ public:
     inline float getRatioTolerance() {return _RATIO_TOLERANCE;}
     inline float getMeshTolerance() {return _MESH_TOLERANCE;}
     inline HashGrid* getHashGrid() {return _hashgrid;}
+    inline MultiLevelSearcher* getSearcher() {return _searcher;}
     inline Evaluator* getEvaluator() {return _evaluator;}
     inline int getGlobalParticlesNum() {return _GlobalParticlesNum;}
-    inline float getDensity() {return _DENSITY;}
-    inline float getMass() {return _MASS;}
-    inline float getRadius() {return _RADIUS;}
+    inline float getConstDensity() {return _DENSITY;}
+    inline std::vector<float>* getDensities() {return _GlobalDensities;}
+    inline std::vector<float>* getMasses() {return _GlobalMasses;}
+    inline std::vector<float>* getRadiuses() {return _GlobalRadiuses;}
+    inline float getConstMass() {return _MASS;}
+    inline float getConstRadius() {return _RADIUS;}
     inline int getSTATE() {return _STATE;}
     inline TNode* getRoot() {return _OurRoot;}
-
-    inline bool isConstDensity() {return _GlobalDensities == nullptr || _DENSITY != 0;}
-    inline bool isConstMass() {return _GlobalMasses == nullptr || _MASS != 0;} 
-    inline bool isConstRadius() {return _GlobalRadiuses == nullptr || _RADIUS != 0;}
 };
 
 #endif

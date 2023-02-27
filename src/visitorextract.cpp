@@ -401,7 +401,8 @@ bool VisitorExtract::on_vert(TraversalData& a, TraversalData& b, TraversalData& 
 
 				points[e_index] = tmpv.head(3);
 				*/
-				while ((tmpv1 - tmpv2).head(3).norm() > (constructor->getRadius() / 2))
+				while ((tmpv1 - tmpv2).head(3).norm() > 
+				((IS_CONST_RADIUS ? constructor->getConstRadius() : constructor->getSearcher()->getAvgRadius()) / 2))
 				{
 					tmpv[0] =  (tmpv1[0] + tmpv2[0]) / 2;
 					tmpv[1] =  (tmpv1[1] + tmpv2[1]) / 2;

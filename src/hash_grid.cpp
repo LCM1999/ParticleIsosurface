@@ -1,11 +1,9 @@
 #include "hash_grid.h"
-#include "surface_reconstructor.h"
 
-
-HashGrid::HashGrid(SurfReconstructor* surf_constructor, std::vector<Eigen::Vector3f>& particles, double* bounding, double cellsize)
+HashGrid::HashGrid(std::vector<Eigen::Vector3f>& particles, double* bounding, double cellsize)
 {
-	constructor = surf_constructor;
 	Particles = &particles;
+	ParticlesNum = Particles->size();
 	CellSize = cellsize;
 
 	int i = 0;
@@ -24,8 +22,8 @@ HashGrid::HashGrid(SurfReconstructor* surf_constructor, std::vector<Eigen::Vecto
 	XYZCellNum[2] = int(ceil((Bounding[5] - Bounding[4]) / CellSize));
 	CellNum = (long long)XYZCellNum[0] * (long long)XYZCellNum[1] * (long long)XYZCellNum[2];
 
-	HashList.resize(constructor->getGlobalParticlesNum(), 0);
-	IndexList.resize(constructor->getGlobalParticlesNum(), 0);
+	HashList.resize(ParticlesNum, 0);
+	IndexList.resize(ParticlesNum, 0);
 
 	BuildTable();
 	HashList.clear();
@@ -40,7 +38,7 @@ inline void HashGrid::BuildTable()
 		}
 	);
 	std::vector<long long> temp(HashList);
-	for (int i = 0; i < constructor->getGlobalParticlesNum(); i++)
+	for (int i = 0; i < ParticlesNum; i++)
 	{
 		HashList[i] = temp[IndexList[i]];
 	}
@@ -50,7 +48,7 @@ inline void HashGrid::BuildTable()
 inline void HashGrid::CalcHashList()
 {
 	Eigen::Vector3i xyzIdx;
-	for (size_t index = 0; index < constructor->getGlobalParticlesNum(); index++)
+	for (size_t index = 0; index < ParticlesNum; index++)
 	{
 		CalcXYZIdx((Particles->at(index)), xyzIdx);
 		HashList[index] = CalcCellHash(xyzIdx);
@@ -62,7 +60,7 @@ inline void HashGrid::FindStartEnd()
 {
 	int index, hash, count = 0, previous = -1;
 	
-	for (size_t index = 0; index < constructor->getGlobalParticlesNum(); index++)
+	for (size_t index = 0; index < ParticlesNum; index++)
 	{
 		hash = HashList[index];
 		if (hash < 0)
@@ -96,12 +94,51 @@ long long HashGrid::CalcCellHash(const Eigen::Vector3i& xyzIdx)
 		(long long)xyzIdx[1] * (long long)XYZCellNum[0] + (long long)xyzIdx[0];
 }
 
+void HashGrid::GetInCellList(const long long hash, std::vector<int>& pIdxList)
+{
+	int countIndex, startIndex, endIndex;
+	if ((StartList.find(hash) != StartList.end()) && (EndList.find(hash) != EndList.end()))
+	{
+		startIndex = StartList[hash];
+		endIndex = EndList[hash];
+	}
+	else
+	{
+		return;
+	}
+	for (int countIndex = startIndex; countIndex < endIndex; countIndex++)
+		pIdxList.push_back(IndexList[countIndex]);
+}
+
+void HashGrid::GetInBoxParticles(
+	const Eigen::Vector3f& box1, const Eigen::Vector3f& box2, 
+	std::vector<int>& insides)
+{
+	Eigen::Vector3i minXyzIdx, maxXyzIdx;
+	CalcXYZIdx(box1, minXyzIdx);
+	CalcXYZIdx(box2, maxXyzIdx);
+
+	long long temp_hash;
+	for (int x = (minXyzIdx.x()-1); x < (maxXyzIdx.x()+1); x++)
+    {
+        for (int y = (minXyzIdx.y()-1); y < (maxXyzIdx.y()+1); y++)
+        {
+            for (int z = (minXyzIdx.z()-1); z < (maxXyzIdx.z()+1); z++)
+            {
+                temp_hash = CalcCellHash(Eigen::Vector3i(x, y, z));
+                if (temp_hash < 0) {continue;}
+                GetInCellList(temp_hash, insides);
+            }
+        }
+    }
+}
+
+
 void HashGrid::GetPIdxList(const Eigen::Vector3f& pos, std::vector<int>& pIdxList)
 {
 	pIdxList.clear();
 	Eigen::Vector3i xyzIdx;
 	long long neighbor_hash;
-	int countIndex, startIndex, endIndex;
 	CalcXYZIdx(pos, xyzIdx);
 	for (int z = -1; z <= 1; z++)
 	{
@@ -110,19 +147,8 @@ void HashGrid::GetPIdxList(const Eigen::Vector3f& pos, std::vector<int>& pIdxLis
 			for (int x = -1; x <= 1; x++)
 			{
 				neighbor_hash = CalcCellHash((xyzIdx + Eigen::Vector3i(x, y, z)));
-				if (neighbor_hash < 0)
-					continue;
-				if ((StartList.find(neighbor_hash) != StartList.end()) && (EndList.find(neighbor_hash) != EndList.end()))
-				{
-					startIndex = StartList[neighbor_hash];
-					endIndex = EndList[neighbor_hash];
-				}
-				else
-				{
-					continue;
-				}
-				for (int countIndex = startIndex; countIndex < endIndex; countIndex++)
-					pIdxList.push_back(IndexList[countIndex]);
+				if (neighbor_hash < 0) {continue;}
+				GetInCellList(neighbor_hash, pIdxList);
 			}
 		}
 	}

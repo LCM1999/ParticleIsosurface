@@ -12,9 +12,27 @@ Evaluator::Evaluator(SurfReconstructor* surf_constructor,
 	GlobalDensity = densities;
 	GlobalMass = masses;
     GlobalRadius = radiuses;
+    if (!IS_CONST_DENSITY)
+    {
+        _MAX_DENSITY = *std::max_element(GlobalDensity->begin(), GlobalDensity->end());
+        _MIN_DENSITY = *std::min_element(GlobalDensity->begin(), GlobalDensity->end());
+    }
+    if (!IS_CONST_MASS)
+    {
+        _MAX_MASS = *std::max_element(GlobalMass->begin(), GlobalMass->end());
+        _MIN_MASS = *std::min_element(GlobalMass->begin(), GlobalMass->end());
+    }
+    if (!IS_CONST_RADIUS)
+    {
+        _MAX_RADIUS = constructor->getSearcher()->getMaxRadius();
+        _MAX_RADIUS = constructor->getSearcher()->getMinRadius();
+    }
     Density = density;
     Mass = mass;
     Radius = radius;
+
+    inf_factor = constructor->getInfluenceFactor();
+
     PariclesNormals.clear();
     GlobalSplash.clear();
     PariclesNormals.resize(constructor->getGlobalParticlesNum(), Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX));
@@ -23,9 +41,6 @@ Evaluator::Evaluator(SurfReconstructor* surf_constructor,
 
     GlobalxMeans = new Eigen::Vector3f[constructor->getGlobalParticlesNum()];
     GlobalGs = new Eigen::Matrix3f[constructor->getGlobalParticlesNum()];
-    sample_step = constructor->getRadius();
-    influnce = constructor->getInfluenceFactor() * radius * 2;
-    influnce2 = influnce * influnce;
 
 	if (constructor->getUseAni())
 	{
@@ -48,14 +63,15 @@ void Evaluator::SingleEval(const Eigen::Vector3f& pos, float& scalar, Eigen::Vec
 
 	float info = 0.0f;
 	float temp_scalars[6] = {0.0f};
+    float sample_radius = 0.0f;
 
     if (constructor->getUseAni())
     {
-        AnisotropicEval(pos, info, temp_scalars);
+        AnisotropicEval(pos, info, temp_scalars, sample_radius);
     }
     else
     {
-        IsotropicEval(pos, info, temp_scalars);
+        IsotropicEval(pos, info, temp_scalars, sample_radius);
     }
 	
     if (use_normalize)
@@ -66,9 +82,9 @@ void Evaluator::SingleEval(const Eigen::Vector3f& pos, float& scalar, Eigen::Vec
     {
         scalar = constructor->getIsoValue() - scalar;
     }
-	gradient[0] = ((temp_scalars[1] - temp_scalars[0]) / constructor->getMaxScalar() * 255) / (constructor->getRadius() * 2);
-	gradient[1] = ((temp_scalars[3] - temp_scalars[2]) / constructor->getMaxScalar() * 255) / (constructor->getRadius() * 2);
-	gradient[2] = ((temp_scalars[5] - temp_scalars[4]) / constructor->getMaxScalar() * 255) / (constructor->getRadius() * 2);
+	gradient[0] = ((temp_scalars[1] - temp_scalars[0]) / constructor->getMaxScalar() * 255) / (sample_radius * 2);
+	gradient[1] = ((temp_scalars[3] - temp_scalars[2]) / constructor->getMaxScalar() * 255) / (sample_radius * 2);
+	gradient[2] = ((temp_scalars[5] - temp_scalars[4]) / constructor->getMaxScalar() * 255) / (sample_radius * 2);
     if (grad_normalize)
     {
         gradient.normalize();
@@ -89,11 +105,16 @@ void Evaluator::GridEval(
         float scalar = 0.0f;
         if (constructor->getUseAni())
         {
-            std::vector<int> pIdxList;
-            constructor->getHashGrid()->GetPIdxList(p, pIdxList);
-            if (!pIdxList.empty())
+            std::vector<int> neighbors;
+            if (IS_CONST_RADIUS)
             {
-                for (int pIdx : pIdxList)
+                constructor->getHashGrid()->GetPIdxList(p, neighbors);
+            } else {
+                constructor->getSearcher()->GetNeighbors(p, neighbors);
+            }
+            if (!neighbors.empty())
+            {
+                for (int pIdx : neighbors)
                 {
                     scalar += AnisotropicInterpolate(pIdx, p - GlobalxMeans[pIdx]);
                 }
@@ -101,15 +122,20 @@ void Evaluator::GridEval(
         }
         else
         {
-            std::vector<int> pIdxList;
-            constructor->getHashGrid()->GetPIdxList(p, pIdxList);
-            if (!pIdxList.empty())
+            std::vector<int> neighbors;
+            if (IS_CONST_RADIUS)
             {
-                float d;
-                for (int pIdx : pIdxList)
+                constructor->getHashGrid()->GetPIdxList(p, neighbors);
+            } else {
+                constructor->getSearcher()->GetNeighbors(p, neighbors);
+            }
+            if (!neighbors.empty())
+            {
+                double d2;
+                for (int pIdx : neighbors)
                 {
-                    d = (p - GlobalPoses->at(pIdx)).norm();
-                    scalar += IsotrpicInterpolate(pIdx, d);
+                    d2 = (p - GlobalPoses->at(pIdx)).squaredNorm();
+                    scalar += IsotropicInterpolate(pIdx, d2);
                 }
             }
         }
@@ -195,105 +221,75 @@ bool Evaluator::CheckSplash(const int& pIdx)
     return false;
 }
 
-float Evaluator::CalculateMaxScalar()
+float Evaluator::CalculateMaxScalarConstR()
 {
     double k_value = 0;
-    const double radius = constructor->getRadius();
+    const double radius = Radius;
     const double radius2 = radius * radius;
+    const double influnce = radius * inf_factor;
+    const double influnce2 = influnce * influnce;
 
-    switch (constructor->getKernelType())
-    {
-    case 0:
-        k_value += general_kernel(3 * radius2, influnce2) * 8;
-        k_value += general_kernel(11 * radius2, influnce2) * 4 * 6;
-        break;
-    case 1:
-        k_value += spiky_kernel(sqrt(3) * radius, influnce) * 8;
-        k_value += spiky_kernel(sqrt(11) * radius, influnce) * 4 * 6;
-        break;
-    case 2:
-        k_value+= viscosity_kernel(sqrt(3) * radius, influnce) * 8;
-        k_value+= viscosity_kernel(sqrt(11) * radius, influnce) * 4 * 6;
-        break;
-    default:
-        k_value += general_kernel(3 * radius2, influnce2) * 8;
-        k_value += general_kernel(11 * radius2, influnce2) * 4 * 6;
-        break;
-    }
+    k_value += general_kernel(3 * radius2, influnce2, influnce) * 8;
+    k_value += general_kernel(11 * radius2, influnce2, influnce) * 4 * 6;
+
     return ((1.0 / 1000) * k_value);
 }
 
-float Evaluator::RecommendIsoValue()
+float Evaluator::CalculateMaxScalarVarR()
+{
+    double max_scalar = 0;
+    std::vector<float>* radiuses = constructor->getSearcher()->getCheckedRadiuses();
+
+    double radius2, influnce, influnce2;
+    for (const float r : *radiuses)
+    {
+        double temp_scalar = 0;
+        radius2 = r * r;
+        influnce = r * inf_factor;
+        influnce2 = influnce * influnce;
+        temp_scalar += general_kernel(3 * radius2, influnce2, influnce) * 8;
+        temp_scalar += general_kernel(11 * radius2, influnce2, influnce) * 4 * 6;
+        if (temp_scalar > max_scalar)
+        {
+            max_scalar = temp_scalar;
+        }
+    }
+    return ((IS_CONST_MASS ? Mass : _MAX_MASS) / (IS_CONST_DENSITY ? Density : _MIN_DENSITY)) * max_scalar;
+}
+
+float Evaluator::RecommendIsoValueConstR()
 {
     double k_value = 0.0;
-    const double recommend_dist = constructor->getRadius() * 1.0;
-    const double rDist2 = recommend_dist * recommend_dist;
-    const double sqrt3 = 1.7320508075688772935274463415059;
-
-    switch (constructor->getKernelType())
-    {
-    case 0:
-        k_value += general_kernel(2 * rDist2, influnce2) * 2;
-        //k_value += general_kernel(5 * rDist2, influnce2) * 2;
-        break;
-    case 1:
-        k_value = spiky_kernel(recommend_dist, constructor->getInfluenceFactor());
-        break;
-    case 2:
-        k_value = viscosity_kernel(recommend_dist, constructor->getInfluenceFactor());
-        break;
-    default:
-        k_value += general_kernel(2 * rDist2, influnce2) * 2;
-        //k_value += general_kernel(5 * rDist2, influnce2) * 2;
-        break;
-    }
-    return ((((1.0 / 1000) * k_value) - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
-}
-/*
-float Evaluator::RecommendSurfaceThreshold()
-{
-    double inside = 0, outside = 0;
-    const double radius = constructor->getRadius();
+    const double radius = Radius;
     const double radius2 = radius * radius;
     const double sqrt3 = 1.7320508075688772935274463415059;
-    switch (constructor->getKernelType())
-    {
-    case 0:
-        inside += general_kernel(radius2, influnce2);
-        inside += general_kernel((5 - 2 * sqrt3) * radius2, influnce2) * 2;
-        outside += general_kernel(radius2, influnce2);
-        outside += general_kernel((5 + 2 * sqrt3) * radius2, influnce2) * 2;
-        break;
-    case 1:
-        inside += spiky_kernel(radius, constructor->getInfluence());
-        inside += spiky_kernel(sqrt(5) * radius, constructor->getInfluence());
-        outside += spiky_kernel(radius, influnce2);
-        outside += spiky_kernel(sqrt(5) * radius, influnce2);
-        outside += spiky_kernel(sqrt(9) * radius, influnce2);
-        outside += spiky_kernel(sqrt(13) * radius, influnce2);
-        break;
-    case 2:
-        inside += viscosity_kernel(radius, constructor->getInfluence());
-        inside += viscosity_kernel(sqrt(5) * radius, constructor->getInfluence());
-        outside += viscosity_kernel(radius, influnce2);
-        outside += viscosity_kernel(sqrt(5) * radius, influnce2);
-        outside += viscosity_kernel(sqrt(9) * radius, influnce2);
-        outside += viscosity_kernel(sqrt(13) * radius, influnce2);
-        break;
-    default:
-        inside += general_kernel(radius2, influnce2);
-        inside += general_kernel(5 * radius2, influnce2);
-        outside += general_kernel(radius2, influnce2);
-        outside += general_kernel(5 * radius2, influnce2);
-        outside += general_kernel(9 * radius2, influnce2);
-        outside += general_kernel(13 * radius2, influnce2);
-        break;
-    }
-    inside *= (GlobalMass->at(0) / 1000);
-    outside *= (GlobalMass->at(0) / 1000);
-    return (std::abs(((outside - inside) / constructor->getMaxScalar() * 255) / (radius * 2)));
+
+    const double influnce = radius * inf_factor;
+    const double influnce2 = influnce * influnce;
+
+    k_value += general_kernel(2 * radius2, influnce2, influnce) * 2;
+    //k_value += general_kernel(5 * rDist2, influnce2) * 2;
+
+    return ((((1.0 / 1000) * k_value) - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
 }
-*/
+
+float Evaluator::RecommendIsoValueVarR()
+{
+    double recommend = 0.0;
+    std::vector<float>* radiuses = constructor->getSearcher()->getCheckedRadiuses();
+
+    double radius2, influnce, influnce2;
+    for (const float r : *radiuses)
+    {
+        radius2 = r * r;
+        influnce = r * inf_factor;
+        influnce2 = influnce * influnce;
+        recommend += general_kernel(2 * radius2, influnce2, influnce) * 2;
+    }
+    return ((
+        ((IS_CONST_MASS ? Mass : _MAX_MASS) / (IS_CONST_DENSITY ? Density : _MIN_DENSITY)) * 
+        (recommend / radiuses->size())) - constructor->getMinScalar()) / constructor->getMaxScalar() * 255;
+}
 
 void Evaluator::CalcParticlesNormal()
 {
@@ -329,17 +325,17 @@ void Evaluator::CalcParticlesNormal()
     //printf("   Surface particles number = %d\n", SurfaceNormals.size());
 }
 
-inline float Evaluator::general_kernel(double d2, double h2)
+inline float Evaluator::general_kernel(double d2, double h2, double h)
 {
     double p_dist = (d2 >= h2 ? 0.0 : pow(h2 - d2, 3));
-    double sigma = (315 / (64 * pow(influnce, 9))) * 0.318309886183790671538;
+    double sigma = (315 / (64 * pow(h, 9))) * 0.318309886183790671538;
     return p_dist * sigma;
 }
 
 inline float Evaluator::spiky_kernel(double d, double h)
 {
     double p_dist = (d >= h ? 0.0 : pow(h - d, 3));
-    double sigma = (15 / pow(influnce, 6)) * 0.318309886183790671538;
+    double sigma = (15 / pow(h, 6)) * 0.318309886183790671538;
     return p_dist * sigma;
 }
 
@@ -350,61 +346,55 @@ inline float Evaluator::viscosity_kernel(double d, double h)
     return p_dist * sigma;
 }
 
-inline float Evaluator::IsotrpicInterpolate(const int pIdx, const float d)
+inline float Evaluator::IsotropicInterpolate(const int pIdx, const double d2)
 {
-	if (d > influnce)
+    double influnce = (IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx)) * inf_factor;
+    double influnce2 = influnce * influnce;
+	if (d2 > influnce2)
 		return 0.0f;
-	float kernel_value = 315 / (64 * pow(influnce, 9)) * 0.318309886183790671538 * pow((influnce2 - (d * d)), 3);
-	return (GlobalMass == nullptr ? Mass : GlobalMass->at(pIdx)) / (GlobalDensity == nullptr ? Density : GlobalDensity->at(pIdx)) * kernel_value;
+	float kernel_value = 315 / (64 * pow(influnce, 9)) * 0.318309886183790671538 * pow((influnce2 - d2), 3);
+	return (IS_CONST_MASS ? Mass : GlobalMass->at(pIdx)) / (IS_CONST_DENSITY ? Density : GlobalDensity->at(pIdx)) * kernel_value;
 }
 
 inline float Evaluator::AnisotropicInterpolate(const int pIdx, const Eigen::Vector3f& diff)
 {
-    double k_value;
-    switch (constructor->getKernelType())
-    {
-    case 0:
-        k_value = general_kernel((GlobalGs[pIdx] * diff).squaredNorm(), influnce2);
-        break;
-    case 1:
-        k_value = spiky_kernel((GlobalGs[pIdx] * diff).norm(), influnce);
-        break;
-    case 2:
-        k_value = viscosity_kernel((GlobalGs[pIdx] * diff).norm(), influnce);
-        break;
-    default:
-        k_value = general_kernel((GlobalGs[pIdx] * diff).squaredNorm(), influnce2);
-        break;
-    }
-    return ((GlobalMass == nullptr ? Mass : GlobalMass->at(pIdx)) / (GlobalDensity == nullptr ? Density : GlobalDensity->at(pIdx))) * (GlobalGs[pIdx].determinant() * k_value);
+    double influnce = (IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx)) * inf_factor;
+    double influnce2 = influnce * influnce;
+    double k_value = general_kernel((GlobalGs[pIdx] * diff).squaredNorm(), influnce2, influnce);
+    return ((IS_CONST_MASS ? Mass : GlobalMass->at(pIdx)) / (IS_CONST_DENSITY ? Density : GlobalDensity->at(pIdx))) * (GlobalGs[pIdx].determinant() * k_value);
 }
 
 inline void Evaluator::compute_Gs_xMeans()
 {
-	const double R = constructor->getRadius();
-	const double R2 = R * R;
-    const double D = 2.5 * R;
-    const double D2 = D * D;
-	const double I = influnce;
-    const double I2 = I * I;
     const double invH = 1.0;
-
 #pragma omp parallel for schedule(static, OMP_THREADS_NUM) 
     for (int pIdx = 0; pIdx < constructor->getGlobalParticlesNum(); pIdx++)
     {
-        std::vector<int> tempNeighborList;
-        std::vector<int> neighborList;
+        std::vector<int> tempNeighbors;
+        std::vector<int> neighbors;
         int closerNeigbors = 0;
         Eigen::Vector3f xMean = Eigen::Vector3f::Zero();
         Eigen::Matrix3f G = Eigen::Matrix3f::Zero();
-        constructor->getHashGrid()->GetPIdxList((GlobalPoses->at(pIdx)), tempNeighborList);
-        if (tempNeighborList.empty())
+        if (IS_CONST_RADIUS)
+        {
+            constructor->getHashGrid()->GetPIdxList((GlobalPoses->at(pIdx)), tempNeighbors);
+        } else {
+            constructor->getSearcher()->GetNeighbors((GlobalPoses->at(pIdx)), tempNeighbors);
+        }
+        if (tempNeighbors.empty())
             continue;
         double wSum = 0, d2, d, wj;
-        for (int nIdx : tempNeighborList)
+        double R, R2, D, D2, I, I2;
+        for (int nIdx : tempNeighbors)
         {
             if (nIdx == pIdx)
                 continue;
+            R = IS_CONST_RADIUS ? Radius : GlobalRadius->at(nIdx);
+            R2 = R * R;
+            D = 2.5 * R;
+            D2 = D * D;
+            I = R * inf_factor;
+            I2 = I * I;
             d2 = (((GlobalPoses->at(nIdx))) - ((GlobalPoses->at(pIdx)))).squaredNorm();
             if (d2 >= I2)
             {
@@ -414,7 +404,7 @@ inline void Evaluator::compute_Gs_xMeans()
             wj = wij(d, I);
             wSum += wj;
             xMean += ((GlobalPoses->at(nIdx))) * wj;
-            neighborList.push_back(nIdx);
+            neighbors.push_back(nIdx);
             if (d2 < D2)
             {
                 closerNeigbors++;
@@ -437,7 +427,7 @@ inline void Evaluator::compute_Gs_xMeans()
             xMean = (GlobalPoses->at(pIdx));
         }
 
-        if (neighborList.size() < 1 || closerNeigbors < 1)
+        if (neighbors.size() < 1 || closerNeigbors < 1)
         {
             G += Eigen::DiagonalMatrix<float, 3>(invH, invH, invH);
             GlobalSplash[pIdx] = 1;
@@ -456,7 +446,7 @@ inline void Evaluator::compute_Gs_xMeans()
             Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
             cov += Eigen::DiagonalMatrix<double, 3>(invH, invH, invH);
             wSum = 0.0f;
-            for (int nIdx : neighborList)
+            for (int nIdx : neighbors)
             {
                 d = (xMean - ((GlobalPoses->at(nIdx)))).norm();
                 wj = wij(d, I);
@@ -503,23 +493,34 @@ inline double Evaluator::wij(double d, double r)
 	}
 }
 
-inline void Evaluator::IsotropicEval(const Eigen::Vector3f& pos, float& info, float* temp_scalars)
-{
-    Eigen::Vector3f x_up_pos(pos[0] + sample_step, pos[1], pos[2]),
-        x_down_pos(pos[0] - sample_step, pos[1], pos[2]),
-        y_up_pos(pos[0], pos[1] + sample_step, pos[2]),
-        y_down_pos(pos[0], pos[1] - sample_step, pos[2]),
-        z_up_pos(pos[0], pos[1], pos[2] + sample_step),
-        z_down_pos(pos[0], pos[1], pos[2] - sample_step);
-    
-    std::vector<int> pIdxList;
-    constructor->getHashGrid()->GetPIdxList(pos, pIdxList);
-    if (pIdxList.empty())
+inline void Evaluator::IsotropicEval(const Eigen::Vector3f& pos, float& info, float* temp_scalars, float& sample_radius)
+{    
+    std::vector<int> neighbors;
+    if (IS_CONST_RADIUS)
+    {
+        constructor->getHashGrid()->GetPIdxList(pos, neighbors);
+    } else {
+        constructor->getSearcher()->GetNeighbors(pos, neighbors);
+    }
+    if (neighbors.empty())
     {
         return;
     }
+
+    sample_radius = IS_CONST_RADIUS ? Radius : 
+    (*std::min_element(neighbors.begin(), neighbors.end(), [&](const int& a, const int& b) {
+        return GlobalRadius[a] < GlobalRadius[b];
+    }));
+
+    Eigen::Vector3f x_up_pos(pos[0] + sample_radius, pos[1], pos[2]),
+                    x_down_pos(pos[0] - sample_radius, pos[1], pos[2]),
+                    y_up_pos(pos[0], pos[1] + sample_radius, pos[2]),
+                    y_down_pos(pos[0], pos[1] - sample_radius, pos[2]),
+                    z_up_pos(pos[0], pos[1], pos[2] + sample_radius),
+                    z_down_pos(pos[0], pos[1], pos[2] - sample_radius);
+
     float d;
-    for (int pIdx : pIdxList)
+    for (int pIdx : neighbors)
     {
         if (this->CheckSplash(pIdx))
         {
@@ -527,45 +528,56 @@ inline void Evaluator::IsotropicEval(const Eigen::Vector3f& pos, float& info, fl
         }
         
         d = (pos - GlobalPoses->at(pIdx)).norm();
-        info += IsotrpicInterpolate(pIdx, d);
+        info += IsotropicInterpolate(pIdx, d);
 
         d = (x_up_pos - GlobalPoses->at(pIdx)).norm();
-        temp_scalars[0] += IsotrpicInterpolate(pIdx, d);
+        temp_scalars[0] += IsotropicInterpolate(pIdx, d);
 
         d = (x_down_pos - GlobalPoses->at(pIdx)).norm();
-        temp_scalars[1] += IsotrpicInterpolate(pIdx, d);
+        temp_scalars[1] += IsotropicInterpolate(pIdx, d);
 
         d = (y_up_pos - GlobalPoses->at(pIdx)).norm();
-        temp_scalars[2] += IsotrpicInterpolate(pIdx, d);
+        temp_scalars[2] += IsotropicInterpolate(pIdx, d);
 
         d = (y_down_pos - GlobalPoses->at(pIdx)).norm();
-        temp_scalars[3] += IsotrpicInterpolate(pIdx, d);
+        temp_scalars[3] += IsotropicInterpolate(pIdx, d);
 
         d = (z_up_pos - GlobalPoses->at(pIdx)).norm();
-        temp_scalars[4] += IsotrpicInterpolate(pIdx, d);
+        temp_scalars[4] += IsotropicInterpolate(pIdx, d);
 
         d = (z_down_pos - GlobalPoses->at(pIdx)).norm();
-        temp_scalars[5] += IsotrpicInterpolate(pIdx, d);
+        temp_scalars[5] += IsotropicInterpolate(pIdx, d);
     }
 }
 
-inline void Evaluator::AnisotropicEval(const Eigen::Vector3f& pos, float& info, float* temp_scalars)
+inline void Evaluator::AnisotropicEval(const Eigen::Vector3f& pos, float& info, float* temp_scalars, float& sample_radius)
 {
-    Eigen::Vector3f x_up_pos(pos[0] + sample_step, pos[1], pos[2]),
-        x_down_pos(pos[0] - sample_step, pos[1], pos[2]),
-        y_up_pos(pos[0], pos[1] + sample_step, pos[2]),
-        y_down_pos(pos[0], pos[1] - sample_step, pos[2]),
-        z_up_pos(pos[0], pos[1], pos[2] + sample_step),
-        z_down_pos(pos[0], pos[1], pos[2] - sample_step);
-
-    std::vector<int> pIdxList;
-    constructor->getHashGrid()->GetPIdxList(pos, pIdxList);
-    if (pIdxList.empty())
+    std::vector<int> neighbors;
+    if (IS_CONST_RADIUS)
+    {
+        constructor->getHashGrid()->GetPIdxList(pos, neighbors);
+    } else {
+        constructor->getSearcher()->GetNeighbors(pos, neighbors);
+    }
+    if (neighbors.empty())
     {
         return;
     }
+
+    sample_radius = IS_CONST_RADIUS ? Radius : 
+    GlobalRadius->at(*std::min_element(neighbors.begin(), neighbors.end(), [&](const int& a, const int& b) {
+        return GlobalRadius->at(a) < GlobalRadius->at(b);
+    }));
+
+    Eigen::Vector3f x_up_pos(pos[0] + sample_radius, pos[1], pos[2]),
+                    x_down_pos(pos[0] - sample_radius, pos[1], pos[2]),
+                    y_up_pos(pos[0], pos[1] + sample_radius, pos[2]),
+                    y_down_pos(pos[0], pos[1] - sample_radius, pos[2]),
+                    z_up_pos(pos[0], pos[1], pos[2] + sample_radius),
+                    z_down_pos(pos[0], pos[1], pos[2] - sample_radius);
+
     Eigen::Vector3f diff;
-    for (int pIdx : pIdxList)
+    for (int pIdx : neighbors)
     {
         if (this->CheckSplash(pIdx))
         {

@@ -20,6 +20,10 @@
 int OMP_USE_DYNAMIC_THREADS = 0;
 int OMP_THREADS_NUM = 16;
 
+bool IS_CONST_DENSITY = false;
+bool IS_CONST_MASS = false;
+bool IS_CONST_RADIUS = false;
+
 // variants for test
 short DATA_TYPE = 0;    // CSV:0, H5: 1
 bool NEED_RECORD;
@@ -58,14 +62,17 @@ void loadConfigJson(const std::string controlJsonPath)
         if (readInJSON.contains("DENSITY"))
         {
             DENSITY = readInJSON.at("DENSITY");
+            IS_CONST_DENSITY = true;
         }
         if (readInJSON.contains("MASS"))
         {
             MASS = readInJSON.at("MASS");
+            IS_CONST_MASS = true;
         }
         if (readInJSON.contains("RADIUS"))
         {
             RADIUS = readInJSON.at("RADIUS");
+            IS_CONST_RADIUS = true;
         }
         NEED_RECORD = readInJSON.at("NEED_RECORD");
     }
@@ -91,29 +98,27 @@ void loadParticlesFromCSV(std::string &csvPath,
     std::vector<float> elements;
     std::getline(ifn, line);
     parseString(&titles, line, ",");
-    if (densities != nullptr)
+    if (!IS_CONST_DENSITY)
     {
-        densities->clear();
         densityIdx = std::distance(titles.begin(), 
         std::find_if(titles.begin(), titles.end(), [&](const std::string &title) {
             std::regex reg(".*density.*", std::regex::icase);
             return std::regex_match(title, reg);
         }));
     }
-    if (masses != nullptr)
+    if (!IS_CONST_MASS)
     {
-        masses->clear(); 
         massIdx = std::distance(titles.begin(), 
         std::find_if(titles.begin(), titles.end(), [&](const std::string &title) {
             std::regex reg(".*mass.*", std::regex::icase);
             return std::regex_match(title, reg);
         }));
     }
-    if (radiuses != nullptr)
+    if (!IS_CONST_RADIUS)
     {
-        radiuses->clear();
         radiusIdx = std::distance(titles.begin(),
-        std::find_if(titles.begin(), titles.end(), [&](const std::string &title) {
+        std::find_if(titles.begin(), titles.end(), 
+        [&](const std::string &title) {
             std::regex reg(".*radius.*", std::regex::icase);
             return std::regex_match(title, reg);
         }));
@@ -141,15 +146,15 @@ void loadParticlesFromCSV(std::string &csvPath,
         elements.clear();
         parseStringToElements(&elements, line, ",");
         particles.push_back(Eigen::Vector3f(elements[xIdx], elements[yIdx], elements[zIdx]));
-        if (densities != nullptr)
+        if (!IS_CONST_DENSITY)
         {
             densities->push_back(elements[densityIdx] + 1000.0f);
         }
-        if (masses != nullptr)
+        if (!IS_CONST_MASS)
         {
             masses->push_back(elements[massIdx]);
         }
-        if (radiuses != nullptr)
+        if (!IS_CONST_RADIUS)
         {
             radiuses->push_back(elements[radiusIdx]);
         }
@@ -189,9 +194,9 @@ void run(std::string &dataDirPath)
     double frameStart = 0;
     int index = 0;
     std::vector<Eigen::Vector3f> particles;
-    std::vector<float>* densities = (DENSITY == 0 ? new std::vector<float> : nullptr);
-    std::vector<float>* masses = (MASS == 0 ? new std::vector<float> : nullptr);
-    std::vector<float>* radiuses = (RADIUS == 0 ? new std::vector<float> : nullptr);
+    std::vector<float>* densities = (IS_CONST_DENSITY ? nullptr : new std::vector<float>());
+    std::vector<float>* masses = (IS_CONST_MASS ? nullptr : new std::vector<float>());
+    std::vector<float>* radiuses = (IS_CONST_RADIUS ? nullptr : new std::vector<float>());
     for (const std::string frame : DATA_PATHES)
     {
         Mesh mesh;
@@ -215,7 +220,7 @@ void run(std::string &dataDirPath)
 
         printf("Particles Number = %zd\n", particles.size());
 
-        SurfReconstructor constructor(particles, densities, masses, radiuses, mesh, DENSITY, MASS, RADIUS);
+        SurfReconstructor constructor(particles, densities, masses, radiuses, mesh, DENSITY, MASS, RADIUS, 3.1f);
         Recorder recorder(dataDirPath, frame.substr(0, frame.size() - 4),
                           &constructor);
         constructor.Run();
@@ -259,7 +264,7 @@ int main(int argc, char **argv)
     else
     {
         std::string dataDirPath =
-            "E:/data/vtk/csv";
+            "E:/data/multiR/mr_csv";
         run(dataDirPath);
     }
 

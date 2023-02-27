@@ -3,3 +3,7 @@
 extern int OMP_USE_DYNAMIC_THREADS;
 extern int OMP_THREADS_NUM;
 
+extern bool IS_CONST_DENSITY;
+extern bool IS_CONST_MASS;
+extern bool IS_CONST_RADIUS;
+

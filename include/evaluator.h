@@ -2,6 +2,7 @@
 
 #include "iso_common.h"
 #include "hash_grid.h"
+#include "multi_level_researcher.h"
 #include <assert.h>
 #include <iostream>
 #include <vector>
@@ -21,6 +22,10 @@ public:
 	std::vector<float>* GlobalDensity;
 	std::vector<float>* GlobalMass;
     std::vector<float>* GlobalRadius;
+    float _MAX_DENSITY, _MIN_DENSITY;
+    float _MAX_MASS, _MIN_MASS;
+    float _MAX_RADIUS, _MIN_RADIUS;
+
     float Density = 0;
     float Mass = 0;
     float Radius = 0;
@@ -41,25 +46,24 @@ public:
         bool& signchange, int oversample);
 
     bool CheckSplash(const int& pIdx);
-    float CalculateMaxScalar();
-    float RecommendIsoValue();
-    float RecommendSurfaceThreshold();
+    float CalculateMaxScalarConstR();
+    float CalculateMaxScalarVarR();
+    float RecommendIsoValueConstR();
+    float RecommendIsoValueVarR();
     void CalcParticlesNormal();
     float CurvEval(std::vector<int>& p_list);
 private:
-    float sample_step;
-    double influnce;
-    double influnce2;
+    float inf_factor;
 
-    float general_kernel(double d2, double h2);
+    float general_kernel(double d2, double h2, double h);
     float spiky_kernel(double d, double h);
     float viscosity_kernel(double d, double h);
 
-	float IsotrpicInterpolate(const int pIdx, const float d);
+	float IsotropicInterpolate(const int pIdx, const double d);
 	float AnisotropicInterpolate(const int pIdx, const Eigen::Vector3f& diff);
 	void compute_Gs_xMeans();
 	double wij(double d, double r);
 
-    void IsotropicEval(const Eigen::Vector3f& pos, float& info, float* temp_scalars);
-    void AnisotropicEval(const Eigen::Vector3f& pos, float& info, float* temp_scalars);
+    void IsotropicEval(const Eigen::Vector3f& pos, float& info, float* temp_scalars, float& sample_radius);
+    void AnisotropicEval(const Eigen::Vector3f& pos, float& info, float* temp_scalars, float& sample_radius);
 };

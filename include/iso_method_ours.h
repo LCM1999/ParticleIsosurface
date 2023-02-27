@@ -119,7 +119,7 @@ struct TNode
 		return err;
 	}
 
-	void vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float& qef_error);
+	void vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float& qef_error, float& sample_radius);
 
 	int CountLeaves()
 	{

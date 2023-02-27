@@ -5,6 +5,7 @@
 
 #include "surface_reconstructor.h"
 #include "hash_grid.h"
+#include "multi_level_researcher.h"
 #include "evaluator.h"
 #include "iso_method_ours.h"
 #include "global.h"
@@ -45,7 +46,7 @@ inline void SurfReconstructor::loadRootBox()
 	[&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.z() < b.z(); })).z();
 }
 
-void SurfReconstructor::resizeRootBox()
+void SurfReconstructor::resizeRootBoxConstR()
 {
     double maxLen, resizeLen;
 	float r = _RADIUS;
@@ -74,73 +75,80 @@ void SurfReconstructor::resizeRootBox()
 	_DEPTH_MIN = (_DEPTH_MAX - int(_DEPTH_MAX / 3));
 }
 
-void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& curv)
+void SurfReconstructor::resizeRootBoxVarR()
 {
-	empty = true;
-	Eigen::Vector3i min_xyz_idx, max_xyz_idx;
-	_hashgrid->CalcXYZIdx((tnode->center - Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length)), min_xyz_idx);
-	_hashgrid->CalcXYZIdx((tnode->center + Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length)), max_xyz_idx);
-	//min_xyz_idx = origin_xyz_idx - Eigen::Vector3i(1, 1, 1);
-	//max_xyz_idx = origin_xyz_idx + Eigen::Vector3i(1, 1, 1);
-	long long temp_hash;
+	double maxLen, resizeLen;
+	float minR = _searcher->getMinRadius(), maxR = _searcher->getMaxRadius();
+	maxLen = (std::max)({ 
+		(_BoundingBox[1] - _BoundingBox[0]) , 
+		(_BoundingBox[3] - _BoundingBox[2]) , 
+		(_BoundingBox[5] - _BoundingBox[4]) });
+	_DEPTH_MAX = int(ceil(log2(ceil(maxLen / minR))));
+	resizeLen = pow(2, _DEPTH_MAX) * minR;
+	resizeLen *= 1.01;
+	_RootHalfLength = resizeLen / 2;
+	for (size_t i = 0; i < 3; i++)
+	{
+		double center = (_BoundingBox[i * 2] + _BoundingBox[i * 2 + 1]) / 2;
+		_BoundingBox[i * 2] = center - _RootHalfLength;
+		_BoundingBox[i * 2 + 1] = center + _RootHalfLength;
+		_RootCenter[i] = center;
+	}
+
+	_DEPTH_MIN = std::min(int(ceil(log2(ceil(maxLen / maxR)))) - 2, _DEPTH_MAX - int(_DEPTH_MAX / 3));
+}
+
+
+void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& curv, float& min_radius, float& avg_radius)
+{
 	Eigen::Vector3f norms(0, 0, 0);
 	float area = 0;
-	for (int x = min_xyz_idx[0] - 1; x < max_xyz_idx[0] + 1 && empty; x++)
+	std::vector<int> insides;
+	min_radius = FLT_MAX;
+	avg_radius = 0;
+	if (IS_CONST_RADIUS)
 	{
-		for (int y = min_xyz_idx[1] - 1; y < max_xyz_idx[1] + 1 && empty; y++)
+		_hashgrid->GetInBoxParticles(
+			(tnode->center - Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length)), 
+			(tnode->center + Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length)),
+			insides);
+	} else {
+		_searcher->GetInBoxParticles(
+			(tnode->center - Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length)), 
+			(tnode->center + Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length)),
+			insides);
+	}
+	empty = insides.empty();
+	if (!empty)
+	{
+		bool all_splash = true;
+		int used_particles = 0;
+		for (const int& in: insides)
 		{
-			for (int z = min_xyz_idx[2] - 1; z < max_xyz_idx[2] + 1 && empty; z++)
+			if (!_evaluator->CheckSplash(in))
 			{
-				if (empty)
+				all_splash = false;
+				Eigen::Vector3f tempNorm = _evaluator->PariclesNormals[in];
+				if (tempNorm == Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX))	{continue;}
+				norms += tempNorm;
+				area += tempNorm.norm();
+				if (!IS_CONST_RADIUS && min_radius >= _GlobalRadiuses->at(in))
 				{
-					temp_hash = _hashgrid->CalcCellHash(Eigen::Vector3i(x, y, z));
-					if (temp_hash < 0)
-						continue;
-					if ((_hashgrid->StartList.find(temp_hash) != _hashgrid->StartList.end()) && (_hashgrid->EndList.find(temp_hash) != _hashgrid->EndList.end()))
-					{
-						if ((_hashgrid->EndList[temp_hash] - _hashgrid->StartList[temp_hash]) == 0)
-						{
-							empty = true;
-						} else {
-							empty = true;
-							for (int countIndex = _hashgrid->StartList[temp_hash]; countIndex < _hashgrid->EndList[temp_hash]; countIndex++)
-							{
-								if (!_evaluator->CheckSplash(_hashgrid->IndexList[countIndex]))
-								{
-									empty = false;
-									break;
-								}
-							}
-						}
-					}
-				} 
-				if (!empty &&
-					x >= min_xyz_idx[0] && x < max_xyz_idx[0] && 
-					y >= min_xyz_idx[1] && y < max_xyz_idx[1] && 
-					z >= min_xyz_idx[2] && z < max_xyz_idx[2])
-				{
-					if ((_hashgrid->StartList.find(temp_hash) != _hashgrid->StartList.end()) && (_hashgrid->EndList.find(temp_hash) != _hashgrid->EndList.end()))
-					{
-						for (int countIndex = _hashgrid->StartList[temp_hash]; countIndex < _hashgrid->EndList[temp_hash]; countIndex++)
-						{
-							Eigen::Vector3f tempNorm = _evaluator->PariclesNormals[_hashgrid->IndexList[countIndex]];
-							if (tempNorm == Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX))
-							{
-								continue;
-							}
-							norms += tempNorm;
-							area += tempNorm.norm();
-							// auto iter = _evaluator->SurfaceNormals.find(_hashgrid->IndexList[countIndex]);
-							// if (iter != _evaluator->SurfaceNormals.end())
-							// {
-							// }
-						}
-					}
+					min_radius = _GlobalRadiuses->at(in);
+					avg_radius += _GlobalRadiuses->at(in);
 				}
+				used_particles++;
 			}
 		}
+		empty = all_splash;
+		avg_radius /= used_particles;
 	}
 	curv = (area == 0) ? 0.0 : (norms.norm() / area);
+	if (IS_CONST_RADIUS || min_radius == FLT_MAX || avg_radius == 0)
+	{
+		min_radius = _RADIUS;
+		avg_radius = _RADIUS;
+	}
 }
 
 void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
@@ -156,7 +164,7 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 //		}
 //		printf("Record at %llu\n", tnode->nId);
 //	}
-	float qef_error = 0, curv = 0;
+	float qef_error = 0, curv = 0, min_radius, avg_radius;
 	bool signchange = false, recur = false, next = false, empty;
 
 	switch (tnode->type)
@@ -172,7 +180,7 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 		if (!guide || (guide && guide->children[0] == 0))
 		{
 			// evaluate QEF samples
-			checkEmptyAndCalcCurv(tnode, empty, curv);
+			checkEmptyAndCalcCurv(tnode, empty, curv, min_radius, avg_radius);
 			if (empty)
 			{
 				tnode->node[0] = tnode->center[0];
@@ -193,7 +201,7 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 			}
 			else
 			{
-				tnode->vertAll(curv, signchange, grad, qef_error);
+				tnode->vertAll(curv, signchange, grad, qef_error, avg_radius);
 			}
 		}
 		if (std::isnan(curv))
@@ -210,7 +218,7 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 			// check max/min sizes of cells
 
 			// static float minsize = dynamic_cast<InternalNode*>(mytree->l)->lenn * pow(.5, DEPTH_MAX);
-			bool issmall = (cellsize - _RADIUS) < _TOLERANCE;// || depth >= DEPTH_MAX;
+			bool issmall = (cellsize - min_radius) < _TOLERANCE;// || depth >= DEPTH_MAX;
 			if (issmall)
 			{
 				// it's a leaf
@@ -506,22 +514,30 @@ void SurfReconstructor::generalModeRun()
 
 	printf("-= Box =-\n");
 	loadRootBox();
-	
-	printf("-= Resize Box =-\n");
-	resizeRootBox();
-	printf("   MAX_DEPTH = %d, MIN_DEPTH = %d\n", _DEPTH_MAX, _DEPTH_MIN);
 
 	temp_time = get_time();
 
-	printf("-= Build Hash Grid =-\n");
-    _hashgrid = new HashGrid(this, _GlobalParticles, _BoundingBox, _INFLUENCE_FACTOR * _RADIUS * 2);
+	printf("-= Build Neighbor Searcher =-\n");
+	if (IS_CONST_RADIUS)
+	{
+    	_hashgrid = new HashGrid(_GlobalParticles, _BoundingBox, _INFLUENCE_FACTOR * _RADIUS * 2);
+	} else {
+		_searcher = new MultiLevelSearcher(&_GlobalParticles, _GlobalRadiuses);
+	}
     last_temp_time = temp_time;
     temp_time = get_time();
-
 	printf("   Build Hash Grid Time = %f \n", temp_time - last_temp_time);
+	
+	printf("-= Resize Box =-\n");
+	if (IS_CONST_RADIUS)
+	{
+		resizeRootBoxConstR();
+	} else {
+		resizeRootBoxVarR();
+	}
+	printf("   MAX_DEPTH = %d, MIN_DEPTH = %d\n", _DEPTH_MAX, _DEPTH_MIN);
 
     printf("-= Initialize Evaluator =-\n");
-
 	_evaluator = new Evaluator(this, &_GlobalParticles, _GlobalDensities, _GlobalMasses, _GlobalRadiuses, _DENSITY, _MASS, _RADIUS);
 	last_temp_time = temp_time;
 	temp_time = get_time();
@@ -530,10 +546,11 @@ void SurfReconstructor::generalModeRun()
 
 	//int max_density_index = std::distance(_GlobalDensities.begin(), std::max_element(_GlobalDensities.begin(), _GlobalDensities.end()));
 	// _evaluator->SingleEval(_GlobalParticles[max_density_index], _MAX_SCALAR, *(Eigen::Vector3f*)NULL);
-	_MAX_SCALAR = _evaluator->CalculateMaxScalar();
+	_MAX_SCALAR = (IS_CONST_RADIUS ? _evaluator->CalculateMaxScalarConstR() : _evaluator->CalculateMaxScalarVarR());
 
-	_ISO_VALUE = _evaluator->RecommendIsoValue();
+	_ISO_VALUE = (IS_CONST_RADIUS ? _evaluator->RecommendIsoValueConstR() : _evaluator->RecommendIsoValueVarR());
     printf("   Recommend Iso Value = %f\n", _ISO_VALUE);
+	temp_time = get_time();
 	_evaluator->CalcParticlesNormal();
 	last_temp_time = temp_time;
 	temp_time = get_time();
