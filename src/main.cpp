@@ -220,7 +220,7 @@ void run(std::string &dataDirPath)
 
         printf("Particles Number = %zd\n", particles.size());
 
-        SurfReconstructor constructor(particles, densities, masses, radiuses, mesh, DENSITY, MASS, RADIUS, 3.1f);
+        SurfReconstructor constructor(particles, densities, masses, radiuses, mesh, DENSITY, MASS, RADIUS, 4.0f);
         Recorder recorder(dataDirPath, frame.substr(0, frame.size() - 4),
                           &constructor);
         constructor.Run();
