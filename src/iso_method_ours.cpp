@@ -20,6 +20,15 @@ TNode::TNode(SurfReconstructor* surf_constructor, int id)
 	type = UNCERTAIN;
 }
 
+double TNode::calcErrorDMC(Eigen::Vector4f& p, Eigen::Vector4f* verts, Eigen::Vector3f* verts_grad)
+{
+	double err = 0;
+	for (size_t i = 0; i < 8; i++)
+	{
+		err += squared(p[3] - verts_grad[i].dot((p - verts[i]).head(3))) / (1 + verts_grad[i].squaredNorm());
+	}
+	return err;
+}
 
 void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float& qef_error, float& sample_radius)
 {

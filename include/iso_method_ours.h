@@ -108,18 +108,9 @@ struct TNode
 		return t * t;
 	}
 
-	template <class T, class U, class V>
-	static double calcErrorDMC(T& p, U& verts, V& verts_grad)
-	{
-		double err = 0;
-		for (size_t i = 0; i < 8; i++)
-		{
-			err += squared(p[3] - verts[i][3] - verts_grad[i].dot((p - verts[i]).head(3)));
-		}
-		return err;
-	}
+	double calcErrorDMC(Eigen::Vector4f& p, Eigen::Vector4f* verts, Eigen::Vector3f* verts_grad);
 
-	void vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float& qef_error, float& sample_radius);
+	void vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float& qef_error, float& sample);
 
 	int CountLeaves()
 	{

@@ -56,12 +56,12 @@ void SurfReconstructor::resizeRootBoxConstR()
 		(_BoundingBox[5] - _BoundingBox[4]) });
 	_DEPTH_MAX = int(ceil(log2(ceil(maxLen / r))));
 	resizeLen = pow(2, _DEPTH_MAX) * r;
-	while (resizeLen - maxLen < (_INFLUENCE_FACTOR * _RADIUS * 2))
+	while (resizeLen - maxLen < (_INFLUENCE_FACTOR * _RADIUS))
 	{
 		_DEPTH_MAX++;
 		resizeLen = pow(2, _DEPTH_MAX) * r;
 	}
-	resizeLen *= 0.99;
+	// resizeLen *= 0.99;
 	_RootHalfLength = resizeLen / 2;
 	for (size_t i = 0; i < 3; i++)
 	{
@@ -78,14 +78,19 @@ void SurfReconstructor::resizeRootBoxConstR()
 void SurfReconstructor::resizeRootBoxVarR()
 {
 	double maxLen, resizeLen;
-	float minR = _searcher->getMinRadius(), maxR = _searcher->getMaxRadius();
+	float minR = _searcher->getMinRadius(), maxR = _searcher->getMaxRadius(), avgR = _searcher->getAvgRadius();
 	maxLen = (std::max)({ 
 		(_BoundingBox[1] - _BoundingBox[0]) , 
 		(_BoundingBox[3] - _BoundingBox[2]) , 
 		(_BoundingBox[5] - _BoundingBox[4]) });
 	_DEPTH_MAX = int(ceil(log2(ceil(maxLen / minR))));
 	resizeLen = pow(2, _DEPTH_MAX) * minR;
-	resizeLen *= 1.01;
+	while (resizeLen - maxLen < (_INFLUENCE_FACTOR * avgR))
+	{
+		_DEPTH_MAX++;
+		resizeLen = pow(2, _DEPTH_MAX) * avgR;
+	}
+	// resizeLen *= 1.01;
 	_RootHalfLength = resizeLen / 2;
 	for (size_t i = 0; i < 3; i++)
 	{
@@ -201,7 +206,7 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 			}
 			else
 			{
-				tnode->vertAll(curv, signchange, grad, qef_error, avg_radius);
+				tnode->vertAll(curv, signchange, grad, qef_error, min_radius);
 			}
 		}
 		if (std::isnan(curv))
@@ -469,14 +474,25 @@ void SurfReconstructor::genIsoOurs()
 		TraversalData td(_OurRoot);
 		traverse_node<trav_vert>(v, td);
 		std::vector<Eigen::Vector3f> splash_pos;
+		std::vector<float> splash_radiuses;
 		for (int pIdx = 0; pIdx < getGlobalParticlesNum(); pIdx++)
 		{
 			if (_evaluator->CheckSplash(pIdx))
 			{
-				splash_pos.push_back(_evaluator->GlobalPoses->at(pIdx));
+				splash_pos.push_back(_GlobalParticles[pIdx]);
+				if (!IS_CONST_RADIUS)
+				{
+				 	splash_radiuses.push_back(_GlobalRadiuses->at(pIdx));
+				}
 			}
 		}
-		m->AppendSplash_ConstR(splash_pos, _RADIUS);
+		if (IS_CONST_RADIUS)
+		{
+			m->AppendSplash_ConstR(splash_pos, _RADIUS);
+		} else {
+			m->AppendSplash_VarR(splash_pos, splash_radiuses);
+		}
+		
 		//}
 		double t_alldone = get_time();
 		printf("Time generating polygons = %f\n", t_alldone - t_gen_mesh);
@@ -520,7 +536,7 @@ void SurfReconstructor::generalModeRun()
 	printf("-= Build Neighbor Searcher =-\n");
 	if (IS_CONST_RADIUS)
 	{
-    	_hashgrid = new HashGrid(_GlobalParticles, _BoundingBox, _INFLUENCE_FACTOR * _RADIUS * 2);
+    	_hashgrid = new HashGrid(_GlobalParticles, _BoundingBox, _INFLUENCE_FACTOR * _RADIUS);
 	} else {
 		_searcher = new MultiLevelSearcher(&_GlobalParticles, _GlobalRadiuses);
 	}
