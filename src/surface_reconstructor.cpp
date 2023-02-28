@@ -104,13 +104,12 @@ void SurfReconstructor::resizeRootBoxVarR()
 }
 
 
-void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& curv, float& min_radius, float& avg_radius)
+void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& curv, float& min_radius)
 {
 	Eigen::Vector3f norms(0, 0, 0);
 	float area = 0;
 	std::vector<int> insides;
 	min_radius = FLT_MAX;
-	avg_radius = 0;
 	if (IS_CONST_RADIUS)
 	{
 		_hashgrid->GetInBoxParticles(
@@ -140,19 +139,16 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 				if (!IS_CONST_RADIUS && min_radius >= _GlobalRadiuses->at(in))
 				{
 					min_radius = _GlobalRadiuses->at(in);
-					avg_radius += _GlobalRadiuses->at(in);
 				}
 				used_particles++;
 			}
 		}
 		empty = all_splash;
-		avg_radius /= used_particles;
 	}
 	curv = (area == 0) ? 0.0 : (norms.norm() / area);
-	if (IS_CONST_RADIUS || min_radius == FLT_MAX || avg_radius == 0)
+	if (IS_CONST_RADIUS || min_radius == FLT_MAX)
 	{
 		min_radius = _RADIUS;
-		avg_radius = _RADIUS;
 	}
 }
 
@@ -169,7 +165,7 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 //		}
 //		printf("Record at %llu\n", tnode->nId);
 //	}
-	float qef_error = 0, curv = 0, min_radius, avg_radius;
+	float qef_error = 0, curv = 0, min_radius;
 	bool signchange = false, recur = false, next = false, empty;
 
 	switch (tnode->type)
@@ -185,7 +181,7 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 		if (!guide || (guide && guide->children[0] == 0))
 		{
 			// evaluate QEF samples
-			checkEmptyAndCalcCurv(tnode, empty, curv, min_radius, avg_radius);
+			checkEmptyAndCalcCurv(tnode, empty, curv, min_radius);
 			if (empty)
 			{
 				tnode->node[0] = tnode->center[0];

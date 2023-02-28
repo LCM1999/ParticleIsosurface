@@ -232,7 +232,7 @@ float Evaluator::CalculateMaxScalarConstR()
     k_value += general_kernel(3 * radius2, influnce2, influnce) * 8;
     k_value += general_kernel(11 * radius2, influnce2, influnce) * 4 * 6;
 
-    return ((1.0 / 1000) * k_value);
+    return ((IS_CONST_MASS ? Mass : _MAX_MASS) / (IS_CONST_DENSITY ? Density : _MIN_DENSITY) * k_value);
 }
 
 float Evaluator::CalculateMaxScalarVarR()
@@ -270,7 +270,8 @@ float Evaluator::RecommendIsoValueConstR()
     k_value += general_kernel(2 * radius2, influnce2, influnce) * 2;
     //k_value += general_kernel(5 * rDist2, influnce2) * 2;
 
-    return ((((1.0 / 1000) * k_value) - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
+    return ((((IS_CONST_MASS ? Mass : _MAX_MASS) / (IS_CONST_DENSITY ? Density : _MIN_DENSITY) * k_value) 
+    - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
 }
 
 float Evaluator::RecommendIsoValueVarR()
