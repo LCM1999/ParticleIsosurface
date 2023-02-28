@@ -36,7 +36,7 @@ private:
     float _XMEAN_DELTA = 0.0f;
 
     float _TOLERANCE = 1e-8;
-    float _RATIO_TOLERANCE = 0.05f;
+    float _RATIO_TOLERANCE = 0.1f;
     //float _LOW_MESH_QUALITY = 0.17320508075688772935274463415059;
     float _MESH_TOLERANCE = 1e4;
 

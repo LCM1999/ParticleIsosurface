@@ -25,7 +25,7 @@ double TNode::calcErrorDMC(Eigen::Vector4f& p, Eigen::Vector4f* verts, Eigen::Ve
 	double err = 0;
 	for (size_t i = 0; i < 8; i++)
 	{
-		err += squared(p[3] - verts_grad[i].dot((p - verts[i]).head(3))) / (1 + verts_grad[i].squaredNorm());
+		err += squared(p[3] - verts[i][3] - verts_grad[i].dot((p - verts[i]).head(3)));
 	}
 	return err;
 }

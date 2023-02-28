@@ -366,16 +366,9 @@ bool VisitorExtract::on_vert(TraversalData& a, TraversalData& b, TraversalData& 
 				Eigen::Vector4f tmpv1 = v1.node, tmpv2 = v2.node, tmpv = Eigen::Vector4f::Zero();
 				Eigen::Vector3f tmpg = Eigen::Vector3f::Zero();
 				float ratio;
-				/*
-				auto ratio = invlerp(tmpv1[3], tmpv2[3], 0.0f);
-				if (ratio < constructor->getRatioTolerance())
-					tmpv = tmpv1;
-				else if (ratio > (1 - constructor->getRatioTolerance()))
-					tmpv = tmpv2;
-				else
-					tmpv = lerp(tmpv1, tmpv2, ratio);
-				constructor->getEvaluator()->SingleEval(tmpv.head(3), tmpv[3], tmpg);
-				while (std::abs(tmpv[3]) > 0.5) {
+				while ((tmpv1 - tmpv2).head(3).norm() > 
+				(IS_CONST_RADIUS ? constructor->getConstRadius() : constructor->getSearcher()->getAvgRadius()) / 2)
+				{
 					tmpv[0] =  (tmpv1[0] + tmpv2[0]) / 2;
 					tmpv[1] =  (tmpv1[1] + tmpv2[1]) / 2;
 					tmpv[2] =  (tmpv1[2] + tmpv2[2]) / 2;
@@ -390,36 +383,7 @@ bool VisitorExtract::on_vert(TraversalData& a, TraversalData& b, TraversalData& 
 						tmpv2 = tmpv;
 						tmpv.setZero();
 					}
-					auto ratio = invlerp(tmpv1[3], tmpv2[3], 0.0f);
-					if (ratio < constructor->getRatioTolerance())
-						tmpv = tmpv1;
-					else if (ratio > (1 - constructor->getRatioTolerance()))
-						tmpv = tmpv2;
-					else
-						tmpv = lerp(tmpv1, tmpv2, ratio);
-					constructor->getEvaluator()->SingleEval(tmpv.head(3), tmpv[3], tmpg);
 				}
-
-				points[e_index] = tmpv.head(3);
-				*/
-				// while ((tmpv1 - tmpv2).head(3).norm() > 
-				// (IS_CONST_RADIUS ? constructor->getConstRadius() : constructor->getSearcher()->getAvgRadius()) / 2)
-				// {
-				// 	tmpv[0] =  (tmpv1[0] + tmpv2[0]) / 2;
-				// 	tmpv[1] =  (tmpv1[1] + tmpv2[1]) / 2;
-				// 	tmpv[2] =  (tmpv1[2] + tmpv2[2]) / 2;
-				// 	constructor->getEvaluator()->SingleEval(tmpv.head(3), tmpv[3], tmpg);
-				// 	if ((tmpv[3] > 0 ? 1 : -1) == (tmpv1[3] > 0 ? 1 : -1))
-				// 	{
-				// 		tmpv1 = tmpv;
-				// 		tmpv.setZero();
-				// 	}
-				// 	else if ((tmpv[3] > 0 ? 1 : -1) == (tmpv2[3] > 0 ? 1 : -1))
-				// 	{
-				// 		tmpv2 = tmpv;
-				// 		tmpv.setZero();
-				// 	}
-				// }
 				ratio = invlerp(tmpv1[3], tmpv2[3], 0.0f);
 				if (ratio < constructor->getRatioTolerance())
 					tmpv = tmpv1;
@@ -431,7 +395,7 @@ bool VisitorExtract::on_vert(TraversalData& a, TraversalData& b, TraversalData& 
 				points[e_index] = tmpv.head(3);
 
 				// constructor->getEvaluator()->SingleEval(tmpv.head(3), tmpv[3], tmpg);
-				// while (abs(tmpv[3]) > 1.0f)
+				// while (abs(tmpv[3]) > 0.1f)
 				// {
 				// 	if ((tmpv[3] > 0 ? 1 : -1) == (tmpv1[3] > 0 ? 1 : -1))
 				// 	{
@@ -444,13 +408,13 @@ bool VisitorExtract::on_vert(TraversalData& a, TraversalData& b, TraversalData& 
 				// 		tmpv.setZero();
 				// 	}
 
-				// 	ratio = invlerp(tmpv1[3], tmpv2[3], 0.0f);
-				// 	if (ratio < constructor->getRatioTolerance())
-				// 		tmpv = tmpv1;
-				// 	else if (ratio > (1 - constructor->getRatioTolerance()))
-				// 		tmpv = tmpv2;
-				// 	else
-				// 		tmpv = lerp(tmpv1, tmpv2, ratio);
+				// 	// ratio = invlerp(tmpv1[3], tmpv2[3], 0.0f);
+				// 	// if (ratio < constructor->getRatioTolerance())
+				// 	// 	tmpv = tmpv1;
+				// 	// else if (ratio > (1 - constructor->getRatioTolerance()))
+				// 	// 	tmpv = tmpv2;
+				// 	// else
+				// 	tmpv = lerp(tmpv1, tmpv2, ratio);
 				// 	constructor->getEvaluator()->SingleEval(tmpv.head(3), tmpv[3], tmpg);
 				// }
 				// points[e_index] = tmpv.head(3);

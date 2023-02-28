@@ -135,7 +135,7 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 				Eigen::Vector3f tempNorm = _evaluator->PariclesNormals[in];
 				if (tempNorm == Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX))	{continue;}
 				norms += tempNorm;
-				area += tempNorm.norm();
+				area += tempNorm.squaredNorm();
 				if (!IS_CONST_RADIUS && min_radius >= _GlobalRadiuses->at(in))
 				{
 					min_radius = _GlobalRadiuses->at(in);
@@ -145,7 +145,7 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 		}
 		empty = all_splash;
 	}
-	curv = (area == 0) ? 0.0 : (norms.norm() / area);
+	curv = (area == 0) ? 0.0 : (norms.squaredNorm() / area);
 	if (IS_CONST_RADIUS || min_radius == FLT_MAX)
 	{
 		min_radius = _RADIUS;
