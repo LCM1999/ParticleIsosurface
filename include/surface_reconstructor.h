@@ -19,6 +19,7 @@ private:
     // Global Parameters
     int _OVERSAMPLE_QEF = 4;
     float _BORDER = (1.0 / 4096.0);
+    float _MAX_CELLSIZE = 0;
     int _DEPTH_MAX = 6; // 7
     int _DEPTH_MIN = 5; // 4
     float _INFLUENCE_FACTOR = 0.0f;
@@ -71,6 +72,8 @@ protected:
 
     void generalModeRun();
 
+    void shrinkBox();
+
     void resizeRootBoxConstR();
 
     void resizeRootBoxVarR();
@@ -93,8 +96,9 @@ public:
 
     void Run();
 
-    inline float getOverSampleQEF() {return _OVERSAMPLE_QEF;};
-    inline float getBorder() {return _BORDER;};
+    inline float getOverSampleQEF() {return _OVERSAMPLE_QEF;}
+    inline float getBorder() {return _BORDER;}
+    inline float getMaxCellsize() {return _MAX_CELLSIZE;}
     inline int getDepthMax() {return _DEPTH_MAX;}
     inline int getDepthMin() {return _DEPTH_MIN;}
     inline float getInfluenceFactor() {return _INFLUENCE_FACTOR;}
@@ -114,6 +118,7 @@ public:
     inline HashGrid* getHashGrid() {return _hashgrid;}
     inline MultiLevelSearcher* getSearcher() {return _searcher;}
     inline Evaluator* getEvaluator() {return _evaluator;}
+    inline std::vector<Eigen::Vector3f>* getGlobalParticles() {return &_GlobalParticles;}
     inline int getGlobalParticlesNum() {return _GlobalParticlesNum;}
     inline std::vector<float>* getDensities() {return _GlobalDensities;}
     inline std::vector<float>* getMasses() {return _GlobalMasses;}

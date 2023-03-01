@@ -48,15 +48,62 @@ inline void SurfReconstructor::loadRootBox()
 	[&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.z() < b.z(); })).z();
 }
 
+void SurfReconstructor::shrinkBox()
+{
+	std::vector<int> ids;
+	ids.resize(_GlobalParticlesNum);
+	for (size_t i = 0; i < _GlobalParticlesNum; i++)
+	{
+		ids[i] = i;
+	}
+	_BoundingBox[0] = _GlobalParticles[(*std::min_element(ids.begin(), ids.end(), 
+	[&] (const int& id1, const int& id2) {
+		if (getEvaluator()->CheckSplash(id1)) {	return false;	}
+		if (getEvaluator()->CheckSplash(id2)) {	return true;	}
+		return getGlobalParticles()->at(id1).x() < getGlobalParticles()->at(id2).x();
+		}))].x();
+	_BoundingBox[1] = _GlobalParticles[(*std::max_element(ids.begin(), ids.end(), 
+	[&] (const int& id1, const int& id2) {
+		if (getEvaluator()->CheckSplash(id1)) {	return true;	}
+		if (getEvaluator()->CheckSplash(id2)) {	return false;	}
+		return getGlobalParticles()->at(id1).x() < getGlobalParticles()->at(id2).x();
+		}))].x();
+	_BoundingBox[2] = _GlobalParticles[(*std::min_element(ids.begin(), ids.end(), 
+	[&] (const int& id1, const int& id2) {
+		if (getEvaluator()->CheckSplash(id1)) {	return false;	}
+		if (getEvaluator()->CheckSplash(id2)) {	return true;	}
+		return getGlobalParticles()->at(id1).y() < getGlobalParticles()->at(id2).y();
+		}))].y();
+	_BoundingBox[3] = _GlobalParticles[(*std::max_element(ids.begin(), ids.end(), 
+	[&] (const int& id1, const int& id2) {
+		if (getEvaluator()->CheckSplash(id1)) {	return true;	}
+		if (getEvaluator()->CheckSplash(id2)) {	return false;	}
+		return getGlobalParticles()->at(id1).y() < getGlobalParticles()->at(id2).y();
+		}))].y();
+	_BoundingBox[4] = _GlobalParticles[(*std::min_element(ids.begin(), ids.end(), 
+	[&] (const int& id1, const int& id2) {
+		if (getEvaluator()->CheckSplash(id1)) {	return false;	}
+		if (getEvaluator()->CheckSplash(id2)) {	return true;	}
+		return getGlobalParticles()->at(id1).z() < getGlobalParticles()->at(id2).z();
+		}))].z();
+	_BoundingBox[5] = _GlobalParticles[(*std::max_element(ids.begin(), ids.end(), 
+	[&] (const int& id1, const int& id2) {
+		if (getEvaluator()->CheckSplash(id1)) {	return true;	}
+		if (getEvaluator()->CheckSplash(id2)) {	return false;	}
+		return getGlobalParticles()->at(id1).z() < getGlobalParticles()->at(id2).z();
+		}))].z();
+}
+
 void SurfReconstructor::resizeRootBoxConstR()
 {
+
     double maxLen, resizeLen;
 	float r = _RADIUS;
 	maxLen = (std::max)({ 
 		(_BoundingBox[1] - _BoundingBox[0]) , 
 		(_BoundingBox[3] - _BoundingBox[2]) , 
 		(_BoundingBox[5] - _BoundingBox[4]) });
-	_DEPTH_MAX = int(ceil(log2(ceil(maxLen / r))));
+	_MAX_CELLSIZE = 2 * _INFLUENCE_FACTOR * r;
 	resizeLen = pow(2, _DEPTH_MAX) * r;
 	while (resizeLen - maxLen < (_INFLUENCE_FACTOR * _RADIUS))
 	{
@@ -531,8 +578,15 @@ void SurfReconstructor::generalModeRun()
     last_temp_time = temp_time;
     temp_time = get_time();
 	printf("   Build Hash Grid Time = %f \n", temp_time - last_temp_time);
+
+    printf("-= Initialize Evaluator =-\n");
+	_evaluator = new Evaluator(this, &_GlobalParticles, _GlobalDensities, _GlobalMasses, _GlobalRadiuses, _DENSITY, _MASS, _RADIUS);
+	last_temp_time = temp_time;
+	temp_time = get_time();
+	printf("   Initialize Evaluator Time = %f \n", temp_time - last_temp_time);
 	
 	printf("-= Resize Box =-\n");
+	shrinkBox();
 	if (IS_CONST_RADIUS)
 	{
 		resizeRootBoxConstR();
@@ -540,13 +594,6 @@ void SurfReconstructor::generalModeRun()
 		resizeRootBoxVarR();
 	}
 	printf("   MAX_DEPTH = %d, MIN_DEPTH = %d\n", _DEPTH_MAX, _DEPTH_MIN);
-
-    printf("-= Initialize Evaluator =-\n");
-	_evaluator = new Evaluator(this, &_GlobalParticles, _GlobalDensities, _GlobalMasses, _GlobalRadiuses, _DENSITY, _MASS, _RADIUS);
-	last_temp_time = temp_time;
-	temp_time = get_time();
-
-	printf("   Initialize Evaluator Time = %f \n", temp_time - last_temp_time);
 
 	//int max_density_index = std::distance(_GlobalDensities.begin(), std::max_element(_GlobalDensities.begin(), _GlobalDensities.end()));
 	// _evaluator->SingleEval(_GlobalParticles[max_density_index], _MAX_SCALAR, *(Eigen::Vector3f*)NULL);
