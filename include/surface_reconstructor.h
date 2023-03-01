@@ -49,6 +49,9 @@ private:
     std::vector<float>* _GlobalMasses;
     std::vector<float>* _GlobalRadiuses;
 
+    float _BASE_DENSITY = 0;
+    float _BASE_MASS = 0;
+
     float _DENSITY = 0;
     float _MASS = 0;
     float _RADIUS = 0;
@@ -84,7 +87,7 @@ public:
         std::vector<float>* densities, std::vector<float>* masses, std::vector<float>* radiuses, 
         Mesh& mesh, 
         float density, float mass, float radius, 
-        float inf_factor = 2.0f);
+        float inf_factor = 2.0f, float base_density = 1000.0f, float base_mass = 1.0f);
 
     ~SurfReconstructor() {};
 
@@ -112,10 +115,12 @@ public:
     inline MultiLevelSearcher* getSearcher() {return _searcher;}
     inline Evaluator* getEvaluator() {return _evaluator;}
     inline int getGlobalParticlesNum() {return _GlobalParticlesNum;}
-    inline float getConstDensity() {return _DENSITY;}
     inline std::vector<float>* getDensities() {return _GlobalDensities;}
     inline std::vector<float>* getMasses() {return _GlobalMasses;}
     inline std::vector<float>* getRadiuses() {return _GlobalRadiuses;}
+    inline float getBaseDensity() {return _BASE_DENSITY;}
+    inline float getBaseMass() {return _BASE_MASS;}
+    inline float getConstDensity() {return _DENSITY;}
     inline float getConstMass() {return _MASS;}
     inline float getConstRadius() {return _RADIUS;}
     inline int getSTATE() {return _STATE;}

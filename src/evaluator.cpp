@@ -27,6 +27,8 @@ Evaluator::Evaluator(SurfReconstructor* surf_constructor,
         _MAX_RADIUS = constructor->getSearcher()->getMaxRadius();
         _MAX_RADIUS = constructor->getSearcher()->getMinRadius();
     }
+    BaseDensity = constructor->getBaseDensity();
+    BaseMass = constructor->getBaseMass();
     Density = density;
     Mass = mass;
     Radius = radius;
@@ -45,8 +47,6 @@ Evaluator::Evaluator(SurfReconstructor* surf_constructor,
 	if (constructor->getUseAni())
 	{
         compute_Gs_xMeans();
-        //GlobalSplash.shrink_to_fit();
-        //printf("   Splash number = %d\n", GlobalSplash.size());
 	}
 }
 
@@ -232,7 +232,7 @@ float Evaluator::CalculateMaxScalarConstR()
     k_value += general_kernel(3 * radius2, influnce2, influnce) * 8;
     k_value += general_kernel(11 * radius2, influnce2, influnce) * 4 * 6;
 
-    return ((IS_CONST_MASS ? Mass : _MAX_MASS) / (IS_CONST_DENSITY ? Density : _MIN_DENSITY) * k_value);
+    return (BaseMass / BaseDensity * k_value);
 }
 
 float Evaluator::CalculateMaxScalarVarR()
@@ -254,7 +254,7 @@ float Evaluator::CalculateMaxScalarVarR()
             max_scalar = temp_scalar;
         }
     }
-    return ((IS_CONST_MASS ? Mass : _MAX_MASS) / (IS_CONST_DENSITY ? Density : _MIN_DENSITY)) * max_scalar;
+    return (BaseMass / BaseDensity) * max_scalar;
 }
 
 float Evaluator::RecommendIsoValueConstR()
@@ -270,7 +270,7 @@ float Evaluator::RecommendIsoValueConstR()
     k_value += general_kernel(2 * radius2, influnce2, influnce) * 2;
     //k_value += general_kernel(5 * rDist2, influnce2) * 2;
 
-    return ((((IS_CONST_MASS ? Mass : _MAX_MASS) / (IS_CONST_DENSITY ? Density : _MIN_DENSITY) * k_value) 
+    return (((BaseMass / BaseDensity * k_value) 
     - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
 }
 
@@ -288,7 +288,7 @@ float Evaluator::RecommendIsoValueVarR()
         recommend += general_kernel(2 * radius2, influnce2, influnce) * 2;
     }
     return ((
-        ((IS_CONST_MASS ? Mass : _MAX_MASS) / (IS_CONST_DENSITY ? Density : _MIN_DENSITY)) * 
+        (BaseMass / BaseDensity) * 
         (recommend / radiuses->size())) - constructor->getMinScalar()) / constructor->getMaxScalar() * 255;
 }
 
@@ -307,23 +307,9 @@ void Evaluator::CalcParticlesNormal()
             PariclesNormals[pIdx][0] = tempGrad[0];
             PariclesNormals[pIdx][1] = tempGrad[1];
             PariclesNormals[pIdx][2] = tempGrad[2];
-            //if (SurfaceNormals.find(pIdx) != SurfaceNormals.end())
-            //{
-            //    if (SurfaceNormals[pIdx] == Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX))
-            //    {
-            //        continue;
-            //    } else {
-            //    }
-            //} else {
-            //    SingleEval(GlobalPoses->at(pIdx), tempScalar, tempGrad, true, true, false);
-            //    if (std::abs(tempGrad.maxCoeff()) > recommand_surface_threshold || std::abs(tempGrad.minCoeff()) > recommand_surface_threshold || tempGrad.norm() > recommand_surface_threshold)
-            //    {
-            //        SurfaceNormals[pIdx] = Eigen::Vector3f(tempGrad.normalized());
-            //    }
-            //}
+
         }
     }
-    //printf("   Surface particles number = %d\n", SurfaceNormals.size());
 }
 
 inline float Evaluator::general_kernel(double d2, double h2, double h)

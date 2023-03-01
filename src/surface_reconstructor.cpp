@@ -15,13 +15,15 @@
 
 SurfReconstructor::SurfReconstructor(std::vector<Eigen::Vector3f>& particles, 
 std::vector<float>* densities, std::vector<float>* masses, std::vector<float>* radiuses, Mesh& mesh, 
-float density, float mass, float radius, float inf_factor)
+float density, float mass, float radius, float inf_factor, float base_density, float base_mass)
 {
 	_GlobalParticles = particles;
 	_GlobalParticlesNum = _GlobalParticles.size();
 	_GlobalDensities = densities;
 	_GlobalMasses = masses;
 	_GlobalRadiuses = radiuses;
+	_BASE_DENSITY = base_density;
+	_BASE_MASS = base_mass;
 	_DENSITY = density;
 	_MASS = mass;
 	_RADIUS = radius;
@@ -182,10 +184,6 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 		if (!guide || (guide && guide->children[0] == 0))
 		{
 			// evaluate QEF samples
-			if (tnode->depth == getDepthMax())
-			{
-				printf("");
-			}
 			
 			checkEmptyAndCalcCurv(tnode, empty, curv, min_radius);
 			if (empty)

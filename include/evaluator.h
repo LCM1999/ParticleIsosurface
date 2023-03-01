@@ -26,6 +26,9 @@ public:
     float _MAX_MASS, _MIN_MASS;
     float _MAX_RADIUS, _MIN_RADIUS;
 
+    float BaseDensity = 0;
+    float BaseMass = 0;
+
     float Density = 0;
     float Mass = 0;
     float Radius = 0;

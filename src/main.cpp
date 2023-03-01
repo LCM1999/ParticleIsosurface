@@ -32,6 +32,9 @@ float DENSITY = 0;
 float MASS = 0;
 float RADIUS = 0;
 
+float BASE_DENSITY = 1000.0f;
+float BASE_MASS = 1.0f;
+
 void writeFile(Mesh &m, std::string fn)
 {
     FILE *f = fopen(fn.c_str(), "w");
@@ -59,6 +62,14 @@ void loadConfigJson(const std::string controlJsonPath)
         const std::string filePath = readInJSON.at("DATA_FILE");
         std::string data_pathes = filePath;
         parseString(&DATA_PATHES, data_pathes, ",");
+        if (readInJSON.contains("BASE_DENSIY"))
+        {
+            BASE_DENSITY = readInJSON.at("BASE_DENSITY");
+        }
+        if (readInJSON.contains("BASE_MASS"))
+        {
+            BASE_MASS = readInJSON.at("BASE_MASS");
+        }
         if (readInJSON.contains("DENSITY"))
         {
             DENSITY = readInJSON.at("DENSITY");
@@ -158,32 +169,6 @@ void loadParticlesFromCSV(std::string &csvPath,
         {
             radiuses->push_back(elements[radiusIdx]);
         }
-
-        // switch (CSV_TYPE)
-        // {
-        //     case 0:
-        //         particles.push_back(
-        //             Eigen::Vector3f(elements[0], elements[1], elements[2]));
-        //         masses.push_back(elements[6]);
-        //         densities.push_back(elements[7] + 1000.0f);
-        //         break;
-        //     case 1:
-        //         particles.push_back(
-        //             Eigen::Vector3f(elements[1], elements[2], elements[3]));
-        //         masses.push_back(1.0f);
-        //         densities.push_back(elements[0] + 1000.0f);
-        //         break;
-        //     case 2:
-        //         particles.push_back(
-        //             Eigen::Vector3f(elements[0], elements[1], elements[2]));
-        //         masses.push_back(1.0f);
-        //         densities.push_back(elements[3] + 1000.0f);
-        //         break;
-        //     default:
-        //         printf("Unknown type of csv format.");
-        //         exit(1);
-        //         break;
-        // }
         getline(ifn, line);
     }
 }
@@ -264,8 +249,8 @@ int main(int argc, char **argv)
     else
     {
         std::string dataDirPath =
-            "E:/data/multiR/mr_csv";
-            // "E:/data/vtk/csv";
+            // "E:/data/multiR/mr_csv";
+            "E:/data/vtk/csv";
         run(dataDirPath);
     }
 
