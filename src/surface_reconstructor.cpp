@@ -61,7 +61,7 @@ void SurfReconstructor::resizeRootBoxConstR()
 		_DEPTH_MAX++;
 		resizeLen = pow(2, _DEPTH_MAX) * r;
 	}
-	// resizeLen *= 0.99;
+	resizeLen *= 0.99;
 	_RootHalfLength = resizeLen / 2;
 	for (size_t i = 0; i < 3; i++)
 	{
@@ -135,7 +135,7 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 					Eigen::Vector3f tempNorm = _evaluator->PariclesNormals[in];
 					if (tempNorm == Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX))	{continue;}
 					norms += tempNorm;
-					area += tempNorm.squaredNorm();
+					area += tempNorm.norm();
 
 				}
 				if (!IS_CONST_RADIUS && min_radius >= _GlobalRadiuses->at(in))
@@ -146,7 +146,7 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 		}
 		empty = all_splash;
 	}
-	curv = (area == 0) ? 0.0 : (norms.squaredNorm() / area);
+	curv = (area == 0) ? 0.0 : (norms.norm() / area);
 	if (IS_CONST_RADIUS || min_radius == FLT_MAX)
 	{
 		min_radius = _RADIUS;
@@ -182,6 +182,11 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 		if (!guide || (guide && guide->children[0] == 0))
 		{
 			// evaluate QEF samples
+			if (tnode->depth == getDepthMax())
+			{
+				printf("");
+			}
+			
 			checkEmptyAndCalcCurv(tnode, empty, curv, min_radius);
 			if (empty)
 			{
