@@ -114,7 +114,7 @@ void Evaluator::GridEval(
             }
             if (!neighbors.empty())
             {
-                for (int pIdx : neighbors)
+                for (const int pIdx : neighbors)
                 {
                     scalar += AnisotropicInterpolate(pIdx, p - GlobalxMeans[pIdx]);
                 }

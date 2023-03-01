@@ -119,11 +119,11 @@ void HashGrid::GetInBoxParticles(
 	CalcXYZIdx(box2, maxXyzIdx);
 
 	long long temp_hash;
-	for (int x = (minXyzIdx.x()); x < (maxXyzIdx.x()+1); x++)
+	for (int x = (minXyzIdx.x()-1); x < (maxXyzIdx.x()+1); x++)
     {
-        for (int y = (minXyzIdx.y()); y < (maxXyzIdx.y()+1); y++)
+        for (int y = (minXyzIdx.y()-1); y < (maxXyzIdx.y()+1); y++)
         {
-            for (int z = (minXyzIdx.z()); z < (maxXyzIdx.z()+1); z++)
+            for (int z = (minXyzIdx.z()-1); z < (maxXyzIdx.z()+1); z++)
             {
                 temp_hash = CalcCellHash(Eigen::Vector3i(x, y, z));
                 if (temp_hash < 0) {continue;}

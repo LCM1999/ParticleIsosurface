@@ -110,37 +110,38 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 	float area = 0;
 	std::vector<int> insides;
 	min_radius = FLT_MAX;
+	const Eigen::Vector3f 
+	box1 = tnode->center - Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length),
+	box2 = tnode->center + Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length);
 	if (IS_CONST_RADIUS)
 	{
-		_hashgrid->GetInBoxParticles(
-			(tnode->center - Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length)), 
-			(tnode->center + Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length)),
-			insides);
+		_hashgrid->GetInBoxParticles(box1, box2, insides);
 	} else {
-		_searcher->GetInBoxParticles(
-			(tnode->center - Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length)), 
-			(tnode->center + Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length)),
-			insides);
+		_searcher->GetInBoxParticles(box1, box2, insides);
 	}
 	empty = insides.empty();
 	if (!empty)
 	{
 		bool all_splash = true;
-		int used_particles = 0;
 		for (const int& in: insides)
 		{
 			if (!_evaluator->CheckSplash(in))
 			{
 				all_splash = false;
-				Eigen::Vector3f tempNorm = _evaluator->PariclesNormals[in];
-				if (tempNorm == Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX))	{continue;}
-				norms += tempNorm;
-				area += tempNorm.squaredNorm();
+				if (_GlobalParticles[in].x() >= box1.x() && _GlobalParticles[in].x() <= box2.x() &&
+					_GlobalParticles[in].y() >= box1.y() && _GlobalParticles[in].y() <= box2.y() &&
+					_GlobalParticles[in].z() >= box1.z() && _GlobalParticles[in].z() <= box2.z())
+				{
+					Eigen::Vector3f tempNorm = _evaluator->PariclesNormals[in];
+					if (tempNorm == Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX))	{continue;}
+					norms += tempNorm;
+					area += tempNorm.squaredNorm();
+
+				}
 				if (!IS_CONST_RADIUS && min_radius >= _GlobalRadiuses->at(in))
 				{
 					min_radius = _GlobalRadiuses->at(in);
 				}
-				used_particles++;
 			}
 		}
 		empty = all_splash;
@@ -189,8 +190,6 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 				tnode->node[2] = tnode->center[2];
 				_evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3], grad[8]);
 				tnode->type = EMPTY;
-				//EMPTY_VOLUME += pow(2 * tnode->half_length, 3);
-				//printStatus();
 				return;
 			}
 			else if (tnode->depth < _DEPTH_MIN)
@@ -210,31 +209,21 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 			curv = 0;
 		}
 		
-		//printf("%f ", curv);
 		// judge this node need calculate iso-surface
 		float cellsize = 2 * tnode->half_length;
 
 		if (!guide)
 		{
 			// check max/min sizes of cells
-
-			// static float minsize = dynamic_cast<InternalNode*>(mytree->l)->lenn * pow(.5, DEPTH_MAX);
 			bool issmall = (cellsize - min_radius) < _TOLERANCE;// || depth >= DEPTH_MAX;
 			if (issmall)
 			{
 				// it's a leaf
 				tnode->type = LEAF;
-				//DONE_VOLUME += pow(2 * tnode->half_length, 3);
-				//printStatus();
 				return;
 			}
 			//static float maxsize = dynamic_cast<InternalNode*>(mytree->l)->lenn * pow(.5, DEPTH_MIN);
 			bool isbig = tnode->depth <= _DEPTH_MIN;
-			//
-			//// check for a sign change
-			//if (!isbig)
-			//	signchange |= changeSignDMC();
-
 			// check for qef error
 			//bool badqef = (qef_error / cellsize) > _BAD_QEF;
 
