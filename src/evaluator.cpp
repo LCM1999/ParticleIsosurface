@@ -435,14 +435,6 @@ inline void Evaluator::compute_Gs_xMeans()
         } 
         else
         {
-            // if (neighborList.size() < constructor->getMinNeighborsNum())
-            // {
-                // PariclesNormals[pIdx] = Eigen::Vector3f(0.0, 0.0, 0.0);
-                // if (closerNeigbors < 1)
-                // {
-                    // PariclesNormals[pIdx] = Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX);
-                // }
-            // }
             Eigen::Vector3f wd = Eigen::Vector3f::Zero();
             Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
             cov += Eigen::DiagonalMatrix<double, 3>(invH, invH, invH);

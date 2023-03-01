@@ -51,7 +51,6 @@ public:
     float RecommendIsoValueConstR();
     float RecommendIsoValueVarR();
     void CalcParticlesNormal();
-    float CurvEval(std::vector<int>& p_list);
 private:
     float inf_factor;
 
