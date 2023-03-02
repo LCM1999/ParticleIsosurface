@@ -19,7 +19,6 @@ private:
     // Global Parameters
     int _OVERSAMPLE_QEF = 4;
     float _BORDER = (1.0 / 4096.0);
-    float _MAX_CELLSIZE = 0;
     int _DEPTH_MAX = 6; // 7
     int _DEPTH_MIN = 5; // 4
     float _INFLUENCE_FACTOR = 0.0f;
@@ -98,7 +97,6 @@ public:
 
     inline float getOverSampleQEF() {return _OVERSAMPLE_QEF;}
     inline float getBorder() {return _BORDER;}
-    inline float getMaxCellsize() {return _MAX_CELLSIZE;}
     inline int getDepthMax() {return _DEPTH_MAX;}
     inline int getDepthMin() {return _DEPTH_MIN;}
     inline float getInfluenceFactor() {return _INFLUENCE_FACTOR;}

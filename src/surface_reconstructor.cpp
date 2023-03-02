@@ -64,8 +64,8 @@ void SurfReconstructor::shrinkBox()
 		}))].x();
 	_BoundingBox[1] = _GlobalParticles[(*std::max_element(ids.begin(), ids.end(), 
 	[&] (const int& id1, const int& id2) {
-		if (getEvaluator()->CheckSplash(id1)) {	return true;	}
 		if (getEvaluator()->CheckSplash(id2)) {	return false;	}
+		if (getEvaluator()->CheckSplash(id1)) {	return true;	}
 		return getGlobalParticles()->at(id1).x() < getGlobalParticles()->at(id2).x();
 		}))].x();
 	_BoundingBox[2] = _GlobalParticles[(*std::min_element(ids.begin(), ids.end(), 
@@ -76,8 +76,8 @@ void SurfReconstructor::shrinkBox()
 		}))].y();
 	_BoundingBox[3] = _GlobalParticles[(*std::max_element(ids.begin(), ids.end(), 
 	[&] (const int& id1, const int& id2) {
-		if (getEvaluator()->CheckSplash(id1)) {	return true;	}
 		if (getEvaluator()->CheckSplash(id2)) {	return false;	}
+		if (getEvaluator()->CheckSplash(id1)) {	return true;	}
 		return getGlobalParticles()->at(id1).y() < getGlobalParticles()->at(id2).y();
 		}))].y();
 	_BoundingBox[4] = _GlobalParticles[(*std::min_element(ids.begin(), ids.end(), 
@@ -88,22 +88,21 @@ void SurfReconstructor::shrinkBox()
 		}))].z();
 	_BoundingBox[5] = _GlobalParticles[(*std::max_element(ids.begin(), ids.end(), 
 	[&] (const int& id1, const int& id2) {
-		if (getEvaluator()->CheckSplash(id1)) {	return true;	}
 		if (getEvaluator()->CheckSplash(id2)) {	return false;	}
+		if (getEvaluator()->CheckSplash(id1)) {	return true;	}
 		return getGlobalParticles()->at(id1).z() < getGlobalParticles()->at(id2).z();
 		}))].z();
 }
 
 void SurfReconstructor::resizeRootBoxConstR()
 {
-
     double maxLen, resizeLen;
 	float r = _RADIUS;
 	maxLen = (std::max)({ 
 		(_BoundingBox[1] - _BoundingBox[0]) , 
 		(_BoundingBox[3] - _BoundingBox[2]) , 
 		(_BoundingBox[5] - _BoundingBox[4]) });
-	_MAX_CELLSIZE = 2 * _INFLUENCE_FACTOR * r;
+	_DEPTH_MAX = int(ceil(log2(ceil(maxLen / r))));
 	resizeLen = pow(2, _DEPTH_MAX) * r;
 	while (resizeLen - maxLen < (_INFLUENCE_FACTOR * _RADIUS))
 	{
@@ -120,7 +119,6 @@ void SurfReconstructor::resizeRootBoxConstR()
 		_RootCenter[i] = center;
 	}
 	
-	//_DEPTH_MIN = _DEPTH_MAX - 2;
 	_DEPTH_MIN = (_DEPTH_MAX - int(_DEPTH_MAX / 3));
 }
 
@@ -242,7 +240,7 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 				tnode->type = EMPTY;
 				return;
 			}
-			else if (tnode->depth < _DEPTH_MIN)
+			else if (tnode->depth <= _DEPTH_MIN)
 			{
 				tnode->node[0] = tnode->center[0];
 				tnode->node[1] = tnode->center[1];
@@ -273,7 +271,7 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 				return;
 			}
 			//static float maxsize = dynamic_cast<InternalNode*>(mytree->l)->lenn * pow(.5, DEPTH_MIN);
-			bool isbig = tnode->depth <= _DEPTH_MIN;
+			bool isbig = (tnode->depth <= _DEPTH_MIN);
 			// check for qef error
 			//bool badqef = (qef_error / cellsize) > _BAD_QEF;
 
