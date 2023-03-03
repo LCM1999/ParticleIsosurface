@@ -73,7 +73,7 @@ protected:
     // Method for CSV mode
     void genIsoOurs();
     void checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& curv, float& min_radius);
-    void eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide);
+    void eval(TNode* tnode, Eigen::Vector3f* grad);
 
 public:
     SurfReconstructor() {};

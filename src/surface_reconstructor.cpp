@@ -197,19 +197,8 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 	}
 }
 
-void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
+void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad)
 {
-//	if (tnode->nId % _RECORD_STEP == 0 && _STATE == 0)
-//	{
-//		if (_NEED_RECORD)
-//		{
-//#pragma omp critical
-//			{
-//				RecordProgress(_OurRoot, (_OutputPath + "/" + _RECORD_PREFIX + std::to_string(_INDEX) + "_" + std::to_string(tnode->nId) + ".txt").c_str());
-//			}
-//		}
-//		printf("Record at %llu\n", tnode->nId);
-//	}
 	float qef_error = 0, curv = 0, min_radius;
 	bool signchange = false, recur = false, next = false, empty;
 
@@ -223,31 +212,28 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 		break;
 	case UNCERTAIN:
 	{
-		if (!guide || (guide && guide->children[0] == 0))
+		// evaluate QEF samples
+		
+		checkEmptyAndCalcCurv(tnode, empty, curv, min_radius);
+		if (empty)
 		{
-			// evaluate QEF samples
-			
-			checkEmptyAndCalcCurv(tnode, empty, curv, min_radius);
-			if (empty)
-			{
-				tnode->node[0] = tnode->center[0];
-				tnode->node[1] = tnode->center[1];
-				tnode->node[2] = tnode->center[2];
-				_evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3], grad[8]);
-				tnode->type = EMPTY;
-				return;
-			}
-			else if (tnode->depth <= _DEPTH_MIN)
-			{
-				tnode->node[0] = tnode->center[0];
-				tnode->node[1] = tnode->center[1];
-				tnode->node[2] = tnode->center[2];
-				_evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3], grad[8]);
-			}
-			else
-			{
-				tnode->vertAll(curv, signchange, grad, qef_error, min_radius);
-			}
+			tnode->node[0] = tnode->center[0];
+			tnode->node[1] = tnode->center[1];
+			tnode->node[2] = tnode->center[2];
+			_evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3], grad[8]);
+			tnode->type = EMPTY;
+			return;
+		}
+		else if (tnode->depth <= _DEPTH_MIN)
+		{
+			tnode->node[0] = tnode->center[0];
+			tnode->node[1] = tnode->center[1];
+			tnode->node[2] = tnode->center[2];
+			_evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3], grad[8]);
+		}
+		else
+		{
+			tnode->vertAll(curv, signchange, grad, qef_error, min_radius);
 		}
 		if (std::isnan(curv))
 		{
@@ -257,30 +243,23 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 		// judge this node need calculate iso-surface
 		float cellsize = 2 * tnode->half_length;
 
-		if (!guide)
+		// check max/min sizes of cells
+		bool issmall = (cellsize - min_radius) < _TOLERANCE;// || depth >= DEPTH_MAX;
+		if (issmall)
 		{
-			// check max/min sizes of cells
-			bool issmall = (cellsize - min_radius) < _TOLERANCE;// || depth >= DEPTH_MAX;
-			if (issmall)
-			{
-				// it's a leaf
-				tnode->type = LEAF;
-				return;
-			}
-			//static float maxsize = dynamic_cast<InternalNode*>(mytree->l)->lenn * pow(.5, DEPTH_MIN);
-			bool isbig = (tnode->depth <= _DEPTH_MIN);
-			// check for qef error
-			//bool badqef = (qef_error / cellsize) > _BAD_QEF;
-
-			// check curvature
-			bool badcurv = curv < _FLATNESS;
-
-			recur = isbig || (signchange && badcurv);	//(badcurv || badqef)
+			// it's a leaf
+			tnode->type = LEAF;
+			return;
 		}
-		else
-		{
-			recur = guide->children[0] != 0;
-		}
+		//static float maxsize = dynamic_cast<InternalNode*>(mytree->l)->lenn * pow(.5, DEPTH_MIN);
+		bool isbig = (tnode->depth <= _DEPTH_MIN);
+		// check for qef error
+		//bool badqef = (qef_error / cellsize) > _BAD_QEF;
+
+		// check curvature
+		bool badcurv = curv < _FLATNESS;
+
+		recur = isbig || (signchange && badcurv);	//(badcurv || badqef)
 	}
 	break;
 	default:
@@ -289,19 +268,9 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 
 	if (next)
 	{
-		if (guide)
+		for (Index i; i < 8; i++)
 		{
-			for (Index i; i < 8; i++)
-			{
-				eval(tnode->children[i], grad, guide->children[i]);
-			}
-		}
-		else
-		{
-			for (Index i; i < 8; i++)
-			{
-				eval(tnode->children[i], grad, 0);
-			}
+			eval(tnode->children[i], grad);
 		}
 	}
 	else if (recur)
@@ -332,40 +301,20 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad, TNode* guide)
 		};
 
 		// create children
-		if (guide)
+		for (int t = 0; t < 8; t++)
 		{
-			for (int t = 0; t < 8; t++)
+			Index i = t;
+			tnode->children[i] = new TNode(this, tnode->nId * 8 + i + 1);
+			tnode->children[i]->depth = tnode->depth + 1;
+			tnode->children[i]->half_length = tnode->half_length / 2;
+			tnode->children[i]->center =
+				tnode->center + (Eigen::Vector3f(sign(i.x), sign(i.y), sign(i.z)) * tnode->half_length / 2);
+			for (Index j; j < 8; j++)
 			{
-				Index i = t;
-				tnode->children[i]->depth = tnode->depth + 1;
-				tnode->children[i]->half_length = tnode->half_length / 2;
-				tnode->children[i]->center =
-					tnode->center + (Eigen::Vector3f(sign(i.x), sign(i.y), sign(i.z)) * tnode->half_length / 2);
-				for (Index j; j < 8; j++)
-				{
-					grad[j] = g[i.x + j.x][i.y + j.y][i.z + j.z];
-				}
-				#pragma omp task
-				eval(tnode->children[i], grad, guide->children[i]);
+				grad[j] = g[i.x + j.x][i.y + j.y][i.z + j.z];
 			}
-		}
-		else
-		{
-			for (int t = 0; t < 8; t++)
-			{
-				Index i = t;
-				tnode->children[i] = new TNode(this, tnode->nId * 8 + i + 1);
-				tnode->children[i]->depth = tnode->depth + 1;
-				tnode->children[i]->half_length = tnode->half_length / 2;
-				tnode->children[i]->center =
-					tnode->center + (Eigen::Vector3f(sign(i.x), sign(i.y), sign(i.z)) * tnode->half_length / 2);
-				for (Index j; j < 8; j++)
-				{
-					grad[j] = g[i.x + j.x][i.y + j.y][i.z + j.z];
-				}
-				#pragma omp task
-				eval(tnode->children[i], grad, 0);
-			}
+			#pragma omp task
+			eval(tnode->children[i], grad);
 		}
 	}
 	else
@@ -435,7 +384,6 @@ void SurfReconstructor::genIsoOurs()
 {
     double t_start = get_time();
 
-	TNode* guide;
 	TNode* root;
 	Mesh* m = _OurMesh;
 	TNode* loaded_tree = nullptr;
@@ -448,7 +396,6 @@ void SurfReconstructor::genIsoOurs()
 
 	if (_STATE == 0)
 	{
-		guide = _OurRoot;
 		printf("-= Calculating Tree Structure =-\n");
 		root = new TNode(this, 0);
 		root->center = Eigen::Vector3f(_RootCenter[0], _RootCenter[1], _RootCenter[2]);
@@ -462,8 +409,6 @@ void SurfReconstructor::genIsoOurs()
 	else if (_STATE == 1)
 	{
 		printf("-= Our Method =-\n");
-		guide = _OurRoot;
-		root = guide;
 	}
 	else if (_STATE == 2)
 	{
@@ -533,7 +478,7 @@ void SurfReconstructor::genIsoOurs()
 	#pragma omp single
 	{
 		#pragma omp task
-		eval(root, grad, guide);
+		eval(root, grad);
 	}
 }
 
