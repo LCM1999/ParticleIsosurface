@@ -14,18 +14,12 @@
 
 
 SurfReconstructor::SurfReconstructor(std::vector<Eigen::Vector3f>& particles, 
-std::vector<float>* densities, std::vector<float>* masses, std::vector<float>* radiuses, Mesh& mesh, 
-float density, float mass, float radius, float inf_factor, float base_density, float base_mass)
+std::vector<float>* radiuses, Mesh& mesh, 
+float radius, float inf_factor)
 {
 	_GlobalParticles = particles;
 	_GlobalParticlesNum = _GlobalParticles.size();
-	_GlobalDensities = densities;
-	_GlobalMasses = masses;
 	_GlobalRadiuses = radiuses;
-	_BASE_DENSITY = base_density;
-	_BASE_MASS = base_mass;
-	_DENSITY = density;
-	_MASS = mass;
 	_RADIUS = radius;
 	_INFLUENCE_FACTOR = inf_factor;
 
@@ -132,12 +126,12 @@ void SurfReconstructor::resizeRootBoxVarR()
 		(_BoundingBox[5] - _BoundingBox[4]) });
 	_DEPTH_MAX = int(ceil(log2(ceil(maxLen / minR))));
 	resizeLen = pow(2, _DEPTH_MAX) * minR;
-	while (resizeLen - maxLen < (_INFLUENCE_FACTOR * avgR))
+	while (resizeLen - maxLen < (_INFLUENCE_FACTOR * maxR))
 	{
 		_DEPTH_MAX++;
 		resizeLen = pow(2, _DEPTH_MAX) * avgR;
 	}
-	// resizeLen *= 1.01;
+	resizeLen *= 0.99;
 	_RootHalfLength = resizeLen / 2;
 	for (size_t i = 0; i < 3; i++)
 	{
@@ -175,9 +169,12 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 			if (!_evaluator->CheckSplash(in))
 			{
 				all_splash = false;
-				if (_GlobalParticles[in].x() >= box1.x() && _GlobalParticles[in].x() <= box2.x() &&
-					_GlobalParticles[in].y() >= box1.y() && _GlobalParticles[in].y() <= box2.y() &&
-					_GlobalParticles[in].z() >= box1.z() && _GlobalParticles[in].z() <= box2.z())
+				if (_GlobalParticles[in].x() >= (box1.x() - (_GlobalRadiuses->at(in) * 2.5f)) && 
+					_GlobalParticles[in].x() <= (box2.x() + (_GlobalRadiuses->at(in) * 2.5f)) &&
+					_GlobalParticles[in].y() >= (box1.y() - (_GlobalRadiuses->at(in) * 2.5f)) && 
+					_GlobalParticles[in].y() <= (box2.y() + (_GlobalRadiuses->at(in) * 2.5f)) &&
+					_GlobalParticles[in].z() >= (box1.z() - (_GlobalRadiuses->at(in) * 2.5f)) && 
+					_GlobalParticles[in].z() <= (box2.z() + (_GlobalRadiuses->at(in) * 2.5f)))
 				{
 					Eigen::Vector3f tempNorm = _evaluator->PariclesNormals[in];
 					if (tempNorm == Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX))	{continue;}
@@ -185,7 +182,7 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 					area += tempNorm.norm();
 
 				}
-				if (!IS_CONST_RADIUS && min_radius >= _GlobalRadiuses->at(in))
+				if (!IS_CONST_RADIUS && min_radius > _GlobalRadiuses->at(in))
 				{
 					min_radius = _GlobalRadiuses->at(in);
 				}
@@ -571,14 +568,14 @@ void SurfReconstructor::generalModeRun()
 	{
     	_hashgrid = new HashGrid(_GlobalParticles, _BoundingBox, _INFLUENCE_FACTOR * _RADIUS);
 	} else {
-		_searcher = new MultiLevelSearcher(&_GlobalParticles, _GlobalRadiuses);
+		_searcher = new MultiLevelSearcher(&_GlobalParticles, _GlobalRadiuses, _INFLUENCE_FACTOR);
 	}
     last_temp_time = temp_time;
     temp_time = get_time();
-	printf("   Build Hash Grid Time = %f \n", temp_time - last_temp_time);
+	printf("   Build Neighbor Searcher Time = %f \n", temp_time - last_temp_time);
 
     printf("-= Initialize Evaluator =-\n");
-	_evaluator = new Evaluator(this, &_GlobalParticles, _GlobalDensities, _GlobalMasses, _GlobalRadiuses, _DENSITY, _MASS, _RADIUS);
+	_evaluator = new Evaluator(this, &_GlobalParticles, _GlobalRadiuses, _RADIUS);
 	last_temp_time = temp_time;
 	temp_time = get_time();
 	printf("   Initialize Evaluator Time = %f \n", temp_time - last_temp_time);
@@ -593,8 +590,6 @@ void SurfReconstructor::generalModeRun()
 	}
 	printf("   MAX_DEPTH = %d, MIN_DEPTH = %d\n", _DEPTH_MAX, _DEPTH_MIN);
 
-	//int max_density_index = std::distance(_GlobalDensities.begin(), std::max_element(_GlobalDensities.begin(), _GlobalDensities.end()));
-	// _evaluator->SingleEval(_GlobalParticles[max_density_index], _MAX_SCALAR, *(Eigen::Vector3f*)NULL);
 	_MAX_SCALAR = (IS_CONST_RADIUS ? _evaluator->CalculateMaxScalarConstR() : _evaluator->CalculateMaxScalarVarR());
 
 	_ISO_VALUE = (IS_CONST_RADIUS ? _evaluator->RecommendIsoValueConstR() : _evaluator->RecommendIsoValueVarR());

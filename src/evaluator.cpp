@@ -5,32 +5,16 @@
 
 Evaluator::Evaluator(SurfReconstructor* surf_constructor,
 		std::vector<Eigen::Vector3f>* global_particles, 
-        std::vector<float>* densities, std::vector<float>* masses, std::vector<float>* radiuses, float density, float mass, float radius)
+        std::vector<float>* radiuses, float radius)
 {
     constructor = surf_constructor;
 	GlobalPoses = global_particles;
-	GlobalDensity = densities;
-	GlobalMass = masses;
     GlobalRadius = radiuses;
-    if (!IS_CONST_DENSITY)
-    {
-        _MAX_DENSITY = *std::max_element(GlobalDensity->begin(), GlobalDensity->end());
-        _MIN_DENSITY = *std::min_element(GlobalDensity->begin(), GlobalDensity->end());
-    }
-    if (!IS_CONST_MASS)
-    {
-        _MAX_MASS = *std::max_element(GlobalMass->begin(), GlobalMass->end());
-        _MIN_MASS = *std::min_element(GlobalMass->begin(), GlobalMass->end());
-    }
     if (!IS_CONST_RADIUS)
     {
         _MAX_RADIUS = constructor->getSearcher()->getMaxRadius();
-        _MAX_RADIUS = constructor->getSearcher()->getMinRadius();
+        _MIN_RADIUS = constructor->getSearcher()->getMinRadius();
     }
-    BaseDensity = constructor->getBaseDensity();
-    BaseMass = constructor->getBaseMass();
-    Density = density;
-    Mass = mass;
     Radius = radius;
 
     inf_factor = constructor->getInfluenceFactor();
@@ -39,7 +23,6 @@ Evaluator::Evaluator(SurfReconstructor* surf_constructor,
     GlobalSplash.clear();
     PariclesNormals.resize(constructor->getGlobalParticlesNum(), Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX));
     GlobalSplash.resize(constructor->getGlobalParticlesNum(), 0);
-    //GlobalSplash.reserve(constructor->getGlobalParticlesNum());
 
     GlobalxMeans = new Eigen::Vector3f[constructor->getGlobalParticlesNum()];
     GlobalGs = new Eigen::Matrix3f[constructor->getGlobalParticlesNum()];
@@ -232,7 +215,7 @@ float Evaluator::CalculateMaxScalarConstR()
     k_value += general_kernel(3 * radius2, influnce2, influnce) * 8;
     k_value += general_kernel(11 * radius2, influnce2, influnce) * 4 * 6;
 
-    return (BaseMass / BaseDensity * k_value);
+    return radius * radius2 * k_value;
 }
 
 float Evaluator::CalculateMaxScalarVarR()
@@ -249,12 +232,13 @@ float Evaluator::CalculateMaxScalarVarR()
         influnce2 = influnce * influnce;
         temp_scalar += general_kernel(3 * radius2, influnce2, influnce) * 8;
         temp_scalar += general_kernel(11 * radius2, influnce2, influnce) * 4 * 6;
+        temp_scalar = r * radius2 * temp_scalar;
         if (temp_scalar > max_scalar)
         {
             max_scalar = temp_scalar;
         }
     }
-    return (BaseMass / BaseDensity) * max_scalar;
+    return max_scalar;
 }
 
 float Evaluator::RecommendIsoValueConstR()
@@ -262,15 +246,13 @@ float Evaluator::RecommendIsoValueConstR()
     double k_value = 0.0;
     const double radius = Radius;
     const double radius2 = radius * radius;
-    const double sqrt3 = 1.7320508075688772935274463415059;
 
     const double influnce = radius * inf_factor;
     const double influnce2 = influnce * influnce;
 
     k_value += general_kernel(2 * radius2, influnce2, influnce) * 2;
-    //k_value += general_kernel(5 * rDist2, influnce2) * 2;
 
-    return (((BaseMass / BaseDensity * k_value) 
+    return (((radius2 * radius * k_value) 
     - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
 }
 
@@ -285,11 +267,9 @@ float Evaluator::RecommendIsoValueVarR()
         radius2 = r * r;
         influnce = r * inf_factor;
         influnce2 = influnce * influnce;
-        recommend += general_kernel(2 * radius2, influnce2, influnce) * 2;
+        recommend += (radius2 * r) * general_kernel(2 * radius2, influnce2, influnce) * 2;
     }
-    return ((
-        (BaseMass / BaseDensity) * 
-        (recommend / radiuses->size())) - constructor->getMinScalar()) / constructor->getMaxScalar() * 255;
+    return ((recommend / radiuses->size()) - constructor->getMinScalar()) / constructor->getMaxScalar() * 255;
 }
 
 void Evaluator::CalcParticlesNormal()
@@ -315,40 +295,42 @@ void Evaluator::CalcParticlesNormal()
 inline float Evaluator::general_kernel(double d2, double h2, double h)
 {
     double p_dist = (d2 >= h2 ? 0.0 : pow(h2 - d2, 3));
-    double sigma = (315 / (64 * pow(h, 9))) * 0.318309886183790671538;
+    double sigma = (315 / (64 * pow(h, 9))) * inv_pi;
     return p_dist * sigma;
 }
 
 inline float Evaluator::spiky_kernel(double d, double h)
 {
     double p_dist = (d >= h ? 0.0 : pow(h - d, 3));
-    double sigma = (15 / pow(h, 6)) * 0.318309886183790671538;
+    double sigma = (15 / pow(h, 6)) * inv_pi;
     return p_dist * sigma;
 }
 
 inline float Evaluator::viscosity_kernel(double d, double h)
 {
     double p_dist = (d >= h ? 0.0 : (-pow(d, 3) / (2 * pow(h, 3)) + pow(d, 2) / pow(h, 2) + d / (2 * h) - 1));
-    double sigma = (15 / (2 * pow(h, 3))) * 0.318309886183790671538;
+    double sigma = (15 / (2 * pow(h, 3))) * inv_pi;
     return p_dist * sigma;
 }
 
 inline float Evaluator::IsotropicInterpolate(const int pIdx, const double d2)
 {
-    double influnce = (IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx)) * inf_factor;
+    double radius = (IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx));
+    double influnce = radius * inf_factor;
     double influnce2 = influnce * influnce;
 	if (d2 > influnce2)
 		return 0.0f;
-	float kernel_value = 315 / (64 * pow(influnce, 9)) * 0.318309886183790671538 * pow((influnce2 - d2), 3);
-	return (IS_CONST_MASS ? Mass : GlobalMass->at(pIdx)) / (IS_CONST_DENSITY ? Density : GlobalDensity->at(pIdx)) * kernel_value;
+	float kernel_value = 315 / (64 * pow(influnce, 9)) * inv_pi * pow((influnce2 - d2), 3);
+	return pow(radius, 3) * kernel_value;
 }
 
 inline float Evaluator::AnisotropicInterpolate(const int pIdx, const Eigen::Vector3f& diff)
 {
-    double influnce = (IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx)) * inf_factor;
+    double radius = (IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx));
+    double influnce = radius * inf_factor;
     double influnce2 = influnce * influnce;
     double k_value = general_kernel((GlobalGs[pIdx] * diff).squaredNorm(), influnce2, influnce);
-    return ((IS_CONST_MASS ? Mass : GlobalMass->at(pIdx)) / (IS_CONST_DENSITY ? Density : GlobalDensity->at(pIdx))) * (GlobalGs[pIdx].determinant() * k_value);
+    return (pow(radius, 3)) * (GlobalGs[pIdx].determinant() * k_value);
 }
 
 inline void Evaluator::compute_Gs_xMeans()

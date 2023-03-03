@@ -11,10 +11,11 @@ private:
     std::vector<HashGrid*> searchers;
     std::vector<std::vector<int>> sortedIndex;
     std::vector<float> checkedRadiuses;
-    float maxRadius, minRadius, avgRadius;
+    float maxRadius = 0, minRadius = 0, avgRadius = 0;
+    float infFactor;
 
 public:
-    MultiLevelSearcher(std::vector<Eigen::Vector3f>* particles, std::vector<float>* radiuses);
+    MultiLevelSearcher(std::vector<Eigen::Vector3f>* particles, std::vector<float>* radiuses, float inf_factor);
     MultiLevelSearcher(){};
 
     inline std::vector<float>* getCheckedRadiuses() {return &checkedRadiuses;}

@@ -19,18 +19,9 @@ public:
 
     SurfReconstructor* constructor;
 	std::vector<Eigen::Vector3f>* GlobalPoses;
-	std::vector<float>* GlobalDensity;
-	std::vector<float>* GlobalMass;
     std::vector<float>* GlobalRadius;
-    float _MAX_DENSITY, _MIN_DENSITY;
-    float _MAX_MASS, _MIN_MASS;
     float _MAX_RADIUS, _MIN_RADIUS;
 
-    float BaseDensity = 0;
-    float BaseMass = 0;
-
-    float Density = 0;
-    float Mass = 0;
     float Radius = 0;
     std::vector<char> GlobalSplash;
     std::vector<Eigen::Vector3f> PariclesNormals;
@@ -38,9 +29,9 @@ public:
 	Eigen::Vector3f* GlobalxMeans;
     Eigen::Matrix3f* GlobalGs;
 
-	Evaluator(SurfReconstructor* surf_constructor, std::vector<Eigen::Vector3f>* global_particles, 
-    std::vector<float>* densities, std::vector<float>* masses, std::vector<float>* radiuses,
-    float density, float mass, float radius);
+	Evaluator(  SurfReconstructor* surf_constructor, std::vector<Eigen::Vector3f>* global_particles, 
+                std::vector<float>* radiuses,
+                float radius);
 
 	void SingleEval(const Eigen::Vector3f& pos, float& scalar, Eigen::Vector3f& gradient, bool use_normalize = true, bool use_signed = true, bool grad_normalize = true);
 
@@ -55,6 +46,9 @@ public:
     float RecommendIsoValueVarR();
     void CalcParticlesNormal();
 private:
+    const double bv_factor = 4.1887902047863909846168578443727;
+    const double inv_pi = 0.31830988618379067153776752674503;
+
     float inf_factor;
 
     float general_kernel(double d2, double h2, double h);

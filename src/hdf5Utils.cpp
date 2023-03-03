@@ -5,8 +5,6 @@
 
 bool readShonDyParticleData(const std::string &fileName,
                             std::vector<Eigen::Vector3f> &positions,
-                            std::vector<float>* densities,
-                            std::vector<float>* masses,
                             std::vector<float>* radiuses)
 {
     if (!std::filesystem::exists(fileName))
@@ -27,23 +25,11 @@ bool readShonDyParticleData(const std::string &fileName,
     auto nodeSize = size(hdf5FileID, "position");
     const int numberOfNodes = nodeSize / 3;
     std::vector<double> nodes(nodeSize);
-    std::vector<double> densitiesDouble(numberOfNodes);
-    std::vector<double> massesDouble(numberOfNodes);
     std::vector<double> radiusesDouble(numberOfNodes);
     readDouble(hdf5FileID, "position", nodes);
     positions.resize(numberOfNodes);
 
     // read particle densities
-    if (densities != nullptr)
-    {
-        readDouble(hdf5FileID, "numberDensity", densitiesDouble);
-        densities->resize(numberOfNodes);
-    }
-    if (masses != nullptr)
-    {
-        readDouble(hdf5FileID, "mass", massesDouble);
-        masses->resize(numberOfNodes);
-    }
     if (radiuses != nullptr)
     {
         readDouble(hdf5FileID, "radius", radiusesDouble);
@@ -55,14 +41,6 @@ bool readShonDyParticleData(const std::string &fileName,
     {
         positions[i] =
             Eigen::Vector3f(nodes[3 * i], nodes[3 * i + 1], nodes[3 * i + 2]);
-        if (densities != nullptr)
-        {
-            (*densities)[i] = densitiesDouble[i];
-        }
-        if (masses != nullptr)
-        {
-            (*masses)[i] = massesDouble[i];
-        }
         if (radiuses != nullptr)
         {
             (*radiuses)[i] = radiusesDouble[i];

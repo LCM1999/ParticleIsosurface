@@ -20,20 +20,13 @@
 int OMP_USE_DYNAMIC_THREADS = 0;
 int OMP_THREADS_NUM = 16;
 
-bool IS_CONST_DENSITY = false;
-bool IS_CONST_MASS = false;
 bool IS_CONST_RADIUS = false;
 
 // variants for test
 short DATA_TYPE = 0;    // CSV:0, H5: 1
 bool NEED_RECORD;
 std::vector<std::string> DATA_PATHES;
-float DENSITY = 0;
-float MASS = 0;
 float RADIUS = 0;
-
-float BASE_DENSITY = 1000.0f;
-float BASE_MASS = 1.0f;
 
 void writeFile(Mesh &m, std::string fn)
 {
@@ -62,24 +55,6 @@ void loadConfigJson(const std::string controlJsonPath)
         const std::string filePath = readInJSON.at("DATA_FILE");
         std::string data_pathes = filePath;
         parseString(&DATA_PATHES, data_pathes, ",");
-        if (readInJSON.contains("BASE_DENSIY"))
-        {
-            BASE_DENSITY = readInJSON.at("BASE_DENSITY");
-        }
-        if (readInJSON.contains("BASE_MASS"))
-        {
-            BASE_MASS = readInJSON.at("BASE_MASS");
-        }
-        if (readInJSON.contains("DENSITY"))
-        {
-            DENSITY = readInJSON.at("DENSITY");
-            IS_CONST_DENSITY = true;
-        }
-        if (readInJSON.contains("MASS"))
-        {
-            MASS = readInJSON.at("MASS");
-            IS_CONST_MASS = true;
-        }
         if (readInJSON.contains("RADIUS"))
         {
             RADIUS = readInJSON.at("RADIUS");
@@ -95,12 +70,12 @@ void loadConfigJson(const std::string controlJsonPath)
 
 void loadParticlesFromCSV(std::string &csvPath,
                           std::vector<Eigen::Vector3f> &particles,
-                          std::vector<float>* densities, std::vector<float>* masses, std::vector<float>* radiuses)
+                          std::vector<float>* radiuses)
 {
     std::ifstream ifn;
     ifn.open(csvPath.c_str());
 
-    int densityIdx = -1, massIdx = -1, radiusIdx = -1, xIdx = -1, yIdx = -1, zIdx = -1;
+    int radiusIdx = -1, xIdx = -1, yIdx = -1, zIdx = -1;
 
     particles.clear();
 
@@ -109,22 +84,6 @@ void loadParticlesFromCSV(std::string &csvPath,
     std::vector<float> elements;
     std::getline(ifn, line);
     parseString(&titles, line, ",");
-    if (!IS_CONST_DENSITY)
-    {
-        densityIdx = std::distance(titles.begin(), 
-        std::find_if(titles.begin(), titles.end(), [&](const std::string &title) {
-            std::regex reg(".*density.*", std::regex::icase);
-            return std::regex_match(title, reg);
-        }));
-    }
-    if (!IS_CONST_MASS)
-    {
-        massIdx = std::distance(titles.begin(), 
-        std::find_if(titles.begin(), titles.end(), [&](const std::string &title) {
-            std::regex reg(".*mass.*", std::regex::icase);
-            return std::regex_match(title, reg);
-        }));
-    }
     if (!IS_CONST_RADIUS)
     {
         radiusIdx = std::distance(titles.begin(),
@@ -157,14 +116,6 @@ void loadParticlesFromCSV(std::string &csvPath,
         elements.clear();
         parseStringToElements(&elements, line, ",");
         particles.push_back(Eigen::Vector3f(elements[xIdx], elements[yIdx], elements[zIdx]));
-        if (!IS_CONST_DENSITY)
-        {
-            densities->push_back(elements[densityIdx] + 1000.0f);
-        }
-        if (!IS_CONST_MASS)
-        {
-            masses->push_back(elements[massIdx]);
-        }
         if (!IS_CONST_RADIUS)
         {
             radiuses->push_back(elements[radiusIdx]);
@@ -179,8 +130,6 @@ void run(std::string &dataDirPath)
     double frameStart = 0;
     int index = 0;
     std::vector<Eigen::Vector3f> particles;
-    std::vector<float>* densities = (IS_CONST_DENSITY ? nullptr : new std::vector<float>());
-    std::vector<float>* masses = (IS_CONST_MASS ? nullptr : new std::vector<float>());
     std::vector<float>* radiuses = (IS_CONST_RADIUS ? nullptr : new std::vector<float>());
     for (const std::string frame : DATA_PATHES)
     {
@@ -193,10 +142,10 @@ void run(std::string &dataDirPath)
         switch (DATA_TYPE)
         {
         case 0:
-            loadParticlesFromCSV(dataPath, particles, densities, masses, radiuses);
+            loadParticlesFromCSV(dataPath, particles, radiuses);
             break;
         case 1:
-            readShonDyParticleData(dataPath, particles, densities, masses, radiuses);
+            readShonDyParticleData(dataPath, particles, radiuses);
             break;
         default:
             printf("ERROR: Unknown DATA TYPE;");
@@ -205,7 +154,7 @@ void run(std::string &dataDirPath)
 
         printf("Particles Number = %zd\n", particles.size());
 
-        SurfReconstructor constructor(particles, densities, masses, radiuses, mesh, DENSITY, MASS, RADIUS, 4.0f);
+        SurfReconstructor constructor(particles, radiuses, mesh, RADIUS, 4.0f);
         Recorder recorder(dataDirPath, frame.substr(0, frame.size() - 4),
                           &constructor);
         constructor.Run();
@@ -249,8 +198,8 @@ int main(int argc, char **argv)
     else
     {
         std::string dataDirPath =
-            // "E:/data/multiR/mr_csv";
-            "E:/data/vtk/csv";
+            "E:/data/multiR/mr_csv";
+            // "E:/data/vtk/csv";
         run(dataDirPath);
     }
 
