@@ -141,7 +141,7 @@ void SurfReconstructor::resizeRootBoxVarR()
 		_RootCenter[i] = center;
 	}
 
-	_DEPTH_MIN = std::min(int(ceil(log2(ceil(maxLen / maxR)))) - 2, _DEPTH_MAX - int(_DEPTH_MAX / 3));
+	_DEPTH_MIN = 1; // std::min(int(ceil(log2(ceil(maxLen / maxR)))) - 2, _DEPTH_MAX - int(_DEPTH_MAX / 3));
 }
 
 
@@ -201,6 +201,7 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad)
 {
 	float qef_error = 0, curv = 0, min_radius;
 	bool signchange = false, recur = false, next = false, empty;
+	Eigen::Vector4f* verts = nullptr;
 
 	switch (tnode->type)
 	{
@@ -233,7 +234,8 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad)
 		}
 		else
 		{
-			tnode->vertAll(curv, signchange, grad, qef_error, min_radius);
+			verts = new Eigen::Vector4f[8];
+			tnode->vertAll(curv, signchange, grad, verts, qef_error, min_radius);
 		}
 		if (std::isnan(curv))
 		{
@@ -249,6 +251,11 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad)
 		{
 			// it's a leaf
 			tnode->type = LEAF;
+			if (signchange)
+			{
+				tnode->points = new std::array<Eigen::Vector3f, 12>();
+				tnode->vertvs = verts;
+			}
 			return;
 		}
 		//static float maxsize = dynamic_cast<InternalNode*>(mytree->l)->lenn * pow(.5, DEPTH_MIN);
@@ -320,8 +327,11 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad)
 	else
 	{
 		tnode->type = LEAF;
-		//DONE_VOLUME += pow(2 * tnode->half_length, 3);
-		//printStatus();
+		if (signchange)
+		{
+			tnode->points = new std::array<Eigen::Vector3f, 12>();
+			tnode->vertvs = verts;
+		}
 	}
 }
 
@@ -412,36 +422,6 @@ void SurfReconstructor::genIsoOurs()
 	}
 	else if (_STATE == 2)
 	{
-		/*----------Make Graph----------*/
-		/*
-		char cdepth = 0;
-		std::vector<TNode*> layer_nodes;
-		get_division_depth(_OurRoot, cdepth, layer_nodes);
-		printf("   cDepth = %d, layerNodesNum = %d\n", cdepth, layer_nodes.size());
-		Graph layerGraph(layer_nodes);
-		VisitorExtract gv(this, cdepth, &layerGraph);
-		TraversalData gtd(_OurRoot);
-		traverse_node<trav_face>(gv, gtd);
-		int* xadj = new int[layerGraph.vNum + 1];
-		int* adjncy = new int[layerGraph.eNum * 2];
-		layerGraph.getXAdjAdjncy(xadj, adjncy);
-
-		std::vector<idx_t> part(layerGraph.vNum, 0);
-		idx_t nParts = OMP_THREADS_NUM;
-		idx_t obj_val;
-
-		int ret = METIS_PartGraphRecursive(&layerGraph.vNum, &layerGraph.ncon, xadj, adjncy, layerGraph.vwgt.data(),
-			NULL, layerGraph.ewgt.data(), &nParts, NULL, NULL, NULL, &obj_val, part.data());
-		
-		if (ret == rstatus_et::METIS_OK)
-		{
-			printf("-= METIS DIVISION SUCCESS =-\n");
-
-		}
-//		else
-//		{
-			printf("-= METIS ERROR, USE DEFAULT SINGLE THREAD =-\n");
-		*/
 		printf("-= Generate Surface =-\n");
 		double t_gen_mesh = get_time();
 		m->tris.reserve(1000000);

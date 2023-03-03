@@ -183,21 +183,3 @@ void Mesh::AppendSplash_VarR(std::vector<Eigen::Vector3f>& splash_particles, std
 		}
 	}
 }
-
-Graph::Graph(std::vector<TNode*>& layer_nodes, int vwn)
-{
-	vNum = 0;
-	eNum = 0;
-	ncon = vwn;
-	for (size_t i = 0; i < layer_nodes.size(); i++)
-	{
-		vidx_map[layer_nodes[i]->nId] = vNum;
-		vNum++;
-		for (size_t j = 0; j < ncon; j++)
-		{
-			vwgt.push_back(layer_nodes[i]->getWeight());
-		}
-	}
-	gAdj.resize(vNum);
-}
-

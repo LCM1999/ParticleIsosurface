@@ -30,7 +30,7 @@ double TNode::calcErrorDMC(Eigen::Vector4f& p, Eigen::Vector4f* verts, Eigen::Ve
 	return err;
 }
 
-void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float& qef_error, float& sample_radius)
+void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, Eigen::Vector4f* verts, float& qef_error, float& sample_radius)
 {
 	bool origin_sign;
 	signchange = false;
@@ -39,7 +39,6 @@ void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float&
 		return x ? 1 : -1;
 	};
 	
-	Eigen::Vector4f verts[8];
 	for (Index i = 0; i < 8; i++)
 	{
 		verts[i][0] = center[0] + sign(i.x) * half_length;

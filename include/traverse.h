@@ -180,6 +180,12 @@ void traverse_face_x(V &v, T &n0, T &n1)
 }
 
 template <TraversalType TT, class V, class T>
+void traverse_face_x_iso(V &v, T &n0, T &n1)
+{
+	
+}
+
+template <TraversalType TT, class V, class T>
 void traverse_face_y(V &v, T &n0, T &n1)
 {
 	if (!v.on_face(n0, n1, 1))
@@ -303,5 +309,29 @@ void traverse_node(V &v, T &td)
 						 c[Index(1,0,1)],
 						 c[Index(0,1,1)],
 						 c[Index(1,1,1)]);
+	}
+}
+
+template <TraversalType TT, class V, class T>
+void traverse_node_iso(V &v, T &td)
+{
+	if (!v.on_node_iso(td))
+		return;
+
+	T c[8];
+	for (Index i = 0; i < 8; i++)
+	{
+		td.gen_trav(c[i], i);
+		traverse_node_iso<TT,V,T>(v, c[i]);
+	}
+
+	if (TT >= trav_face)
+	{
+		for (Index i; i < 4; i++)
+		{
+			traverse_face_x<TT,V,T>(v, c[Index(0,i.x,i.y)], c[Index(1,i.x,i.y)]);
+			traverse_face_y<TT,V,T>(v, c[Index(i.x,0,i.y)], c[Index(i.x,1,i.y)]);
+			traverse_face_z<TT,V,T>(v, c[Index(i.x,i.y,0)], c[Index(i.x,i.y,1)]);
+		}
 	}
 }

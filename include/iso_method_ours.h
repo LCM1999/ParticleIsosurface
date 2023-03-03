@@ -56,9 +56,10 @@ struct TNode
 	short type;
 
 	TNode *children[8];
+	Eigen::Vector4f* vertvs = nullptr;
+	std::array<Eigen::Vector3f, 12>* points = nullptr;
 
 	bool changeSignDMC(Eigen::Vector4f* verts);
-
 
 	int getWeight()
 	{
@@ -110,7 +111,7 @@ struct TNode
 
 	double calcErrorDMC(Eigen::Vector4f& p, Eigen::Vector4f* verts, Eigen::Vector3f* verts_grad);
 
-	void vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float& qef_error, float& sample);
+	void vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, Eigen::Vector4f* verts, float& qef_error, float& sample);
 
 	int CountLeaves()
 	{
