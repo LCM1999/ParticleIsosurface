@@ -141,7 +141,7 @@ void SurfReconstructor::resizeRootBoxVarR()
 		_RootCenter[i] = center;
 	}
 
-	_DEPTH_MIN = 1; // std::min(int(ceil(log2(ceil(maxLen / maxR)))) - 2, _DEPTH_MAX - int(_DEPTH_MAX / 3));
+	_DEPTH_MIN = std::min(int(ceil(log2(ceil(maxLen / maxR)))) - 2, _DEPTH_MAX - int(_DEPTH_MAX / 3));
 }
 
 
@@ -169,12 +169,12 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 			if (!_evaluator->CheckSplash(in))
 			{
 				all_splash = false;
-				if (_GlobalParticles[in].x() >= (box1.x() - (_GlobalRadiuses->at(in) * 2.5f)) && 
-					_GlobalParticles[in].x() <= (box2.x() + (_GlobalRadiuses->at(in) * 2.5f)) &&
-					_GlobalParticles[in].y() >= (box1.y() - (_GlobalRadiuses->at(in) * 2.5f)) && 
-					_GlobalParticles[in].y() <= (box2.y() + (_GlobalRadiuses->at(in) * 2.5f)) &&
-					_GlobalParticles[in].z() >= (box1.z() - (_GlobalRadiuses->at(in) * 2.5f)) && 
-					_GlobalParticles[in].z() <= (box2.z() + (_GlobalRadiuses->at(in) * 2.5f)))
+				if (_GlobalParticles[in].x() >= (box1.x() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * 2.5f)) && 
+					_GlobalParticles[in].x() <= (box2.x() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * 2.5f)) &&
+					_GlobalParticles[in].y() >= (box1.y() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * 2.5f)) && 
+					_GlobalParticles[in].y() <= (box2.y() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * 2.5f)) &&
+					_GlobalParticles[in].z() >= (box1.z() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * 2.5f)) && 
+					_GlobalParticles[in].z() <= (box2.z() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * 2.5f)))
 				{
 					Eigen::Vector3f tempNorm = _evaluator->PariclesNormals[in];
 					if (tempNorm == Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX))	{continue;}
@@ -214,7 +214,6 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad)
 	case UNCERTAIN:
 	{
 		// evaluate QEF samples
-		
 		checkEmptyAndCalcCurv(tnode, empty, curv, min_radius);
 		if (empty)
 		{
