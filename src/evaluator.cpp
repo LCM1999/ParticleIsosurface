@@ -78,12 +78,12 @@ void Evaluator::SingleEval(const Eigen::Vector3f& pos, float& scalar, Eigen::Vec
 }
 
 void Evaluator::GridEval(
-    std::vector<Eigen::Vector3f>& sample_points, std::vector<float>& field_scalars, std::vector<Eigen::Vector3f>& field_gradients,
-    bool& signchange, int oversample)
+    std::vector<Eigen::Vector4f>& sample_points, std::vector<Eigen::Vector3f>& field_gradients,
+    bool& signchange, int oversample, bool grad_normalize)
 {
     assert(!sample_points.empty());
     bool origin_sign;
-    for (Eigen::Vector3f p : sample_points)
+    for (Eigen::Vector4f &p : sample_points)
     {
         float scalar = 0.0f;
         if (constructor->getUseAni())
@@ -91,15 +91,15 @@ void Evaluator::GridEval(
             std::vector<int> neighbors;
             if (IS_CONST_RADIUS)
             {
-                constructor->getHashGrid()->GetPIdxList(p, neighbors);
+                constructor->getHashGrid()->GetPIdxList(p.head(3), neighbors);
             } else {
-                constructor->getSearcher()->GetNeighbors(p, neighbors);
+                constructor->getSearcher()->GetNeighbors(p.head(3), neighbors);
             }
             if (!neighbors.empty())
             {
                 for (const int pIdx : neighbors)
                 {
-                    scalar += AnisotropicInterpolate(pIdx, p - GlobalxMeans[pIdx]);
+                    scalar += AnisotropicInterpolate(pIdx, p.head(3) - GlobalxMeans[pIdx]);
                 }
             }
         }
@@ -108,23 +108,23 @@ void Evaluator::GridEval(
             std::vector<int> neighbors;
             if (IS_CONST_RADIUS)
             {
-                constructor->getHashGrid()->GetPIdxList(p, neighbors);
+                constructor->getHashGrid()->GetPIdxList(p.head(3), neighbors);
             } else {
-                constructor->getSearcher()->GetNeighbors(p, neighbors);
+                constructor->getSearcher()->GetNeighbors(p.head(3), neighbors);
             }
             if (!neighbors.empty())
             {
                 double d2;
                 for (int pIdx : neighbors)
                 {
-                    d2 = (p - GlobalPoses->at(pIdx)).squaredNorm();
+                    d2 = (p.head(3) - GlobalPoses->at(pIdx)).squaredNorm();
                     scalar += IsotropicInterpolate(pIdx, d2);
                 }
             }
         }
         scalar = constructor->getIsoValue() - ((scalar - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
-        field_scalars.push_back(scalar);
-        origin_sign = field_scalars[0] >= 0;
+        p[3] = scalar;
+        origin_sign = sample_points[0][3] >= 0;
         if (!signchange)
         {
             signchange = origin_sign ^ (scalar >= 0);
@@ -144,51 +144,53 @@ void Evaluator::GridEval(
                 last_idx = (z * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + (x - 1));
                 if (x == 0)
                 {
-                    gradient[0] = field_scalars[index] - field_scalars[next_idx];
+                    gradient[0] = sample_points[index][3] - sample_points[next_idx][3];
                 }
                 else if (x == oversample)
                 {
-                    gradient[0] = field_scalars[last_idx] - field_scalars[index];
+                    gradient[0] = sample_points[last_idx][3] - sample_points[index][3];
                 }
                 else
                 {
-                    gradient[0] = field_scalars[last_idx] - field_scalars[next_idx];
+                    gradient[0] = sample_points[last_idx][3] - sample_points[next_idx][3];
                 }
 
                 next_idx = (z * (oversample + 1) * (oversample + 1) + (y + 1) * (oversample + 1) + x);
                 last_idx = (z * (oversample + 1) * (oversample + 1) + (y - 1) * (oversample + 1) + x);
                 if (y == 0)
                 {
-                    gradient[1] = field_scalars[index] - field_scalars[next_idx];
+                    gradient[1] = sample_points[index][3] - sample_points[next_idx][3];
                 }
                 else if (y == oversample)
                 {
-                    gradient[1] = field_scalars[last_idx] - field_scalars[index];
+                    gradient[1] = sample_points[last_idx][3] - sample_points[index][3];
                 }
                 else
                 {
-                    gradient[1] = field_scalars[last_idx] - field_scalars[next_idx];
+                    gradient[1] = sample_points[last_idx][3] - sample_points[next_idx][3];
                 }
 
                 next_idx = ((z + 1) * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + x);
                 last_idx = ((z - 1) * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + x);
                 if (z == 0)
                 {
-                    gradient[2] = field_scalars[index] - field_scalars[next_idx];
+                    gradient[2] = sample_points[index][3] - sample_points[next_idx][3];
                 }
                 else if (z == oversample)
                 {
-                    gradient[2] = field_scalars[last_idx] - field_scalars[index];
+                    gradient[2] = sample_points[last_idx][3] - sample_points[index][3];
                 }
                 else
                 {
-                    gradient[2] = field_scalars[last_idx] - field_scalars[next_idx];
+                    gradient[2] = sample_points[last_idx][3] - sample_points[next_idx][3];
                 }
-
-                gradient.normalize();
-                gradient[0] = std::isnan(gradient[0]) ? 0.0f : gradient[0];
-                gradient[1] = std::isnan(gradient[1]) ? 0.0f : gradient[1];
-                gradient[2] = std::isnan(gradient[2]) ? 0.0f : gradient[2];
+                if (grad_normalize)
+                {
+                    gradient.normalize();
+                    gradient[0] = std::isnan(gradient[0]) ? 0.0f : gradient[0];
+                    gradient[1] = std::isnan(gradient[1]) ? 0.0f : gradient[1];
+                    gradient[2] = std::isnan(gradient[2]) ? 0.0f : gradient[2];
+                }
                 field_gradients.push_back(gradient);
             }
         }

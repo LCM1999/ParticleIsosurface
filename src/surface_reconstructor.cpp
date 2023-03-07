@@ -168,7 +168,6 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 		{
 			if (!_evaluator->CheckSplash(in))
 			{
-				all_splash = false;
 				if (_GlobalParticles[in].x() >= (box1.x() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * 2.5f)) && 
 					_GlobalParticles[in].x() <= (box2.x() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * 2.5f)) &&
 					_GlobalParticles[in].y() >= (box1.y() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * 2.5f)) && 
@@ -176,15 +175,16 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 					_GlobalParticles[in].z() >= (box1.z() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * 2.5f)) && 
 					_GlobalParticles[in].z() <= (box2.z() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * 2.5f)))
 				{
+					all_splash = false;
 					Eigen::Vector3f tempNorm = _evaluator->PariclesNormals[in];
 					if (tempNorm == Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX))	{continue;}
 					norms += tempNorm;
 					area += tempNorm.norm();
 
-				}
-				if (!IS_CONST_RADIUS && min_radius > _GlobalRadiuses->at(in))
-				{
-					min_radius = _GlobalRadiuses->at(in);
+					if (!IS_CONST_RADIUS && min_radius > _GlobalRadiuses->at(in))
+					{
+						min_radius = _GlobalRadiuses->at(in);
+					}
 				}
 			}
 		}
@@ -250,11 +250,6 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad)
 		{
 			// it's a leaf
 			tnode->type = LEAF;
-			if (signchange)
-			{
-				tnode->points = new std::array<Eigen::Vector3f, 12>();
-				tnode->vertvs = verts;
-			}
 			return;
 		}
 		//static float maxsize = dynamic_cast<InternalNode*>(mytree->l)->lenn * pow(.5, DEPTH_MIN);
@@ -326,11 +321,6 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad)
 	else
 	{
 		tnode->type = LEAF;
-		if (signchange)
-		{
-			tnode->points = new std::array<Eigen::Vector3f, 12>();
-			tnode->vertvs = verts;
-		}
 	}
 }
 

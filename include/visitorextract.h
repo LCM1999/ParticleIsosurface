@@ -300,11 +300,7 @@ struct VisitorExtract
 
 	bool on_node(TraversalData &td);
 
-	bool on_node_iso(TraversalData &td);
-
 	bool on_edge(TraversalData& td00, TraversalData& td10, TraversalData& td01, TraversalData& td11);
 
 	bool on_face(TraversalData &td0, TraversalData &td1, char orient);
-
-	bool on_face_iso(TraversalData &td0, TraversalData &td1, char orient);
 };
