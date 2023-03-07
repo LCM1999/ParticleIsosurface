@@ -1,3 +1,0 @@
-E:/Isosurface_cmake/Isosurface/CMakeFiles/Isosurface_smiplify.dir
-E:/Isosurface_cmake/Isosurface/CMakeFiles/ALL_BUILD.dir
-E:/Isosurface_cmake/Isosurface/CMakeFiles/ZERO_CHECK.dir

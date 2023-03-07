@@ -408,6 +408,7 @@ void SurfReconstructor::genIsoOurs()
 	else if (_STATE == 1)
 	{
 		printf("-= Our Method =-\n");
+		root = _OurRoot;
 	}
 	else if (_STATE == 2)
 	{
