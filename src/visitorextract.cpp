@@ -94,6 +94,8 @@ bool VisitorExtract::on_vert(TraversalData& a, TraversalData& b, TraversalData& 
 					{
 						tmpv2 = tmpv;
 						tmpv.setZero();
+					} else {
+						break;
 					}
 				}
 				ratio = invlerp(tmpv1[3], tmpv2[3], 0.0f);

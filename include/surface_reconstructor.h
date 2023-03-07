@@ -38,7 +38,6 @@ private:
     float _TOLERANCE = 1e-8;
     float _RATIO_TOLERANCE = 0.1f;
     //float _LOW_MESH_QUALITY = 0.17320508075688772935274463415059;
-    float _MESH_TOLERANCE = 1e4;
 
     HashGrid* _hashgrid = NULL;
     MultiLevelSearcher* _searcher = NULL;
@@ -105,7 +104,6 @@ public:
     inline float getXMeanDelta() {return _XMEAN_DELTA;}
     inline float getTolerance() {return _TOLERANCE;}
     inline float getRatioTolerance() {return _RATIO_TOLERANCE;}
-    inline float getMeshTolerance() {return _MESH_TOLERANCE;}
     inline HashGrid* getHashGrid() {return _hashgrid;}
     inline MultiLevelSearcher* getSearcher() {return _searcher;}
     inline Evaluator* getEvaluator() {return _evaluator;}

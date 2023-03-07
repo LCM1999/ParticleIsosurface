@@ -103,7 +103,7 @@ void SurfReconstructor::resizeRootBoxConstR()
 		_DEPTH_MAX++;
 		resizeLen = pow(2, _DEPTH_MAX) * r;
 	}
-	resizeLen *= 0.99;
+	resizeLen *= 0.995;
 	_RootHalfLength = resizeLen / 2;
 	for (size_t i = 0; i < 3; i++)
 	{
@@ -131,7 +131,7 @@ void SurfReconstructor::resizeRootBoxVarR()
 		_DEPTH_MAX++;
 		resizeLen = pow(2, _DEPTH_MAX) * avgR;
 	}
-	resizeLen *= 0.99;
+	resizeLen *= 0.995;
 	_RootHalfLength = resizeLen / 2;
 	for (size_t i = 0; i < 3; i++)
 	{

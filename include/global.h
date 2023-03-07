@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <array>
 #include <math.h>
 #include <map>
 #include <iterator>
@@ -47,13 +48,14 @@ struct Triangle
 		v[0] = a;
 		v[1] = b;
 		v[2] = c;
+		//std::sort(v.begin(), v.end());
 	}
 
-	T v[3];
+	std::array<T, 3> v;
 
 	bool operator<(const Triangle<T>& t) const
 	{
-		return std::lexicographical_compare(v, v+3, t.v, t.v+3);
+		return std::lexicographical_compare(v.begin(), v.end(), t.v.begin(), t.v.end());
 	}
 };
 
