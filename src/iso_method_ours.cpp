@@ -82,13 +82,15 @@ void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, Eigen:
 	float area = 0;
 	for (Eigen::Vector3f n : field_gradient)
 	{
+		n.normalize();
 		norms += n;
 		area += n.norm();
 	}
-	if (curv == 0)
-	{
-		curv = norms.norm() / area;
-	}
+	// if (curv == 0)
+	// {
+		curv += (norms.norm() / area);
+		curv /= 2;
+	// }
 	// else if (curv < 0) {
 	// 	curv = 0;
 	// } 

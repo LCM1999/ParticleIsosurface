@@ -10,14 +10,14 @@ Mesh::Mesh(const float mesh_tolerance)
 
 int Mesh::insert_vert(const Eigen::Vector3f& p)
 {
-	vect3i tmp = vect3f2vect3i(p);
-	if (vertices_map.find(tmp) == vertices_map.end())
-	{
-		verticesNum++;
-		vertices_map[tmp] = verticesNum;
-		vertices.push_back(p);
-	}
-	return vertices_map[tmp];
+	// vect3i tmp = vect3f2vect3i(p);
+	// if (vertices_map.find(tmp) == vertices_map.end())
+	// {
+	// 	vertices_map[tmp] = verticesNum;
+	// }
+	verticesNum++;
+	vertices.push_back(p);
+	return verticesNum;
 }
 
 vect3i Mesh::vect3f2vect3i(const Eigen::Vector3f& a)
@@ -25,7 +25,7 @@ vect3i Mesh::vect3f2vect3i(const Eigen::Vector3f& a)
 	vect3i r;
 	for (size_t i = 0; i < 3; i++)
 	{
-		r[i] = int(round(a[i] * MESH_TOLERANCE));
+		r.v[i] = int(round(a[i] * MESH_TOLERANCE));
 	}
 	return r;
 }
@@ -59,10 +59,10 @@ void Mesh::insert_tri(int t0, int t1, int t2)
 		return;
 	}
 	
-	vect3i t0_i = vect3f2vect3i(vertices[(t0 - 1)]);
-	vect3i t1_i = vect3f2vect3i(vertices[(t1 - 1)]);
-	vect3i t2_i = vect3f2vect3i(vertices[(t2 - 1)]);
-	Triangle<vect3i> ti(t0_i, t1_i, t2_i);
+	// vect3i t0_i = vect3f2vect3i(vertices[(t0 - 1)]);
+	// vect3i t1_i = vect3f2vect3i(vertices[(t1 - 1)]);
+	// vect3i t2_i = vect3f2vect3i(vertices[(t2 - 1)]);
+	// Triangle<vect3i> ti(t0_i, t1_i, t2_i);
 	//float length[3];
 	//int top, bottom1, bottom2;
 	//float height, half;
@@ -94,11 +94,11 @@ void Mesh::insert_tri(int t0, int t1, int t2)
 	//else
 	//{
 	//}
-	if (tris_map.find(ti) == tris_map.end())
+	Triangle<int> tv(t0, t1, t2);
+	if (tris_map.find(tv) == tris_map.end())
 	{
 		trianglesNum++;
-		tris_map[ti] = trianglesNum;
-		Triangle<int> tv(t0, t1, t2);
+		tris_map[tv] = trianglesNum;
 		tris.push_back(tv);
 	}
 }

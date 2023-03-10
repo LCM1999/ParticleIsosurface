@@ -131,7 +131,7 @@ void SurfReconstructor::resizeRootBoxVarR()
 		_DEPTH_MAX++;
 		resizeLen = pow(2, _DEPTH_MAX) * avgR;
 	}
-	resizeLen *= 0.995;
+	resizeLen *= 1.005;
 	_RootHalfLength = resizeLen / 2;
 	for (size_t i = 0; i < 3; i++)
 	{
@@ -151,6 +151,9 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 	float area = 0;
 	std::vector<int> insides;
 	min_radius = FLT_MAX;
+	float outside_avg_radius = 0;
+	int outsiders = 0;
+	bool inner_empty = true;
 	const Eigen::Vector3f 
 	box1 = tnode->center - Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length),
 	box2 = tnode->center + Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length);
@@ -168,33 +171,53 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 		{
 			if (!_evaluator->CheckSplash(in))
 			{
-				if (_GlobalParticles[in].x() >= (box1.x() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * 2.5f)) && 
-					_GlobalParticles[in].x() <= (box2.x() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * 2.5f)) &&
-					_GlobalParticles[in].y() >= (box1.y() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * 2.5f)) && 
-					_GlobalParticles[in].y() <= (box2.y() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * 2.5f)) &&
-					_GlobalParticles[in].z() >= (box1.z() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * 2.5f)) && 
-					_GlobalParticles[in].z() <= (box2.z() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * 2.5f)))
+				if (_GlobalParticles[in].x() >= (box1.x() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _INFLUENCE_FACTOR)) && 
+					_GlobalParticles[in].x() <= (box2.x() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _INFLUENCE_FACTOR)) &&
+					_GlobalParticles[in].y() >= (box1.y() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _INFLUENCE_FACTOR)) && 
+					_GlobalParticles[in].y() <= (box2.y() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _INFLUENCE_FACTOR)) &&
+					_GlobalParticles[in].z() >= (box1.z() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _INFLUENCE_FACTOR)) && 
+					_GlobalParticles[in].z() <= (box2.z() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _INFLUENCE_FACTOR)))
 				{
 					all_splash = false;
 					Eigen::Vector3f tempNorm = _evaluator->PariclesNormals[in];
 					if (tempNorm == Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX))	{continue;}
 					norms += tempNorm;
 					area += tempNorm.norm();
-
-					if (!IS_CONST_RADIUS && min_radius > _GlobalRadiuses->at(in))
+					if (min_radius > _GlobalRadiuses->at(in))
 					{
 						min_radius = _GlobalRadiuses->at(in);
 					}
+					outsiders++;
+					// if (!IS_CONST_RADIUS)
+					// {
+					// 	if (_GlobalParticles[in].x() >= box1.x() && _GlobalParticles[in].x() <= box2.x() &&
+					// 		_GlobalParticles[in].y() >= box1.y() && _GlobalParticles[in].y() <= box2.y() &&
+					// 		_GlobalParticles[in].z() >= box1.z() && _GlobalParticles[in].z() <= box2.z())
+					// 	{
+					// 		inner_empty = false;
+					// 	} else {
+					// 		// if (outside_avg_radius > _GlobalRadiuses->at(in))
+					// 		// {
+					// 			outside_avg_radius += _GlobalRadiuses->at(in);
+					// 			outsiders++;
+					// 		// }
+					// 	}
+					// }
 				}
 			}
 		}
 		empty = all_splash;
 	}
 	curv = (area == 0) ? 0.0 : (norms.norm() / area);
-	if (IS_CONST_RADIUS || min_radius == FLT_MAX)
-	{
-		min_radius = _RADIUS;
-	}
+	// if (IS_CONST_RADIUS)
+	// {
+	// 	min_radius = _RADIUS;
+	// } else {
+	// 	if (inner_empty)
+	// 	{
+	// 		min_radius = (outside_avg_radius / outsiders);
+	// 	}
+	// }
 }
 
 void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad)

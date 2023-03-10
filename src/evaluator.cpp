@@ -355,28 +355,35 @@ inline void Evaluator::compute_Gs_xMeans()
         if (tempNeighbors.empty())
             continue;
         double wSum = 0, d2, d, wj;
-        double R, R2, D, D2, I, I2;
+        double pR, pR2, pD, pD2, pI, pI2;
+        pR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx);
+        pR2 = pR * pR;
+        pD = 2.5 * pR;
+        pD2 = pD * pD;
+        pI = pR * inf_factor;
+        pI2 = pI * pI;
+        double nR, nR2, nD, nD2, nI, nI2;
         for (int nIdx : tempNeighbors)
         {
             if (nIdx == pIdx)
                 continue;
-            R = IS_CONST_RADIUS ? Radius : GlobalRadius->at(nIdx);
-            R2 = R * R;
-            D = 2.5 * R;
-            D2 = D * D;
-            I = R * inf_factor;
-            I2 = I * I;
+            nR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(nIdx);
+            nR2 = nR * nR;
+            nD = 2.5 * nR;
+            nD2 = nD * nD;
+            nI = nR * inf_factor;
+            nI2 = nI * nI;
             d2 = (((GlobalPoses->at(nIdx))) - ((GlobalPoses->at(pIdx)))).squaredNorm();
-            if (d2 >= I2)
+            if (d2 >= nI2)
             {
                 continue;
             }
             d = sqrt(d2);
-            wj = wij(d, I);
+            wj = wij(d, nI);
             wSum += wj;
             xMean += ((GlobalPoses->at(nIdx))) * wj;
             neighbors.push_back(nIdx);
-            if (d2 < D2)
+            if (d2 <= std::max(pD2, nD2))
             {
                 closerNeigbors++;
             }
@@ -398,7 +405,7 @@ inline void Evaluator::compute_Gs_xMeans()
             xMean = (GlobalPoses->at(pIdx));
         }
 
-        if (neighbors.size() < 1 || closerNeigbors < 1)
+        if (neighbors.size() < 1)
         {
             G += Eigen::DiagonalMatrix<float, 3>(invH, invH, invH);
             GlobalSplash[pIdx] = 1;
@@ -412,7 +419,7 @@ inline void Evaluator::compute_Gs_xMeans()
             for (int nIdx : neighbors)
             {
                 d = (xMean - ((GlobalPoses->at(nIdx)))).norm();
-                wj = wij(d, I);
+                wj = wij(d, nI);
                 wSum += wj;
                 wd = ((GlobalPoses->at(nIdx))) - xMean;
                 cov += ((wd * wd.transpose()).cast<double>() * wj);

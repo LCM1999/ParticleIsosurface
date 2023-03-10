@@ -93,3 +93,48 @@ void Recorder::RecordParticles()
 	}
 	fclose(f);
 }
+
+void Recorder::RecordFeatures()
+{
+	FILE* f = fopen((_Output_Dir + "/features_" + _Frame_Name + ".txt").c_str(), "w");
+	if (constructor->getRoot() == nullptr)
+	{
+		return;
+	}
+	TNode* root = constructor->getRoot();
+	std::stack<TNode*> node_stack;
+	node_stack.push(root);
+	std::vector<TNode*> leaves_and_empty;
+	TNode* temp_node;
+	std::string types = "", ids = "";
+	while (!node_stack.empty())
+	{
+		temp_node = node_stack.top();
+		node_stack.pop();
+		if (temp_node == 0)
+		{
+			continue;
+		}
+		//types += (std::to_string(temp_node->type) + " ");
+		switch (temp_node->type)
+		{
+		case INTERNAL:
+			for (int i = 7; i >= 0; i--)
+			{
+				node_stack.push(temp_node->children[i]);
+			}
+			break;
+		case UNCERTAIN:
+			break;
+		default:
+			leaves_and_empty.push_back(temp_node);
+			break;
+		}
+	}
+	fprintf(f, "\"x\",\"y\",\"z\",\"scalar\", \"type\"\n");
+	for (TNode* n : leaves_and_empty)
+	{
+		fprintf(f, "%f,%f,%f,%f,%d\n", n->node[0], n->node[1], n->node[2], n->node[3], (n->type == LEAF ? 1 : 0));
+	}
+	fclose(f);
+}

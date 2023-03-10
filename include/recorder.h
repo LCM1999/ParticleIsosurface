@@ -18,6 +18,7 @@ public:
 
     void RecordProgress();
     void RecordParticles();
+    void RecordFeatures();
 };
 
 

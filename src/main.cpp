@@ -161,8 +161,9 @@ void run(std::string &dataDirPath)
 
         if (NEED_RECORD)
         {
-            recorder.RecordProgress();
-            recorder.RecordParticles();
+            // recorder.RecordProgress();
+            // recorder.RecordParticles();
+            recorder.RecordFeatures();
         }
 
         writeFile(mesh,
@@ -198,8 +199,8 @@ int main(int argc, char **argv)
     else
     {
         std::string dataDirPath =
-            // "E:/data/multiR/mr_csv";
-            "E:/data/vtk/csv";
+            "E:/data/multiR/mr_csv";
+            // "E:/data/vtk/csv";
         run(dataDirPath);
     }
 
