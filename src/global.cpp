@@ -10,14 +10,14 @@ Mesh::Mesh(const float mesh_tolerance)
 
 int Mesh::insert_vert(const Eigen::Vector3f& p)
 {
-	// vect3i tmp = vect3f2vect3i(p);
-	// if (vertices_map.find(tmp) == vertices_map.end())
-	// {
-	// 	vertices_map[tmp] = verticesNum;
-	// }
-	verticesNum++;
-	vertices.push_back(p);
-	return verticesNum;
+	vect3i tmp = vect3f2vect3i(p);
+	if (vertices_map.find(tmp) == vertices_map.end())
+	{
+		verticesNum++;
+		vertices_map[tmp] = verticesNum;
+		vertices.push_back(p);
+	}
+	return vertices_map[tmp];
 }
 
 vect3i Mesh::vect3f2vect3i(const Eigen::Vector3f& a)
@@ -25,7 +25,7 @@ vect3i Mesh::vect3f2vect3i(const Eigen::Vector3f& a)
 	vect3i r;
 	for (size_t i = 0; i < 3; i++)
 	{
-		r.v[i] = int(round(a[i] * MESH_TOLERANCE));
+		r[i] = int(round(a[i] * MESH_TOLERANCE));
 	}
 	return r;
 }
@@ -63,44 +63,44 @@ void Mesh::insert_tri(int t0, int t1, int t2)
 	// vect3i t1_i = vect3f2vect3i(vertices[(t1 - 1)]);
 	// vect3i t2_i = vect3f2vect3i(vertices[(t2 - 1)]);
 	// Triangle<vect3i> ti(t0_i, t1_i, t2_i);
-	//float length[3];
-	//int top, bottom1, bottom2;
-	//float height, half;
-	//double area;
-	//half = 0;
-	//for (size_t i = 0; i < 3; i++)
-	//{
-	//	length[i] = (vertices[t.v[triangle_edge2vert[i][1]] - 1] - vertices[t.v[triangle_edge2vert[i][0]] - 1]).length();
-	//	half += length[i];
-	//}
-	//half /= 2;
-	//for (size_t i = 0; i < 3; i++)
-	//{
-	//	if (length[i] >= length[triangle_edge2vert[i][0]] && length[i] >= length[triangle_edge2vert[i][1]])
-	//	{
-	//		top = i; bottom1 = triangle_edge2vert[i][0]; bottom2 = triangle_edge2vert[i][1];
-	//		break;
-	//	}
-	//}
-	//area = sqrt(half * (half - length[0]) * (half - length[1]) * (half - length[2]));
-	//height = area * 2 / length[top];
-	//if ((height / length[top]) < LOW_MESH_QUALITY)
-	//{
-	//	vertices[t.v[top] - 1] =
-	//		(vertices[t.v[bottom1] - 1] * (length[bottom1] / (length[bottom1] + length[bottom2])) +
-	//			vertices[t.v[bottom2] - 1] * (length[bottom2] / (length[bottom1] + length[bottom2])));
-	//	//printf("Elimit: %d, %d;  ", t.v[top], t.v[top]);
-	//}
-	//else
-	//{
-	//}
+	// //float length[3];
+	// //int top, bottom1, bottom2;
+	// //float height, half;
+	// //double area;
+	// //half = 0;
+	// //for (size_t i = 0; i < 3; i++)
+	// //{
+	// //	length[i] = (vertices[t.v[triangle_edge2vert[i][1]] - 1] - vertices[t.v[triangle_edge2vert[i][0]] - 1]).length();
+	// //	half += length[i];
+	// //}
+	// //half /= 2;
+	// //for (size_t i = 0; i < 3; i++)
+	// //{
+	// //	if (length[i] >= length[triangle_edge2vert[i][0]] && length[i] >= length[triangle_edge2vert[i][1]])
+	// //	{
+	// //		top = i; bottom1 = triangle_edge2vert[i][0]; bottom2 = triangle_edge2vert[i][1];
+	// //		break;
+	// //	}
+	// //}
+	// //area = sqrt(half * (half - length[0]) * (half - length[1]) * (half - length[2]));
+	// //height = area * 2 / length[top];
+	// //if ((height / length[top]) < LOW_MESH_QUALITY)
+	// //{
+	// //	vertices[t.v[top] - 1] =
+	// //		(vertices[t.v[bottom1] - 1] * (length[bottom1] / (length[bottom1] + length[bottom2])) +
+	// //			vertices[t.v[bottom2] - 1] * (length[bottom2] / (length[bottom1] + length[bottom2])));
+	// //	//printf("Elimit: %d, %d;  ", t.v[top], t.v[top]);
+	// //}
+	// //else
+	// //{
+	// //}
+	// if (tris_map.find(ti) == tris_map.end())
+	// {
+	// 	trianglesNum++;
+	// 	tris_map[ti] = trianglesNum;
+	// }
 	Triangle<int> tv(t0, t1, t2);
-	if (tris_map.find(tv) == tris_map.end())
-	{
-		trianglesNum++;
-		tris_map[tv] = trianglesNum;
-		tris.push_back(tv);
-	}
+	tris.push_back(tv);
 }
 
 void Mesh::reset()

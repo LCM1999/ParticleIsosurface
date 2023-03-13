@@ -81,6 +81,7 @@ public:
         std::vector<float>* radiuses, 
         Mesh& mesh, 
         float radius, 
+        float flatness = 0.98,
         float inf_factor = 2.0f);
 
     ~SurfReconstructor() {};

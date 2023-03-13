@@ -15,7 +15,7 @@
 
 SurfReconstructor::SurfReconstructor(std::vector<Eigen::Vector3f>& particles, 
 std::vector<float>* radiuses, Mesh& mesh, 
-float radius, float inf_factor)
+float radius, float flatness, float inf_factor)
 {
 	_GlobalParticles = particles;
 	_GlobalParticlesNum = _GlobalParticles.size();

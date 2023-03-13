@@ -8,7 +8,6 @@
 #include <algorithm>
 #include <assert.h>
 #include <Eigen/Dense>
-#include <unordered_map>
 
 
 struct TNode;
@@ -27,14 +26,7 @@ struct vect3i
 		}
 	}
 
-	vect3i(int a, int b, int c)
-	{
-		v[0] = a;
-		v[1] = b;
-		v[2] = c;
-	}
-
-	int operator[](const int i) const
+	int &operator[](const int i)
 	{
 		assert(i >= 0 && i < 3);
 		return v[i];
@@ -61,30 +53,12 @@ struct Triangle
 
 	std::array<T, 3> v;
 
-	T operator[](const int i) const
-	{
-		assert(i >= 0 && i < 3);
-		return v[i];
-	}
-
 	bool operator<(const Triangle<T>& t) const
 	{
 		return std::lexicographical_compare(v.begin(), v.end(), t.v.begin(), t.v.end());
 	}
 };
 
-
-struct tri_hash{
-	size_t operator()(const Triangle<int>& t) const{
-		return size_t((t[0] * t[1] * t[2]) << (t[0] + t[1] + t[2]));
-	}
-};
-
-struct tri_cmp{
-	bool operator()(const Triangle<int>& t1, const Triangle<int>& t2) const {
-		return t1 < t2;
-	}
-};
 
 struct Mesh
 {
@@ -93,7 +67,7 @@ struct Mesh
 	std::vector<Eigen::Vector3f> IcosaTable;
 	std::map<vect3i, int> vertices_map;
 	std::vector<Eigen::Vector3f> vertices;
-	std::unordered_map<Triangle<int>, int, tri_hash, tri_cmp> tris_map;
+	std::map<Triangle<vect3i>, int> tris_map;
 	std::vector<Triangle<int>> tris;
 	unsigned int verticesNum = 0;
 	unsigned int trianglesNum = 0;

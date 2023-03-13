@@ -27,6 +27,8 @@ short DATA_TYPE = 0;    // CSV:0, H5: 1
 bool NEED_RECORD;
 std::vector<std::string> DATA_PATHES;
 float RADIUS = 0;
+float FLATNESS = 0.99;
+float INF_FACTOR = 4.0;
 
 void writeFile(Mesh &m, std::string fn)
 {
@@ -59,6 +61,16 @@ void loadConfigJson(const std::string controlJsonPath)
         {
             RADIUS = readInJSON.at("RADIUS");
             IS_CONST_RADIUS = true;
+        } else {
+            IS_CONST_RADIUS = false;
+        }
+        if (readInJSON.contains("FLATNESS"))
+        {
+            FLATNESS = readInJSON.at("FLATNESS");
+        }
+        if (readInJSON.contains("INF_FACTOR"))
+        {
+            INF_FACTOR = readInJSON.at("INF_FACTOR");
         }
         NEED_RECORD = readInJSON.at("NEED_RECORD");
     }
@@ -154,7 +166,7 @@ void run(std::string &dataDirPath)
 
         printf("Particles Number = %zd\n", particles.size());
 
-        SurfReconstructor constructor(particles, radiuses, mesh, RADIUS, 4.0f);
+        SurfReconstructor constructor(particles, radiuses, mesh, RADIUS, FLATNESS, INF_FACTOR);
         Recorder recorder(dataDirPath, frame.substr(0, frame.size() - 4),
                           &constructor);
         constructor.Run();
