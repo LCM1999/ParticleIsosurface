@@ -96,7 +96,6 @@ void SurfReconstructor::resizeRootBoxConstR()
 		(_BoundingBox[1] - _BoundingBox[0]) , 
 		(_BoundingBox[3] - _BoundingBox[2]) , 
 		(_BoundingBox[5] - _BoundingBox[4]) });
-	printf("%d \n", maxLen);
 	_DEPTH_MAX = int(ceil(log2(ceil(maxLen / r))));
 	resizeLen = pow(2, _DEPTH_MAX) * r;
 	while (resizeLen - maxLen < (_INFLUENCE_FACTOR * _RADIUS))
