@@ -63,8 +63,8 @@ add_executable(${PROJECT_NAME}
     src/surface_reconstructor.cpp
     src/global.cpp
     src/recorder.cpp
-    #src/pugixml.cpp
-    #src/hdf5Utils.cpp
+    src/pugixml.cpp
+    src/hdf5Utils.cpp
     src/multi_level_reseacher.cpp
 )
 
