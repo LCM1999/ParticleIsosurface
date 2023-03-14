@@ -150,10 +150,7 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 	Eigen::Vector3f norms(0, 0, 0);
 	float area = 0;
 	std::vector<int> insides;
-	min_radius = FLT_MAX;
-	float outside_avg_radius = 0;
-	int outsiders = 0;
-	bool inner_empty = true;
+	min_radius = IS_CONST_RADIUS ? _RADIUS : FLT_MAX;
 	const Eigen::Vector3f 
 	box1 = tnode->center - Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length),
 	box2 = tnode->center + Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length);
@@ -183,41 +180,19 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 					if (tempNorm == Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX))	{continue;}
 					norms += tempNorm;
 					area += tempNorm.norm();
-					if (min_radius > _GlobalRadiuses->at(in))
+					if (!IS_CONST_RADIUS)
 					{
-						min_radius = _GlobalRadiuses->at(in);
+						if (min_radius > _GlobalRadiuses->at(in))
+						{
+							min_radius = _GlobalRadiuses->at(in);
+						}
 					}
-					outsiders++;
-					// if (!IS_CONST_RADIUS)
-					// {
-					// 	if (_GlobalParticles[in].x() >= box1.x() && _GlobalParticles[in].x() <= box2.x() &&
-					// 		_GlobalParticles[in].y() >= box1.y() && _GlobalParticles[in].y() <= box2.y() &&
-					// 		_GlobalParticles[in].z() >= box1.z() && _GlobalParticles[in].z() <= box2.z())
-					// 	{
-					// 		inner_empty = false;
-					// 	} else {
-					// 		// if (outside_avg_radius > _GlobalRadiuses->at(in))
-					// 		// {
-					// 			outside_avg_radius += _GlobalRadiuses->at(in);
-					// 			outsiders++;
-					// 		// }
-					// 	}
-					// }
 				}
 			}
 		}
 		empty = all_splash;
 	}
 	curv = (area == 0) ? 0.0 : (norms.norm() / area);
-	// if (IS_CONST_RADIUS)
-	// {
-	// 	min_radius = _RADIUS;
-	// } else {
-	// 	if (inner_empty)
-	// 	{
-	// 		min_radius = (outside_avg_radius / outsiders);
-	// 	}
-	// }
 }
 
 void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad)

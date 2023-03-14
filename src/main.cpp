@@ -101,23 +101,23 @@ void loadParticlesFromCSV(std::string &csvPath,
         radiusIdx = std::distance(titles.begin(),
         std::find_if(titles.begin(), titles.end(), 
         [&](const std::string &title) {
-            std::regex reg("(.*radius.*|^r$)", std::regex::icase);
+            std::regex reg(".*radius.*", std::regex::icase);
             return std::regex_match(title, reg);
         }));
     }
     xIdx = std::distance(titles.begin(), 
     std::find_if(titles.begin(), titles.end(), [&](const std::string &title) {
-        std::regex reg("(^(P(.*))[_,-](x|0)$|^x$)", std::regex::icase);
+        std::regex reg(".*(Position|Point).*(x|0).*", std::regex::icase);
         return std::regex_match(title, reg);
     }));
     yIdx = std::distance(titles.begin(), 
     std::find_if(titles.begin(), titles.end(), [&](const std::string &title) {
-        std::regex reg("(^(P(.*))[_,-](y|z)$|^y$)", std::regex::icase);
+        std::regex reg(".*(Position|Point).*(y|1).*", std::regex::icase);
         return std::regex_match(title, reg);
     }));
     zIdx = std::distance(titles.begin(), 
     std::find_if(titles.begin(), titles.end(), [&](const std::string &title) {
-        std::regex reg("(^(P(.*))[_,-](z|2)$|^z$)", std::regex::icase);
+        std::regex reg(".*(Position|Point).*(z|2).*", std::regex::icase);
         return std::regex_match(title, reg);
     }));
 
@@ -213,9 +213,9 @@ int main(int argc, char **argv)
     else
     {
         std::string dataDirPath =
-            "C:/Users/11379/Desktop/protein";
+            // "C:/Users/11379/Desktop/protein";
             // "E:/data/multiR/mr_csv";
-            // "E:/data/vtk/csv";
+            "E:/data/vtk/csv";
         run(dataDirPath);
     }
 
