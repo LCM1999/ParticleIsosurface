@@ -27,6 +27,7 @@ short DATA_TYPE = 0;    // CSV:0, H5: 1
 bool NEED_RECORD;
 std::vector<std::string> DATA_PATHES;
 float RADIUS = 0;
+float SCALE = 1;
 float FLATNESS = 0.99;
 float INF_FACTOR = 4.0;
 
@@ -64,6 +65,10 @@ void loadConfigJson(const std::string controlJsonPath)
         } else {
             IS_CONST_RADIUS = false;
         }
+        if (readInJSON.contains("SCALE"))
+        {
+            SCALE = readInJSON.at("SCALE");
+        }
         if (readInJSON.contains("FLATNESS"))
         {
             FLATNESS = readInJSON.at("FLATNESS");
@@ -95,6 +100,7 @@ void loadParticlesFromCSV(std::string &csvPath,
     std::vector<std::string> titles;
     std::vector<float> elements;
     std::getline(ifn, line);
+    replaceAll(line, "\"", "");
     parseString(&titles, line, ",");
     if (!IS_CONST_RADIUS)
     {
@@ -107,21 +113,27 @@ void loadParticlesFromCSV(std::string &csvPath,
     }
     xIdx = std::distance(titles.begin(), 
     std::find_if(titles.begin(), titles.end(), [&](const std::string &title) {
-        std::regex reg(".*(Position|Point).*(x|0).*", std::regex::icase);
+        std::regex reg("^(.*(:|_|-)(x|0)|x)$", std::regex::icase);
         return std::regex_match(title, reg);
     }));
     yIdx = std::distance(titles.begin(), 
     std::find_if(titles.begin(), titles.end(), [&](const std::string &title) {
-        std::regex reg(".*(Position|Point).*(y|1).*", std::regex::icase);
+        std::regex reg("^(.*(:|_|-)(y|1)|y)$", std::regex::icase);
         return std::regex_match(title, reg);
     }));
     zIdx = std::distance(titles.begin(), 
     std::find_if(titles.begin(), titles.end(), [&](const std::string &title) {
-        std::regex reg(".*(Position|Point).*(z|2).*", std::regex::icase);
+        std::regex reg("^(.*(:|_|-)(z|2)|z)$", std::regex_constants::ECMAScript | std::regex::icase);
         return std::regex_match(title, reg);
     }));
 
     printf("%d %d %d \n", xIdx, yIdx, zIdx);
+
+    if (xIdx == titles.size() || yIdx == titles.size() || zIdx == titles.size())
+    {
+        printf("Error: Failed to locate axis column;");
+        exit(1);
+    }
 
     std::getline(ifn, line);
 
@@ -132,7 +144,7 @@ void loadParticlesFromCSV(std::string &csvPath,
         particles.push_back(Eigen::Vector3f(elements[xIdx], elements[yIdx], elements[zIdx]));
         if (!IS_CONST_RADIUS)
         {
-            radiuses->push_back(elements[radiusIdx]);
+            radiuses->push_back(elements[radiusIdx] * SCALE);
         }
         getline(ifn, line);
     }
@@ -159,7 +171,7 @@ void run(std::string &dataDirPath)
             loadParticlesFromCSV(dataPath, particles, radiuses);
             break;
         case 1:
-            // readShonDyParticleData(dataPath, particles, radiuses);
+            // readShonDyParticleData(dataPath, particles, radiuses, SCALE);
             break;
         default:
             printf("ERROR: Unknown DATA TYPE;");

@@ -12,6 +12,8 @@ int sign(Eigen::Vector<T, 4> &x)
 
 void parseString(std::vector<std::string> *commList, const std::string& input, std::string sep);
 
+void replaceAll(std::string &str, const std::string &olds, const std::string &news);
+
 template <class T>
 void parseStringToElements(std::vector<T>* elements, std::string& input, std::string sep)
 {

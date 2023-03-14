@@ -5,7 +5,7 @@
 
 bool readShonDyParticleData(const std::string &fileName,
                             std::vector<Eigen::Vector3f> &positions,
-                            std::vector<float>* radiuses)
+                            std::vector<float>* radiuses, const float scale)
 {
     if (!std::filesystem::exists(fileName))
     {
@@ -43,7 +43,7 @@ bool readShonDyParticleData(const std::string &fileName,
             Eigen::Vector3f(nodes[3 * i], nodes[3 * i + 1], nodes[3 * i + 2]);
         if (radiuses != nullptr)
         {
-            (*radiuses)[i] = radiusesDouble[i];
+            (*radiuses)[i] = radiusesDouble[i] * scale;
         }
     }
 
