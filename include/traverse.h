@@ -180,6 +180,12 @@ void traverse_face_x(V &v, T &n0, T &n1)
 }
 
 template <TraversalType TT, class V, class T>
+void traverse_face_x_iso(V &v, T &n0, T &n1)
+{
+	
+}
+
+template <TraversalType TT, class V, class T>
 void traverse_face_y(V &v, T &n0, T &n1)
 {
 	if (!v.on_face(n0, n1, 1))

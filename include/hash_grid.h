@@ -6,18 +6,16 @@
 #include <Eigen/Dense>
 #include "iso_common.h"
 
-class SurfReconstructor;
-
 class HashGrid
 {
 public:
 	HashGrid();
 	~HashGrid();
 
-	HashGrid(SurfReconstructor* surf_constrcutor, std::vector<Eigen::Vector3f>& particles, double* bounding, double cellsize);
+	HashGrid(std::vector<Eigen::Vector3f>& particles, double* bounding, double cellsize);
 
-	SurfReconstructor* constructor;
 	std::vector<Eigen::Vector3f>* Particles;
+	unsigned int ParticlesNum;
 	double CellSize;
 	double Bounding[6];
 	unsigned int XYZCellNum[3];
@@ -29,6 +27,8 @@ public:
 	void GetPIdxList(const Eigen::Vector3f& pos, std::vector<int>& pIdxList);
 	void CalcXYZIdx(const Eigen::Vector3f& pos, Eigen::Vector3i& xyzIdx);
 	long long CalcCellHash(const Eigen::Vector3i& xyzIdx);
+	void GetInCellList(const long long hash, std::vector<int>& pIdxList);
+    void GetInBoxParticles(const Eigen::Vector3f& box1, const Eigen::Vector3f& box2, std::vector<int>& insides);
 	// void FindParticlesNeighbor(const int& pIdx, std::vector<int>& pIdxList);
 private:
 	void BuildTable();

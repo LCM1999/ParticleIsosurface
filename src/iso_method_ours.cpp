@@ -20,8 +20,17 @@ TNode::TNode(SurfReconstructor* surf_constructor, int id)
 	type = UNCERTAIN;
 }
 
+double TNode::calcErrorDMC(Eigen::Vector4f p, std::vector<Eigen::Vector4f>& verts, std::vector<Eigen::Vector3f>& verts_grad)
+{
+	double err = 0;
+	for (size_t i = 0; i < verts.size(); i++)
+	{
+		err += squared(p[3] - verts_grad[i].dot((p - verts[i]).head(3))) / (1 + verts_grad[i].squaredNorm());
+	}
+	return err;
+}
 
-void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float& qef_error)
+void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, Eigen::Vector4f* verts, float& qef_error, float& sample_radius)
 {
 	bool origin_sign;
 	signchange = false;
@@ -30,7 +39,6 @@ void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float&
 		return x ? 1 : -1;
 	};
 	
-	Eigen::Vector4f verts[8];
 	for (Index i = 0; i < 8; i++)
 	{
 		verts[i][0] = center[0] + sign(i.x) * half_length;
@@ -39,7 +47,7 @@ void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float&
 	}
 	const float cellsize = 2 * half_length;
 	const float border = constructor->getBorder() * cellsize;
-	float sampling_step = constructor->getPRadius() / 2;
+	float sampling_step = sample_radius;
 	int oversample = int(ceil(cellsize / sampling_step) + 1);
 	if (depth < constructor->getDepthMin())
 	{
@@ -47,8 +55,7 @@ void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float&
 	}
 	bool is_out;
 	double err;
-	std::vector<Eigen::Vector3f> sample_points;
-	std::vector<float> field_scalars;
+	std::vector<Eigen::Vector4f> sample_points;
 	std::vector<Eigen::Vector3f> field_gradient;
 	for (int z = 0; z <= oversample; z++)
 	{
@@ -57,37 +64,39 @@ void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float&
 			for (int x = 0; x <= oversample; x++)
 			{
 				sample_points.push_back(
-					Eigen::Vector3f(
+					Eigen::Vector4f(
 						(1 - float(x) / oversample) * verts[0][0] + (float(x) / oversample) * verts[7][0],
 						(1 - float(y) / oversample) * verts[0][1] + (float(y) / oversample) * verts[7][1],
-						(1 - float(z) / oversample) * verts[0][2] + (float(z) / oversample) * verts[7][2])
-					);
+						(1 - float(z) / oversample) * verts[0][2] + (float(z) / oversample) * verts[7][2],
+						0));
 			}
 		}
 	}
-	constructor->getEvaluator()->GridEval(sample_points, field_scalars, field_gradient, signchange, oversample);
+	constructor->getEvaluator()->GridEval(sample_points, field_gradient, signchange, oversample, false);
 	for (Index i = 0; i < 8; i++)
 	{
-		verts[i][3] = field_scalars[i.x * oversample + i.y * oversample * (oversample + 1) + i.z * oversample * (oversample + 1) * (oversample + 1)];
+		verts[i][3] = sample_points[i.x * oversample + i.y * oversample * (oversample + 1) + i.z * oversample * (oversample + 1) * (oversample + 1)][3];
 	}
 	// calculate curvature
 	Eigen::Vector3f norms(0, 0, 0);
 	float area = 0;
 	for (Eigen::Vector3f n : field_gradient)
 	{
+		n.normalize();
 		norms += n;
 		area += n.norm();
 	}
-	if (curv == 0)
-	{
-		curv = norms.norm() / area;
-	}
-	else if (curv < 0) {
-		curv = 0;
-	} 
-	else {
-		curv = std::min(norms.norm() / area, curv);
-	}
+	// if (curv == 0)
+	// {
+		curv += (norms.norm() / area);
+		curv /= 2;
+	// }
+	// else if (curv < 0) {
+	// 	curv = 0;
+	// } 
+	// else {
+	// 	curv = std::min(norms.norm() / area, curv);
+	// }
 	
 	/*--------------------VERT NODE-----------------------*/
 	QEFNormal<double, 4> node_q;
@@ -108,9 +117,9 @@ void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float&
 				pl[1] = field_gradient[node_index][1];
 				pl[2] = field_gradient[node_index][2];
 				pl[3] = -1;
-				pl[4] = -(p[0] * pl[0] + p[1] * pl[1] + p[2] * pl[2]) + field_scalars[node_index];
+				pl[4] = -(p[0] * pl[0] + p[1] * pl[1] + p[2] * pl[2]) + sample_points[node_index][3];
 				node_q.combineSelf(Vector5d(pl.cast<double>()).data());
-				node_mid += Eigen::Vector4f(sample_points[node_index][0], sample_points[node_index][1], sample_points[node_index][2], field_scalars[node_index]);
+				node_mid += Eigen::Vector4f(sample_points[node_index][0], sample_points[node_index][1], sample_points[node_index][2], sample_points[node_index][3]);
 				node_plane_pts.push_back(p);
 				node_plane_norms.push_back(Eigen::Vector3f(pl[0], pl[1], pl[2]));
 			}
@@ -159,7 +168,7 @@ void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float&
 				pc[2] >= node_mine[2] && pc[2] <= node_maxe[2])
 			{
 				is_out = false;
-				err = calcErrorDMC(pc, verts, grad);
+				err = calcErrorDMC(pc, sample_points, field_gradient);
 				node << pc;
 			}
 		}
@@ -202,7 +211,7 @@ void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float&
 				{
 					is_out = false;
 					
-					double e = calcErrorDMC(pc, verts, grad);
+					double e = calcErrorDMC(pc, sample_points, field_gradient);
 					if (e < err)
 					{
 						err = e;
@@ -250,7 +259,7 @@ void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float&
 				if (pc[dir] >= node_mine[dir] && pc[dir] <= node_maxe[dir])
 				{
 					is_out = false;
-					double e = calcErrorDMC(pc, verts, grad);
+					double e = calcErrorDMC(pc, sample_points, field_gradient);
 					if (e < err)
 					{
 						err = e;
@@ -292,7 +301,7 @@ void TNode::vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, float&
 				pc << rvalue[0], rvalue[1], rvalue[2], 0.0f;
 				constructor->getEvaluator()->SingleEval((Eigen::Vector3f&)pc, pc[3], pcg);
 				// check bounds
-				double e = calcErrorDMC(pc, verts, grad);
+				double e = calcErrorDMC(pc, sample_points, field_gradient);
 				if (e < err)
 				{
 					err = e;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <array>
 #include <math.h>
 #include <map>
 #include <iterator>
@@ -47,22 +48,22 @@ struct Triangle
 		v[0] = a;
 		v[1] = b;
 		v[2] = c;
+		//std::sort(v.begin(), v.end());
 	}
 
-	T v[3];
+	std::array<T, 3> v;
 
 	bool operator<(const Triangle<T>& t) const
 	{
-		return std::lexicographical_compare(v, v+3, t.v, t.v+3);
+		return std::lexicographical_compare(v.begin(), v.end(), t.v.begin(), t.v.end());
 	}
 };
 
 
 struct Mesh
 {
-	Mesh(float p_radius, float mesh_tolerance = 1e4);
+	Mesh(float mesh_tolerance = 1e4);
     float MESH_TOLERANCE;
-	float P_RADIUS;
 	std::vector<Eigen::Vector3f> IcosaTable;
 	std::map<vect3i, int> vertices_map;
 	std::vector<Eigen::Vector3f> vertices;
@@ -85,44 +86,6 @@ struct Mesh
 	std::vector<Eigen::Vector3f> norms;
 
 	void BuildIcosaTable();
-	void AppendSplash(std::vector<Eigen::Vector3f>& splash_particles);
-};
-
-
-struct Graph
-{
-	Graph() {};
-	int vNum;
-	int eNum;
-	int ncon;
-	std::map<unsigned long long, int> vidx_map;
-	std::vector<std::vector<int>> gAdj;
-	std::vector<int> vwgt;
-	std::vector<int> ewgt;
-
-	Graph(std::vector<TNode*>& layer_nodes, int vwn = 1);
-
-	void appendEdge(const unsigned long long nId1, const unsigned long long nId2)
-	{
-		gAdj[vidx_map[nId1]].push_back(vidx_map[nId2]);
-		eNum++;
-		gAdj[vidx_map[nId2]].push_back(vidx_map[nId1]);
-		eNum++;
-	}
-
-	void getXAdjAdjncy(int* xadj, int* adjncy)
-	{
-		int adjncyIdx = 0;
-		for (size_t i = 0; i < vNum; i++)
-		{
-			xadj[i] = adjncyIdx;
-			for (size_t j = 0; j < gAdj[i].size(); j++)
-			{
-				adjncy[xadj[i] + j] = gAdj[i][j];
-			}
-			adjncyIdx += gAdj[i].size();
-		}
-		xadj[vNum] = adjncyIdx;
-		ewgt.resize(eNum, 1);
-	}
+	void AppendSplash_ConstR(std::vector<Eigen::Vector3f>& splash_particles, const float radius);
+	void AppendSplash_VarR(std::vector<Eigen::Vector3f>& splash_particles, std::vector<float>& splash_radius);
 };

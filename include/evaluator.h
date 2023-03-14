@@ -2,6 +2,7 @@
 
 #include "iso_common.h"
 #include "hash_grid.h"
+#include "multi_level_researcher.h"
 #include <assert.h>
 #include <iostream>
 #include <vector>
@@ -18,42 +19,47 @@ public:
 
     SurfReconstructor* constructor;
 	std::vector<Eigen::Vector3f>* GlobalPoses;
-	std::vector<float>* GlobalDensity;
-	std::vector<float>* GlobalMass;
+    std::vector<float>* GlobalRadius;
+    float _MAX_RADIUS, _MIN_RADIUS;
+
+    float Radius = 0;
     std::vector<char> GlobalSplash;
     std::vector<Eigen::Vector3f> PariclesNormals;
     std::vector<int> SurfaceParticles;
 	Eigen::Vector3f* GlobalxMeans;
     Eigen::Matrix3f* GlobalGs;
 
-	Evaluator(SurfReconstructor* surf_constructor,
-		std::vector<Eigen::Vector3f>* global_particles, std::vector<float>* global_density, std::vector<float>* global_mass);
+	Evaluator(  SurfReconstructor* surf_constructor, std::vector<Eigen::Vector3f>* global_particles, 
+                std::vector<float>* radiuses,
+                float radius);
 
 	void SingleEval(const Eigen::Vector3f& pos, float& scalar, Eigen::Vector3f& gradient, bool use_normalize = true, bool use_signed = true, bool grad_normalize = true);
 
     void GridEval(
-        std::vector<Eigen::Vector3f>& sample_points, std::vector<float>& field_scalars, std::vector<Eigen::Vector3f>& field_gradients,
-        bool& signchange, int oversample);
+        std::vector<Eigen::Vector4f>& sample_points, std::vector<Eigen::Vector3f>& field_gradients,
+        bool& signchange, int oversample, bool grad_normalize = true);
 
     bool CheckSplash(const int& pIdx);
-    float CalculateMaxScalar();
-    float RecommendIsoValue();
-    float RecommendSurfaceThreshold();
+    float CalculateMaxScalarConstR();
+    float CalculateMaxScalarVarR();
+    float RecommendIsoValueConstR();
+    float RecommendIsoValueVarR();
     void CalcParticlesNormal();
-    float CurvEval(std::vector<int>& p_list);
 private:
-    float sample_step;
-    double influnce2;
+    const double bv_factor = 4.1887902047863909846168578443727;
+    const double inv_pi = 0.31830988618379067153776752674503;
 
-    float general_kernel(double d2, double h2);
+    float inf_factor;
+
+    float general_kernel(double d2, double h2, double h);
     float spiky_kernel(double d, double h);
     float viscosity_kernel(double d, double h);
 
-	float IsotrpicInterpolate(const int pIdx, const float d);
+	float IsotropicInterpolate(const int pIdx, const double d);
 	float AnisotropicInterpolate(const int pIdx, const Eigen::Vector3f& diff);
 	void compute_Gs_xMeans();
 	double wij(double d, double r);
 
-    void IsotropicEval(const Eigen::Vector3f& pos, float& info, float* temp_scalars);
-    void AnisotropicEval(const Eigen::Vector3f& pos, float& info, float* temp_scalars);
+    void IsotropicEval(const Eigen::Vector3f& pos, float& info, float* temp_scalars, float& sample_radius);
+    void AnisotropicEval(const Eigen::Vector3f& pos, float& info, float* temp_scalars, float& sample_radius);
 };

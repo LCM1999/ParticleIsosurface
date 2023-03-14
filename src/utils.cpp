@@ -31,3 +31,18 @@ void parseString(std::vector<std::string> *commList, const std::string& input, s
 	if (comm != "")
 		commList->push_back(comm);
 }
+
+void replaceAll(std::string &str, const std::string &olds, const std::string &news)
+{
+	if (olds.empty())
+		return;
+	std::string::size_type iFind = 0;
+	while (true)
+	{
+		iFind = str.find(olds, iFind);
+		if (std::string::npos == iFind)
+			break;
+		str.replace(iFind, olds.size(), news);
+		iFind += news.size();
+	}
+}

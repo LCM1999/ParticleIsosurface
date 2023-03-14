@@ -9,8 +9,7 @@
 
 bool readShonDyParticleData(const std::string &fileName,
                             std::vector<Eigen::Vector3f> &positions,
-                            std::vector<float> &densities,
-                            std::vector<float> &masses);
+                            std::vector<float>* radiuses, const float scale);
 
 void readInt(hid_t fileID, const std::string &veclLocation,
              std::vector<int> &readVec);
