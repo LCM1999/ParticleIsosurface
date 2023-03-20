@@ -12,27 +12,33 @@
 
 struct TNode;
 
-struct vect3i
+template<class T>
+struct vect3
 {
-	int v[3];
+	T v[3];
 
-	vect3i() {}
+	vect3() {}
 
-	vect3i(Eigen::Vector3i& e)
-	{
-		for (size_t i = 0; i < 3; i++)
-		{
-			v[i] = e.data()[i];
-		}
+	vect3(T a, T b, T c) {
+		v[0] = a;
+		v[1] = b;
+		v[2] = c;
 	}
 
-	int &operator[](const int i)
+	vect3(Eigen::Matrix<T, 3, 1> e)
+	{
+		v[0] = e[0];
+		v[1] = e[1];
+		v[2] = e[2];
+	}
+
+	T &operator[](const int i)
 	{
 		assert(i >= 0 && i < 3);
 		return v[i];
 	}
 
-	bool operator<(const vect3i &a) const 
+	bool operator<(const vect3 &a) const 
 	{
 		return std::lexicographical_compare(v, v+3, a.v, a.v+3);
 	}
@@ -55,19 +61,24 @@ struct Triangle
 
 	bool operator<(const Triangle<T>& t) const
 	{
-		return std::lexicographical_compare(v.begin(), v.end(), t.v.begin(), t.v.end());
+		std::array<T, 3> temp_v(v);
+		std::array<T, 3> temp_t = {t.v[0], t.v[1], t.v[2]};
+		std::sort(temp_v.begin(), temp_v.end());
+		std::sort(temp_t.begin(), temp_t.end());
+
+		return std::lexicographical_compare(temp_v.begin(), temp_v.end(), temp_t.begin(), temp_t.end());
 	}
 };
 
 
 struct Mesh
 {
-	Mesh(float mesh_tolerance = 1e4);
-    float MESH_TOLERANCE;
+	Mesh(int mesh_precision = 1e4);
+    int MESH_PRECISION;
 	std::vector<Eigen::Vector3f> IcosaTable;
-	std::map<vect3i, int> vertices_map;
-	std::vector<Eigen::Vector3f> vertices;
-	std::map<Triangle<vect3i>, int> tris_map;
+	std::map<vect3<int>, int> vertices_map;
+	std::vector<vect3<float>> vertices;
+	std::map<Triangle<int>, int> tris_map;
 	std::vector<Triangle<int>> tris;
 	unsigned int verticesNum = 0;
 	unsigned int trianglesNum = 0;
@@ -75,8 +86,9 @@ struct Mesh
 	const int phi = 5;
 
 	int insert_vert(const Eigen::Vector3f& p);
-	vect3i vect3f2vect3i(const Eigen::Vector3f& a);
-	Eigen::Vector3f vect3i2vect3f(const vect3i& a);
+	double precise(double x);
+	vect3<int> vect3f2vect3i(vect3<float>& a);
+	vect3<float> vect3i2vect3f(vect3<int>& a);
 	bool similiar_point(Eigen::Vector3f& v1, Eigen::Vector3f& v2);
 	void insert_tri(int t0, int t1, int t2);
 	void reset();

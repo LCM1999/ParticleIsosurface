@@ -34,7 +34,7 @@ float INF_FACTOR = 4.0;
 void writeFile(Mesh &m, std::string fn)
 {
     FILE *f = fopen(fn.c_str(), "w");
-    for (Eigen::Vector3f &p : m.vertices)
+    for (auto &p : m.vertices)
     {
         fprintf(f, "v %f %f %f\n", p[0], p[1], p[2]);
     }
@@ -226,8 +226,8 @@ int main(int argc, char **argv)
     {
         std::string dataDirPath =
             // "C:/Users/11379/Desktop/protein";
-            // "E:/data/multiR/mr_csv";
-            "E:/data/vtk/csv";
+            "E:/data/multiR/mr_csv";
+            // "E:/data/vtk/csv";
         run(dataDirPath);
     }
 

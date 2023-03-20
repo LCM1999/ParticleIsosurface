@@ -2,10 +2,12 @@
 #include "visitorextract.h"
 #include "iso_method_ours.h"
 #include "surface_reconstructor.h"
-#include "tet_arrays.h"
+#include "cube_arrays.h"
 #include "iso_method_ours.h"
 #include "evaluator.h"
 #include "global.h"
+
+#include <set>
 
 template <class T, class U>
 auto lerp(T x1, T x2, U ratio)
@@ -44,12 +46,42 @@ VisitorExtract::VisitorExtract(SurfReconstructor* surf_constructor, Mesh* m_)
 	m = m_;
 }
 
+bool isConcaveCell(std::array<TNode*, 8> nodes)
+{
+	bool isConcave = true;
+	for (size_t i = 0; i < 6; i++)
+	{
+		std::set<TNode*> st;
+		st.insert(nodes[cube_face2vert[i][0]]);
+		st.insert(nodes[cube_face2vert[i][1]]);
+		st.insert(nodes[cube_face2vert[i][2]]);
+		st.insert(nodes[cube_face2vert[i][3]]);
+		if (st.size() < 3)
+			continue;
+		std::vector<TNode*> faces;
+		faces.assign(st.begin(), st.end());
+		Eigen::Vector3f faceNormal = (faces[2]->node.head(3) - faces[0]->node.head(3)) * (faces[1]->node.head(3) - faces[0]->node.head(3));
+		for (size_t j = 0; j < 8; j++)
+		{
+			if (st.find(nodes[j]) == st.end())
+			{
+				isConcave &= ((nodes[j]->node.head(3) - faces[0]->node.head(3)).dot(faceNormal) > 0);
+			}
+		}
+		if (!isConcave)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
 bool VisitorExtract::on_vert(TraversalData& a, TraversalData& b, TraversalData& c, TraversalData& d, TraversalData& aa, TraversalData& ba, TraversalData& ca, TraversalData& da)
 {
 	if (a.n->is_leaf() && b.n->is_leaf() && c.n->is_leaf() && d.n->is_leaf() && aa.n->is_leaf() && ba.n->is_leaf() && ca.n->is_leaf() && da.n->is_leaf())
 	{
 		int index = 0;
-		TNode* n[8] = { a.n, b.n, c.n, d.n, aa.n, ba.n, ca.n, da.n };
+		std::array<TNode*, 8> n = { a.n, b.n, c.n, d.n, aa.n, ba.n, ca.n, da.n };
 		for (int i = 0; i < 8; i++)
 		{
 			if (sign(n[i]->node) > 0)
@@ -62,6 +94,12 @@ bool VisitorExtract::on_vert(TraversalData& a, TraversalData& b, TraversalData& 
 		{
 			return false;
 		}
+
+		// if (!isConcaveCell(n))
+		// {
+		// 	return false;
+		// }
+
 		std::array<TNode*, 8> trans_vertices;
 		for (int i = 0; i < 8; i++)
 		{
