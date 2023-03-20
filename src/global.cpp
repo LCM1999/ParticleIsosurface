@@ -1,41 +1,54 @@
 #include "global.h"
 #include "iso_method_ours.h"
 
-Mesh::Mesh(const float mesh_tolerance)
+#include <sstream>
+
+Mesh::Mesh(const int mesh_precision)
 {
-	MESH_TOLERANCE = mesh_tolerance;
+	MESH_PRECISION = mesh_precision;
 	reset();
 	BuildIcosaTable();
 }
 
 int Mesh::insert_vert(const Eigen::Vector3f& p)
 {
-	vect3i tmp = vect3f2vect3i(p);
+	vect3<int> tmp = vect3f2vect3i(vect3<float>(p));
+	// vect3<float> tmp(float(precise(p[0])), float(precise(p[1])), float(precise(p[2])));
 	if (vertices_map.find(tmp) == vertices_map.end())
 	{
 		verticesNum++;
 		vertices_map[tmp] = verticesNum;
-		vertices.push_back(p);
+		vertices.push_back(vect3i2vect3f(tmp));
 	}
 	return vertices_map[tmp];
 }
 
-vect3i Mesh::vect3f2vect3i(const Eigen::Vector3f& a)
+double Mesh::precise(double x)
 {
-	vect3i r;
+	std::stringstream is;
+    double res;
+    is.precision(MESH_PRECISION);
+    is << x;
+    is >> res;
+    return res;
+}
+
+vect3<int> Mesh::vect3f2vect3i(vect3<float>& a)
+{
+	vect3<int> r;
 	for (size_t i = 0; i < 3; i++)
 	{
-		r[i] = int(round(a[i] * MESH_TOLERANCE));
+		r[i] = int(round(a[i] * MESH_PRECISION));
 	}
 	return r;
 }
 
-Eigen::Vector3f Mesh::vect3i2vect3f(const vect3i& a)
+vect3<float> Mesh::vect3i2vect3f(vect3<int>& a)
 {
-	Eigen::Vector3f r;
+	vect3<float> r;
 	for (size_t i = 0; i < 3; i++)
 	{
-		r[i] = a.v[i] / MESH_TOLERANCE;
+		r[i] = a[i] / float(MESH_PRECISION);
 	}
 	return r;
 }
@@ -44,7 +57,7 @@ bool Mesh::similiar_point(Eigen::Vector3f& v1, Eigen::Vector3f& v2)
 {
 	for (size_t i = 0; i < 3; i++)
 	{
-		if (abs(v1[i] - v2[i]) >= MESH_TOLERANCE)
+		if (abs(v1[i] - v2[i]) >= MESH_PRECISION)
 		{
 			return false;
 		}
@@ -100,7 +113,12 @@ void Mesh::insert_tri(int t0, int t1, int t2)
 	// 	tris_map[ti] = trianglesNum;
 	// }
 	Triangle<int> tv(t0, t1, t2);
-	tris.push_back(tv);
+	if (tris_map.find(tv) == tris_map.end())
+	{
+		trianglesNum++;
+		tris_map[tv] = trianglesNum;
+		tris.push_back(tv);
+	}
 }
 
 void Mesh::reset()
