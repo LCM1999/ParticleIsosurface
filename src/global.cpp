@@ -18,7 +18,8 @@ int Mesh::insert_vert(const Eigen::Vector3f& p)
 	{
 		verticesNum++;
 		vertices_map[tmp] = verticesNum;
-		vertices.push_back(vect3i2vect3f(tmp));
+		// vertices.push_back(vect3i2vect3f(tmp));
+		vertices.push_back(p);
 	}
 	return vertices_map[tmp];
 }
