@@ -113,17 +113,17 @@ void loadParticlesFromCSV(std::string &csvPath,
     }
     xIdx = std::distance(titles.begin(), 
     std::find_if(titles.begin(), titles.end(), [&](const std::string &title) {
-        std::regex reg("^(.*(:|_|-)(x|0)|x)$", std::regex::icase);
+        std::regex reg("^(.*(:|_|-)( *)(x|0)|x)$", std::regex::icase);
         return std::regex_match(title, reg);
     }));
     yIdx = std::distance(titles.begin(), 
     std::find_if(titles.begin(), titles.end(), [&](const std::string &title) {
-        std::regex reg("^(.*(:|_|-)(y|1)|y)$", std::regex::icase);
+        std::regex reg("^(.*(:|_|-)( *)(y|1)|y)$", std::regex::icase);
         return std::regex_match(title, reg);
     }));
     zIdx = std::distance(titles.begin(), 
     std::find_if(titles.begin(), titles.end(), [&](const std::string &title) {
-        std::regex reg("^(.*(:|_|-)(z|2)|z)$", std::regex_constants::ECMAScript | std::regex::icase);
+        std::regex reg("^(.*(:|_|-)( *)(z|2)|z)$", std::regex_constants::ECMAScript | std::regex::icase);
         return std::regex_match(title, reg);
     }));
 
