@@ -195,11 +195,10 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 	curv = (area == 0) ? 0.0 : (norms.norm() / area);
 }
 
-void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad)
+void SurfReconstructor::eval(TNode* tnode)
 {
 	float qef_error = 0, curv = 0, min_radius;
 	bool signchange = false, recur = false, next = false, empty;
-	Eigen::Vector4f* verts = nullptr;
 
 	switch (tnode->type)
 	{
@@ -218,7 +217,8 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad)
 			tnode->node[0] = tnode->center[0];
 			tnode->node[1] = tnode->center[1];
 			tnode->node[2] = tnode->center[2];
-			_evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3], grad[8]);
+			Eigen::Vector3f tempG;
+			_evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3], tempG);
 			tnode->type = EMPTY;
 			return;
 		}
@@ -227,12 +227,12 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad)
 			tnode->node[0] = tnode->center[0];
 			tnode->node[1] = tnode->center[1];
 			tnode->node[2] = tnode->center[2];
-			_evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3], grad[8]);
+			Eigen::Vector3f tempG;
+			_evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3], tempG);
 		}
 		else
 		{
-			verts = new Eigen::Vector4f[8];
-			tnode->vertAll(curv, signchange, grad, verts, qef_error, min_radius);
+			tnode->vertAll(curv, signchange, qef_error, min_radius);
 		}
 		if (std::isnan(curv))
 		{
@@ -269,30 +269,13 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad)
 	{
 		for (Index i; i < 8; i++)
 		{
-			eval(tnode->children[i], grad);
+			eval(tnode->children[i]);
 		}
 	}
 	else if (recur)
 	{
 		tnode->type = INTERNAL;
 		// find points and function values in the subdivided cell
-		Eigen::Vector3f g[3][3][3];
-		float temp;
-		for (int x = 0; x < 3; x++)
-		{
-			for (int y = 0; y < 3; y++)
-			{
-				for (int z = 0; z < 3; z++)
-				{
-					if (x == 1 || y == 1 || z == 1) {
-						_evaluator->SingleEval(tnode->center + (Eigen::Vector3f((x - 1), (y - 1), (z - 1)) * tnode->half_length), temp, g[x][y][z]);
-					}
-					else {
-						g[x][y][z] = grad[Index(x >> 1, y >> 1, z >> 1)];
-					}
-				}
-			}
-		}
 
 		auto sign = [&](unsigned int x)
 		{
@@ -308,12 +291,8 @@ void SurfReconstructor::eval(TNode* tnode, Eigen::Vector3f* grad)
 			tnode->children[i]->half_length = tnode->half_length / 2;
 			tnode->children[i]->center =
 				tnode->center + (Eigen::Vector3f(sign(i.x), sign(i.y), sign(i.z)) * tnode->half_length / 2);
-			for (Index j; j < 8; j++)
-			{
-				grad[j] = g[i.x + j.x][i.y + j.y][i.z + j.z];
-			}
 			#pragma omp task
-			eval(tnode->children[i], grad);
+			eval(tnode->children[i]);
 		}
 	}
 	else
@@ -384,7 +363,6 @@ void SurfReconstructor::genIsoOurs()
 	TNode* root;
 	Mesh* m = _OurMesh;
 	TNode* loaded_tree = nullptr;
-	Eigen::Vector3f grad[9];
 
 	auto sign = [&](unsigned int x)
 	{
@@ -397,10 +375,6 @@ void SurfReconstructor::genIsoOurs()
 		root = new TNode(this, 0);
 		root->center = Eigen::Vector3f(_RootCenter[0], _RootCenter[1], _RootCenter[2]);
 		root->half_length = _RootHalfLength;
-		float temp;
-		for (Index i; i < 8; i++) {
-			_evaluator->SingleEval(root->center + (Eigen::Vector3f(sign(i.x), sign(i.y), sign(i.z)) * root->half_length), temp, grad[i]);
-		}
 		_OurRoot = root;
 	}
 	else if (_STATE == 1)
@@ -446,7 +420,7 @@ void SurfReconstructor::genIsoOurs()
 	#pragma omp single
 	{
 		#pragma omp task
-		eval(root, grad);
+		eval(root);
 	}
 }
 

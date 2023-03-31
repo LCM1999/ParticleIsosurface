@@ -109,7 +109,16 @@ struct TNode
 
 	double calcErrorDMC(Eigen::Vector4f p, std::vector<Eigen::Vector4f>& verts, std::vector<Eigen::Vector3f>& verts_grad);
 
-	void vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, Eigen::Vector4f* verts, float& qef_error, float& sample);
+	void vertAll(float& curv, bool& signchange, float& qef_error, float& sample);
+
+	void NodeSampling(
+		float& curv, bool& signchange, 
+		std::vector<Eigen::Vector4f>& sample_points, std::vector<Eigen::Vector3f>& sample_grads, 
+		const int oversample);
+
+	void NodeFeatureCalc();
+
+	void NodeErrorMinimize();
 
 	int CountLeaves()
 	{
