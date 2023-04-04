@@ -113,7 +113,7 @@ void Mesh::insert_tri(int t0, int t1, int t2)
 	// 	trianglesNum++;
 	// 	tris_map[ti] = trianglesNum;
 	// }
-	Triangle<int> tv(t0, t1, t2);
+	Triangle tv(t0, t1, t2);
 	if (tris_map.find(tv) == tris_map.end())
 	{
 		trianglesNum++;
