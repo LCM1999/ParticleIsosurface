@@ -4,7 +4,7 @@
 #include <regex>
 
 #include "global.h"
-// #include "hdf5Utils.hpp"
+#include "hdf5Utils.hpp"
 #include "iso_common.h"
 #include "iso_method_ours.h"
 #include "json.hpp"
@@ -30,6 +30,7 @@ float RADIUS = 0;
 float SCALE = 1;
 float FLATNESS = 0.99;
 float INF_FACTOR = 4.0;
+int MESH_REFINE_LEVEL = 4;
 
 void writeFile(Mesh &m, std::string fn)
 {
@@ -76,6 +77,10 @@ void loadConfigJson(const std::string controlJsonPath)
         if (readInJSON.contains("INF_FACTOR"))
         {
             INF_FACTOR = readInJSON.at("INF_FACTOR");
+        }
+        if (readInJSON.contains("MESH_REFINE_LEVEL"))
+        {
+            MESH_REFINE_LEVEL = readInJSON.at("MESH_REFINE_LEVEL");
         }
         NEED_RECORD = readInJSON.at("NEED_RECORD");
     }
@@ -159,7 +164,7 @@ void run(std::string &dataDirPath)
     std::vector<float>* radiuses = (IS_CONST_RADIUS ? nullptr : new std::vector<float>());
     for (const std::string frame : DATA_PATHES)
     {
-        Mesh mesh;
+        Mesh mesh(int(pow(10, MESH_REFINE_LEVEL)));
         std::cout << "-=   Frame " << index << " " << frame << "   =-"
                   << std::endl;
         std::string dataPath = dataDirPath + "/" + frame;
@@ -171,7 +176,7 @@ void run(std::string &dataDirPath)
             loadParticlesFromCSV(dataPath, particles, radiuses);
             break;
         case 1:
-            // readShonDyParticleData(dataPath, particles, radiuses, SCALE);
+            readShonDyParticleData(dataPath, particles, radiuses, SCALE);
             break;
         default:
             printf("ERROR: Unknown DATA TYPE;");
@@ -226,8 +231,8 @@ int main(int argc, char **argv)
     {
         std::string dataDirPath =
             // "C:/Users/11379/Desktop/protein";
-            // "E:/data/multiR/mr_csv";
-            "F:/BaiduNetdiskDownload/oilnew/oil";
+            "E:/data/multiR/mr_csv";
+            // "E:\\data\\vtk\\csv";
         run(dataDirPath);
     }
 

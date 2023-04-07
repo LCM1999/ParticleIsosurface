@@ -107,18 +107,27 @@ struct TNode
 		return t * t;
 	}
 
-	double calcErrorDMC(Eigen::Vector4f p, std::vector<Eigen::Vector4f>& verts, std::vector<Eigen::Vector3f>& verts_grad);
+	double calcErrorDMC(
+		Eigen::Vector4f p, std::vector<Eigen::Vector4f>& verts, std::vector<Eigen::Vector3f>& verts_grad);
 
 	void vertAll(float& curv, bool& signchange, float& qef_error, float& sample);
+
+	void GenerateSampling(
+		std::vector<Eigen::Vector4f>& sample_points, std::vector<Eigen::Vector3f>& sample_grads, 
+		int& oversample, const float sample_radius);
 
 	void NodeSampling(
 		float& curv, bool& signchange, 
 		std::vector<Eigen::Vector4f>& sample_points, std::vector<Eigen::Vector3f>& sample_grads, 
 		const int oversample);
 
-	void NodeFeatureCalc();
+	void NodeCalcNode(
+		std::vector<Eigen::Vector4f>& sample_points, std::vector<Eigen::Vector3f>& sample_grads, 
+		const int oversample);
 
-	void NodeErrorMinimize();
+	// void NodeFeatureCalc();
+
+	// void NodeErrorMinimize();
 
 	int CountLeaves()
 	{

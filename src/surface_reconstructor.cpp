@@ -103,7 +103,6 @@ void SurfReconstructor::resizeRootBoxConstR()
 		_DEPTH_MAX++;
 		resizeLen = pow(2, _DEPTH_MAX) * r;
 	}
-	resizeLen *= 0.995;
 	_RootHalfLength = resizeLen / 2;
 	for (size_t i = 0; i < 3; i++)
 	{
@@ -131,7 +130,7 @@ void SurfReconstructor::resizeRootBoxVarR()
 		_DEPTH_MAX++;
 		resizeLen = pow(2, _DEPTH_MAX) * avgR;
 	}
-	resizeLen *= 1.005;
+	// resizeLen *= 1.005;
 	_RootHalfLength = resizeLen / 2;
 	for (size_t i = 0; i < 3; i++)
 	{
@@ -214,9 +213,6 @@ void SurfReconstructor::eval(TNode* tnode)
 		checkEmptyAndCalcCurv(tnode, empty, curv, min_radius);
 		if (empty)
 		{
-			tnode->node[0] = tnode->center[0];
-			tnode->node[1] = tnode->center[1];
-			tnode->node[2] = tnode->center[2];
 			Eigen::Vector3f tempG;
 			_evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3], tempG);
 			tnode->type = EMPTY;
@@ -224,15 +220,18 @@ void SurfReconstructor::eval(TNode* tnode)
 		}
 		else if (tnode->depth <= _DEPTH_MIN)
 		{
-			tnode->node[0] = tnode->center[0];
-			tnode->node[1] = tnode->center[1];
-			tnode->node[2] = tnode->center[2];
 			Eigen::Vector3f tempG;
 			_evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3], tempG);
 		}
 		else
 		{
-			tnode->vertAll(curv, signchange, qef_error, min_radius);
+			// tnode->vertAll(curv, signchange, qef_error, min_radius);
+			std::vector<Eigen::Vector4f> sample_points;
+			std::vector<Eigen::Vector3f> sample_grads;
+			int over_sample;
+			tnode->GenerateSampling(sample_points, sample_grads, over_sample, min_radius);
+			tnode->NodeSampling(curv, signchange, sample_points, sample_grads, over_sample);
+			tnode->NodeCalcNode(sample_points, sample_grads, over_sample);
 		}
 		if (std::isnan(curv))
 		{
@@ -291,6 +290,9 @@ void SurfReconstructor::eval(TNode* tnode)
 			tnode->children[i]->half_length = tnode->half_length / 2;
 			tnode->children[i]->center =
 				tnode->center + (Eigen::Vector3f(sign(i.x), sign(i.y), sign(i.z)) * tnode->half_length / 2);
+			tnode->children[i]->node[0] = tnode->children[i]->center[0];
+			tnode->children[i]->node[1] = tnode->children[i]->center[1];
+			tnode->children[i]->node[2] = tnode->children[i]->center[2];
 			#pragma omp task
 			eval(tnode->children[i]);
 		}
@@ -373,7 +375,8 @@ void SurfReconstructor::genIsoOurs()
 	{
 		printf("-= Calculating Tree Structure =-\n");
 		root = new TNode(this, 0);
-		root->center = Eigen::Vector3f(_RootCenter[0], _RootCenter[1], _RootCenter[2]);
+		root->center << _RootCenter[0], _RootCenter[1], _RootCenter[2];
+		root->node << _RootCenter[0], _RootCenter[1], _RootCenter[2], 0.0;
 		root->half_length = _RootHalfLength;
 		_OurRoot = root;
 	}
