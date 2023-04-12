@@ -10,7 +10,7 @@ class HashGrid
 {
 public:
 	HashGrid();
-	~HashGrid();
+	~HashGrid() {};
 
 	HashGrid(std::vector<Eigen::Vector3f>& particles, double* bounding, double cellsize);
 

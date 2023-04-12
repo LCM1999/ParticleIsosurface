@@ -11,12 +11,11 @@
 int tree_cells = 0;
 const std::string SAVE_RECORD_NAME = "./record_II.txt";
 
-TNode::TNode(SurfReconstructor* surf_constructor, int id)
+TNode::TNode(SurfReconstructor* surf_constructor)
 {
 	constructor = surf_constructor;
 	children[0] = children[1] = children[2] = children[3] =
 		children[4] = children[5] = children[6] = children[7] = 0;
-	nId = id;
 	type = UNCERTAIN;
 }
 
@@ -395,11 +394,8 @@ void TNode::NodeSampling(
 		return;
 	} else if (curv == 0.0) {
 		curv = field_curv;
-	} else if (std::abs(curv - field_curv) < 0.25) {
-		curv += field_curv;
-		curv /= 2;
 	} else {
-		curv = std::max(curv, field_curv);
+		curv = std::min(curv, field_curv);
 	}
 }
 

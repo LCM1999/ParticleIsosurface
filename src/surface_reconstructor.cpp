@@ -14,7 +14,7 @@
 
 
 SurfReconstructor::SurfReconstructor(std::vector<Eigen::Vector3f>& particles, 
-std::vector<float>* radiuses, Mesh& mesh, 
+std::vector<float>* radiuses, Mesh* mesh, 
 float radius, float flatness, float inf_factor)
 {
 	_GlobalParticles = particles;
@@ -23,7 +23,7 @@ float radius, float flatness, float inf_factor)
 	_RADIUS = radius;
 	_INFLUENCE_FACTOR = inf_factor;
 
-	_OurMesh = &mesh;
+	_OurMesh = mesh;
 }
 
 inline void SurfReconstructor::loadRootBox()
@@ -285,7 +285,7 @@ void SurfReconstructor::eval(TNode* tnode)
 		for (int t = 0; t < 8; t++)
 		{
 			Index i = t;
-			tnode->children[i] = new TNode(this, tnode->nId * 8 + i + 1);
+			tnode->children[i] = new TNode(this);
 			tnode->children[i]->depth = tnode->depth + 1;
 			tnode->children[i]->half_length = tnode->half_length / 2;
 			tnode->children[i]->center =
@@ -374,7 +374,7 @@ void SurfReconstructor::genIsoOurs()
 	if (_STATE == 0)
 	{
 		printf("-= Calculating Tree Structure =-\n");
-		root = new TNode(this, 0);
+		root = new TNode(this);
 		root->center << _RootCenter[0], _RootCenter[1], _RootCenter[2];
 		root->node << _RootCenter[0], _RootCenter[1], _RootCenter[2], 0.0;
 		root->half_length = _RootHalfLength;
@@ -495,6 +495,11 @@ void SurfReconstructor::generalModeRun()
 	genIsoOurs();
 
 	printf("-=  Total time= %f  =-\n", get_time() - time_all_start);
-
+	if (IS_CONST_RADIUS)
+	{
+    	delete(_hashgrid);
+	} else {
+		delete(_searcher);
+	}
 }
 

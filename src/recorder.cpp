@@ -53,10 +53,10 @@ void Recorder::RecordProgress()
 		}
 	}
 	//fprintf(f, types.c_str());
-	fprintf(f, "\"pos_x\",\"pos_y\",\"pos_z\",\"v\", \"id\"\n");
+	fprintf(f, "\"pos_x\",\"pos_y\",\"pos_z\",\"v\"\n");
 	for (TNode* n : leaves_and_empty)
 	{
-		fprintf(f, "%f,%f,%f,%f,%d\n", n->node[0], n->node[1], n->node[2], n->node[3], n->nId);
+		fprintf(f, "%f,%f,%f,%f\n", n->node[0], n->node[1], n->node[2], n->node[3]);
 	}
 	fclose(f);
 }

@@ -109,10 +109,11 @@ void loadParticlesFromCSV(std::string &csvPath,
     parseString(&titles, line, ",");
     if (!IS_CONST_RADIUS)
     {
+        radiuses->clear();
         radiusIdx = std::distance(titles.begin(),
         std::find_if(titles.begin(), titles.end(), 
         [&](const std::string &title) {
-            std::regex reg(".*radius.*", std::regex::icase);
+            std::regex reg("^(radius|r)$", std::regex::icase);
             return std::regex_match(title, reg);
         }));
     }
@@ -132,7 +133,7 @@ void loadParticlesFromCSV(std::string &csvPath,
         return std::regex_match(title, reg);
     }));
 
-    printf("%d %d %d \n", xIdx, yIdx, zIdx);
+    printf("%d %d %d %d \n", xIdx, yIdx, zIdx, radiusIdx);
 
     if (xIdx == titles.size() || yIdx == titles.size() || zIdx == titles.size())
     {
@@ -164,7 +165,7 @@ void run(std::string &dataDirPath)
     std::vector<float>* radiuses = (IS_CONST_RADIUS ? nullptr : new std::vector<float>());
     for (const std::string frame : DATA_PATHES)
     {
-        Mesh mesh(int(pow(10, MESH_REFINE_LEVEL)));
+        Mesh* mesh = new Mesh(int(pow(10, MESH_REFINE_LEVEL)));
         std::cout << "-=   Frame " << index << " " << frame << "   =-"
                   << std::endl;
         std::string dataPath = dataDirPath + "/" + frame;
@@ -184,22 +185,23 @@ void run(std::string &dataDirPath)
         }
 
         printf("Particles Number = %zd\n", particles.size());
-
-        SurfReconstructor constructor(particles, radiuses, mesh, RADIUS, FLATNESS, INF_FACTOR);
-        Recorder recorder(dataDirPath, frame.substr(0, frame.size() - 4),
-                          &constructor);
-        constructor.Run();
+        SurfReconstructor* constructor = new SurfReconstructor(particles, radiuses, mesh, RADIUS, FLATNESS, INF_FACTOR);
+        Recorder* recorder = new Recorder(dataDirPath, frame.substr(0, frame.size() - 4), constructor);
+        constructor->Run();
 
         if (NEED_RECORD)
         {
             // recorder.RecordProgress();
             // recorder.RecordParticles();
-            recorder.RecordFeatures();
+            recorder->RecordFeatures();
         }
 
-        writeFile(mesh,
+        writeFile(*mesh,
                   dataDirPath + "/" + frame.substr(0, frame.size() - 4) + ".obj");
         index++;
+        delete(mesh);
+        delete(constructor);
+        delete(recorder);
     }
 }
 
@@ -230,8 +232,8 @@ int main(int argc, char **argv)
     else
     {
         std::string dataDirPath =
-            // "C:/Users/11379/Desktop/protein";
-            "E:/data/multiR/mr_csv";
+            "E:/TestYourCode/csv";
+            // "E:/data/multiR/mr_csv";
             // "E:\\data\\vtk\\csv";
         run(dataDirPath);
     }

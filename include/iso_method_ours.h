@@ -38,7 +38,7 @@ struct TNode
 {
 	TNode() {}
 
-	TNode(SurfReconstructor* surf_constructor, int id);
+	TNode(SurfReconstructor* surf_constructor);
 
 	~TNode()
 	{
@@ -52,7 +52,6 @@ struct TNode
 	Eigen::Vector4f node = Eigen::Vector4f::Zero();
 
 	short depth = 0;
-	unsigned long long nId;
 	short type;
 
 	TNode *children[8];

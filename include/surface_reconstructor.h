@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <string.h>
+#include <array>
 #include "timer.h"
 #include "utils.h"
 
@@ -33,7 +34,7 @@ private:
 
     bool _USE_ANI = true;
     bool _USE_XMEAN = true;
-    float _XMEAN_DELTA = 0.0f;
+    float _XMEAN_DELTA = 1.0f;
 
     float _TOLERANCE = 1e-8;
     float _RATIO_TOLERANCE = 0.1f;
@@ -45,7 +46,7 @@ private:
 
     std::vector<Eigen::Vector3f> _GlobalParticles;
     std::vector<float>* _GlobalRadiuses;
-
+    
     float _RADIUS = 0;
 
     int _GlobalParticlesNum = 0;
@@ -58,6 +59,8 @@ private:
     TNode* _OurRoot;
 	Mesh* _OurMesh;
 
+    // std::array<TNode*, 10000000> UnsampledQueue;
+    // std::array<TNode*, 10000000> SampledQueue;
 protected:
     void loadRootBox();
 
@@ -79,7 +82,7 @@ public:
     SurfReconstructor(
         std::vector<Eigen::Vector3f>& particles,
         std::vector<float>* radiuses, 
-        Mesh& mesh, 
+        Mesh* mesh, 
         float radius, 
         float flatness = 0.98,
         float inf_factor = 2.0f);
