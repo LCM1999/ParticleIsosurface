@@ -36,7 +36,7 @@ public:
 	void SingleEval(const Eigen::Vector3f& pos, float& scalar, Eigen::Vector3f& gradient, bool use_normalize = true, bool use_signed = true, bool grad_normalize = true);
 
     void GridEval(
-        std::vector<Eigen::Vector4f>& sample_points, std::vector<Eigen::Vector3f>& field_gradients,
+        float* sample_points, float* field_gradients,
         bool& signchange, int oversample, bool grad_normalize = true);
 
     bool CheckSplash(const int& pIdx);

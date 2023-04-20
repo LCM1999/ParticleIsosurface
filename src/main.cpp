@@ -192,7 +192,7 @@ void run(std::string &dataDirPath)
         if (NEED_RECORD)
         {
             // recorder.RecordProgress();
-            // recorder.RecordParticles();
+            recorder->RecordParticles();
             recorder->RecordFeatures();
         }
 
@@ -232,7 +232,7 @@ int main(int argc, char **argv)
     else
     {
         std::string dataDirPath =
-            "E:/TestYourCode/csv";
+            "E:/data/oil_csv";
             // "E:/data/multiR/mr_csv";
             // "E:\\data\\vtk\\csv";
         run(dataDirPath);

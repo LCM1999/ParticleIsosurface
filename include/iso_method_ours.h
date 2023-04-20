@@ -107,22 +107,21 @@ struct TNode
 	}
 
 	double calcErrorDMC(
-		Eigen::Vector4f p, std::vector<Eigen::Vector4f>& verts, std::vector<Eigen::Vector3f>& verts_grad);
+		Eigen::Vector4f p, float* verts, float* verts_grad, const int oversample);
 
 	void vertAll(float& curv, bool& signchange, float& qef_error, float& sample);
 
 	void GenerateSampling(
-		std::vector<Eigen::Vector4f>& sample_points, std::vector<Eigen::Vector3f>& sample_grads, 
-		int& oversample, const float sample_radius);
+		float* sample_points, const int sampling_idx, const int oversample);
 
 	void NodeSampling(
 		float& curv, bool& signchange, 
-		std::vector<Eigen::Vector4f>& sample_points, std::vector<Eigen::Vector3f>& sample_grads, 
-		const int oversample);
+		float* sample_points, float* sample_grads, 
+		const int sampling_idx, const int oversample);
 
 	void NodeCalcNode(
-		std::vector<Eigen::Vector4f>& sample_points, std::vector<Eigen::Vector3f>& sample_grads, 
-		const int oversample);
+		float* sample_points, float* sample_grads, 
+		const int sampling_idx, const int oversample);
 
 	// void NodeFeatureCalc();
 

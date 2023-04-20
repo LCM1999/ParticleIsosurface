@@ -13,6 +13,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
 set(EIGEN3_DIR C:/Lib/Eigen-3.4.0-MSVC/share/eigen3/cmake)
 set(HDF5_DIR C:/Lib/HDF5-1.10.7-MSVC/cmake/hdf5)
 
+find_package(CUDA  REQUIRED)
+
 find_package(OpenMP REQUIRED)
 if(NOT OpenMP_FOUND)
     message(FATAL_ERROR "OpenMP not found!")
@@ -48,6 +50,8 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     add_compile_options("-openmp:llvm")
 endif()
+SET(COMPUTE_CAPABILITY 75)
+SET(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -gencode arch=compute_${COMPUTE_CAPABILITY},code=compute_${COMPUTE_CAPABILITY};-g;-G;)
 
 
 add_executable(${PROJECT_NAME}
@@ -66,6 +70,7 @@ add_executable(${PROJECT_NAME}
     src/pugixml.cpp
     src/hdf5Utils.cpp
     src/multi_level_reseacher.cpp
+    src/sampling.cu
 )
 
 target_include_directories(${PROJECT_NAME} 

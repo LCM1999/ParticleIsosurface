@@ -4,7 +4,8 @@
 
 #include <vector>
 #include <string.h>
-#include <array>
+#include <queue>
+#include <atomic>
 #include "timer.h"
 #include "utils.h"
 
@@ -33,7 +34,7 @@ private:
     int _SPARSE_NEIGHBORS_NUM = 16;
 
     bool _USE_ANI = true;
-    bool _USE_XMEAN = true;
+    bool _USE_XMEAN = false;
     float _XMEAN_DELTA = 1.0f;
 
     float _TOLERANCE = 1e-8;
@@ -52,6 +53,8 @@ private:
     int _GlobalParticlesNum = 0;
     int _STATE = 0;
 
+    static const int inProcessSize = 10000000; //
+
     double _BoundingBox[6] = {0.0f};
     double _RootHalfLength;
     float _RootCenter[3] = {0.0f};
@@ -59,8 +62,10 @@ private:
     TNode* _OurRoot;
 	Mesh* _OurMesh;
 
-    // std::array<TNode*, 10000000> UnsampledQueue;
-    // std::array<TNode*, 10000000> SampledQueue;
+    std::vector<TNode*> WaitingStack;
+    TNode* ProcessArray[inProcessSize];
+
+    std::atomic<int> queue_flag;
 protected:
     void loadRootBox();
 
@@ -76,6 +81,10 @@ protected:
     void genIsoOurs();
     void checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& curv, float& min_radius);
     void eval(TNode* tnode);
+    void beforeSampleEval(TNode* tnode, float& curv, float& min_radius, bool& empty, int& oversample);
+    void afterSampleEval(
+        TNode* tnode, float& curv, float& min_radius, int* oversample, const int index,
+        float* sample_points, float* sample_grads);
 
 public:
     SurfReconstructor() {};
@@ -84,14 +93,14 @@ public:
         std::vector<float>* radiuses, 
         Mesh* mesh, 
         float radius, 
-        float flatness = 0.98,
-        float inf_factor = 2.0f);
+        float flatness,
+        float inf_factor);
 
     ~SurfReconstructor() {};
 
     void Run();
 
-    inline float getOverSampleQEF() {return _OVERSAMPLE_QEF;}
+    inline int getOverSampleQEF() {return _OVERSAMPLE_QEF;}
     inline float getBorder() {return _BORDER;}
     inline int getDepthMax() {return _DEPTH_MAX;}
     inline int getDepthMin() {return _DEPTH_MIN;}

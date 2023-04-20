@@ -78,13 +78,14 @@ void Evaluator::SingleEval(const Eigen::Vector3f& pos, float& scalar, Eigen::Vec
 }
 
 void Evaluator::GridEval(
-    std::vector<Eigen::Vector4f>& sample_points, std::vector<Eigen::Vector3f>& field_gradients,
+    float* sample_points, float* field_gradients,
     bool& signchange, int oversample, bool grad_normalize)
 {
-    assert(!sample_points.empty());
+    //assert(!sample_points.empty());
     bool origin_sign;
-    for (Eigen::Vector4f &p : sample_points)
+    for (int i = 0; i < pow(oversample+1, 3); i++)
     {
+        Eigen::Vector4f p(sample_points[i*4 + 0], sample_points[i*4 + 1], sample_points[i*4 + 2], sample_points[i*4 + 3]);
         float scalar = 0.0f;
         if (constructor->getUseAni())
         {
@@ -123,8 +124,8 @@ void Evaluator::GridEval(
             }
         }
         scalar = constructor->getIsoValue() - ((scalar - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
-        p[3] = scalar;
-        origin_sign = sample_points[0][3] >= 0;
+        sample_points[i*4 + 3] = scalar;
+        origin_sign = (sample_points[3] >= 0);
         if (!signchange)
         {
             signchange = origin_sign ^ (scalar >= 0);
@@ -144,45 +145,45 @@ void Evaluator::GridEval(
                 last_idx = (z * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + (x - 1));
                 if (x == 0)
                 {
-                    gradient[0] = sample_points[index][3] - sample_points[next_idx][3];
+                    gradient[0] = sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3];
                 }
                 else if (x == oversample)
                 {
-                    gradient[0] = sample_points[last_idx][3] - sample_points[index][3];
+                    gradient[0] = sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3];
                 }
                 else
                 {
-                    gradient[0] = sample_points[last_idx][3] - sample_points[next_idx][3];
+                    gradient[0] = sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3];
                 }
 
                 next_idx = (z * (oversample + 1) * (oversample + 1) + (y + 1) * (oversample + 1) + x);
                 last_idx = (z * (oversample + 1) * (oversample + 1) + (y - 1) * (oversample + 1) + x);
                 if (y == 0)
                 {
-                    gradient[1] = sample_points[index][3] - sample_points[next_idx][3];
+                    gradient[1] = sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3];
                 }
                 else if (y == oversample)
                 {
-                    gradient[1] = sample_points[last_idx][3] - sample_points[index][3];
+                    gradient[1] = sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3];
                 }
                 else
                 {
-                    gradient[1] = sample_points[last_idx][3] - sample_points[next_idx][3];
+                    gradient[1] = sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3];
                 }
 
                 next_idx = ((z + 1) * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + x);
                 last_idx = ((z - 1) * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + x);
                 if (z == 0)
                 {
-                    gradient[2] = sample_points[index][3] - sample_points[next_idx][3];
+                    gradient[2] = sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3];
                 }
                 else if (z == oversample)
                 {
-                    gradient[2] = sample_points[last_idx][3] - sample_points[index][3];
+                    gradient[2] = sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3];
                 }
                 else
                 {
-                    gradient[2] = sample_points[last_idx][3] - sample_points[next_idx][3];
+                    gradient[2] = sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3];
                 }
                 if (grad_normalize)
                 {
@@ -191,7 +192,9 @@ void Evaluator::GridEval(
                     gradient[1] = std::isnan(gradient[1]) ? 0.0f : gradient[1];
                     gradient[2] = std::isnan(gradient[2]) ? 0.0f : gradient[2];
                 }
-                field_gradients.push_back(gradient);
+                field_gradients[index * 3 + 0] = gradient[0];
+                field_gradients[index * 3 + 1] = gradient[1];
+                field_gradients[index * 3 + 2] = gradient[2];
             }
         }
     }
@@ -346,14 +349,6 @@ inline void Evaluator::compute_Gs_xMeans()
         int closerNeigbors = 0;
         Eigen::Vector3f xMean = Eigen::Vector3f::Zero();
         Eigen::Matrix3f G = Eigen::Matrix3f::Zero();
-        if (IS_CONST_RADIUS)
-        {
-            constructor->getHashGrid()->GetPIdxList((GlobalPoses->at(pIdx)), tempNeighbors);
-        } else {
-            constructor->getSearcher()->GetNeighbors((GlobalPoses->at(pIdx)), tempNeighbors);
-        }
-        if (tempNeighbors.empty())
-            continue;
         double wSum = 0, d2, d, wj;
         double pR, pR2, pD, pD2, pI, pI2;
         pR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx);
@@ -362,6 +357,17 @@ inline void Evaluator::compute_Gs_xMeans()
         pD2 = pD * pD;
         pI = pR * inf_factor;
         pI2 = pI * pI;
+        if (IS_CONST_RADIUS)
+        {
+            constructor->getHashGrid()->GetPIdxList((GlobalPoses->at(pIdx)), tempNeighbors);
+        } else {
+            constructor->getSearcher()->GetNeighbors((GlobalPoses->at(pIdx)), tempNeighbors);
+        }
+        if (tempNeighbors.empty())
+        {
+            G = Eigen::DiagonalMatrix<float, 3>(invH, invH, invH);
+            GlobalSplash[pIdx] = 1;
+        }
         double nR, nR2, nD, nD2, nI, nI2;
         for (int nIdx : tempNeighbors)
         {
@@ -407,7 +413,7 @@ inline void Evaluator::compute_Gs_xMeans()
 
         if (neighbors.size() < 1)
         {
-            G += Eigen::DiagonalMatrix<float, 3>(invH, invH, invH);
+            G = Eigen::DiagonalMatrix<float, 3>(invH, invH, invH);
             GlobalSplash[pIdx] = 1;
         } 
         else
@@ -418,7 +424,7 @@ inline void Evaluator::compute_Gs_xMeans()
             wSum = 0.0f;
             for (int nIdx : neighbors)
             {
-                d = (xMean - ((GlobalPoses->at(nIdx)))).norm();
+                d = ((GlobalPoses->at(pIdx)) - ((GlobalPoses->at(nIdx)))).norm();
                 wj = wij(d, nI);
                 wSum += wj;
                 wd = ((GlobalPoses->at(nIdx))) - xMean;

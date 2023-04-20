@@ -1,5 +1,4 @@
 #include <queue>
-#include <stack>
 #include <omp.h>
 //#include <metis.h>
 
@@ -22,6 +21,10 @@ float radius, float flatness, float inf_factor)
 	_GlobalRadiuses = radiuses;
 	_RADIUS = radius;
 	_INFLUENCE_FACTOR = inf_factor;
+
+	WaitingStack.clear();
+
+	queue_flag = 0;
 
 	_OurMesh = mesh;
 }
@@ -205,12 +208,21 @@ void SurfReconstructor::eval(TNode* tnode)
 	case LEAF:
 		return;
 	case INTERNAL:
-		next = true;
-		break;
+	{
+		for (Index i; i < 8; i++)
+		{
+			#pragma omp task
+				eval(tnode->children[i]);
+		}
+		return;
+	}
 	case UNCERTAIN:
 	{
+		// double check_time = 0, generate_time = 0, sampling_time = 0, calc_time = 0;
 		// evaluate QEF samples
+		// check_time = get_time();
 		checkEmptyAndCalcCurv(tnode, empty, curv, min_radius);
+		// check_time = get_time() - check_time;
 		if (empty)
 		{
 			Eigen::Vector3f tempG;
@@ -225,17 +237,20 @@ void SurfReconstructor::eval(TNode* tnode)
 		}
 		else
 		{
-			// tnode->vertAll(curv, signchange, qef_error, min_radius);
-			std::vector<Eigen::Vector4f> sample_points;
-			std::vector<Eigen::Vector3f> sample_grads;
-			int over_sample;
-			tnode->GenerateSampling(sample_points, sample_grads, over_sample, min_radius);
-			tnode->NodeSampling(curv, signchange, sample_points, sample_grads, over_sample);
-			tnode->NodeCalcNode(sample_points, sample_grads, over_sample);
-		}
-		if (std::isnan(curv))
-		{
-			curv = 0;
+			tnode->vertAll(curv, signchange, qef_error, min_radius);
+			// std::vector<Eigen::Vector4f> sample_points;
+			// std::vector<Eigen::Vector3f> sample_grads;
+			// int over_sample;
+			// // generate_time = get_time();
+			// tnode->GenerateSampling(sample_points, sample_grads, over_sample, min_radius);
+			// // generate_time = get_time() - generate_time;
+			// // sampling_time = get_time();
+			// tnode->NodeSampling(curv, signchange, sample_points, sample_grads, over_sample);
+			// sampling_time = get_time() - sampling_time;
+			// calc_time = get_time();
+			// tnode->NodeCalcNode(sample_points, sample_grads, over_sample);
+			// calc_time = get_time() - calc_time;
+			// printf("check:%f, generate:%f, sampling:%f, calc:%f\n", check_time, generate_time, sampling_time, calc_time);
 		}
 		
 		// judge this node need calculate iso-surface
@@ -258,20 +273,14 @@ void SurfReconstructor::eval(TNode* tnode)
 		bool badcurv = curv < _FLATNESS;
 
 		recur = isbig || (signchange && badcurv);	//(badcurv || badqef)
+
 	}
 	break;
 	default:
 		break;
 	}
 
-	if (next)
-	{
-		for (Index i; i < 8; i++)
-		{
-			eval(tnode->children[i]);
-		}
-	}
-	else if (recur)
+	if (recur)
 	{
 		tnode->type = INTERNAL;
 		// find points and function values in the subdivided cell
@@ -294,12 +303,139 @@ void SurfReconstructor::eval(TNode* tnode)
 			tnode->children[i]->node[1] = tnode->children[i]->center[1];
 			tnode->children[i]->node[2] = tnode->children[i]->center[2];
 			#pragma omp task
-			eval(tnode->children[i]);
+				eval(tnode->children[i]);
 		}
 	}
 	else
 	{
 		tnode->type = LEAF;
+	}
+}
+
+void SurfReconstructor::beforeSampleEval(TNode* tnode, float& curv, float& min_radius, bool& empty, int& oversample)
+{
+	switch (tnode->type)
+	{
+	case EMPTY:
+	case LEAF:
+	case INTERNAL:
+		return;
+	case UNCERTAIN:
+	{
+		// evaluate QEF samples
+		checkEmptyAndCalcCurv(tnode, empty, curv, min_radius);
+		if (empty)
+		{
+			Eigen::Vector3f tempG;
+			_evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3], tempG);
+			tnode->type = EMPTY;
+			return;
+		}
+		// else if (tnode->depth <= _DEPTH_MIN)
+		// {
+		// 	Eigen::Vector3f tempG;
+		// 	_evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3], tempG);
+		// }
+	}
+	break;
+	default:
+		break;
+	}
+	if (!empty)
+	{
+		oversample = std::min(getOverSampleQEF(), int(ceil((tnode->half_length * 2) / min_radius) + 2));
+		// if (tnode->depth <= getDepthMin())
+		// {
+		// 	oversample = getOverSampleQEF();
+		// } else {
+		// 	oversample = ;
+		// }
+	}
+}
+
+void SurfReconstructor::afterSampleEval(
+	TNode* tnode, float& curv, float& min_radius, int* oversamples, const int index,
+	float* sample_points, float* sample_grads)
+{
+	// double generate_time = 0, sampling_time = 0, calc_time = 0;
+	bool isbig = (tnode->depth <= _DEPTH_MIN);
+	bool signchange = false;
+	// tnode->vertAll(curv, signchange, qef_error, min_radius);
+	int sampling_idx = 0, oversample = oversamples[index];
+
+	for (size_t i = 0; i < index; i++)
+	{
+		sampling_idx += pow(oversamples[i] + 1, 3);
+	}
+	if (!isbig)
+	{
+		// generate_time = get_time();
+		tnode->GenerateSampling(sample_points, sampling_idx, oversample);
+		// generate_time = get_time() - generate_time;
+		// sampling_time = get_time();
+		tnode->NodeSampling(curv, signchange, sample_points, sample_grads, sampling_idx, oversample);
+		// sampling_time = get_time() - sampling_time;
+		// tnode->NodeCalcNode(sample_points, sample_grads, sampling_idx, oversample);
+	}
+	
+	// judge this node need calculate iso-surface
+	float cellsize = 2 * tnode->half_length;
+
+	// check max/min sizes of cells
+	bool issmall = (cellsize - min_radius) < _TOLERANCE;// || tnode->depth >= _DEPTH_MAX;
+	if (issmall)
+	{
+		// it's a leaf
+		tnode->type = LEAF;
+		// calc_time = get_time();
+		tnode->NodeCalcNode(sample_points, sample_grads, sampling_idx, oversample);
+		// calc_time = get_time() - calc_time;
+		// printf("generate:%f, sampling:%f, calc:%f\n", generate_time, sampling_time, calc_time);
+		return;
+	}
+	//static float maxsize = dynamic_cast<InternalNode*>(mytree->l)->lenn * pow(.5, DEPTH_MIN);
+	// check for qef error
+	//bool badqef = (qef_error / cellsize) > _BAD_QEF;
+
+	// check curvature
+	bool badcurv = curv < _FLATNESS;
+
+	bool recur = isbig || (signchange && badcurv);	//(badcurv || badqef)
+
+	if (recur)
+	{
+		tnode->type = INTERNAL;
+		// find points and function values in the subdivided cell
+
+		auto sign = [&](unsigned int x)
+		{
+			return x ? 1 : -1;
+		};
+
+		// create children
+		for (int t = 0; t < 8; t++)
+		{
+			Index i = t;
+			tnode->children[i] = new TNode(this);
+			tnode->children[i]->depth = tnode->depth + 1;
+			tnode->children[i]->half_length = tnode->half_length / 2;
+			tnode->children[i]->center =
+				tnode->center + (Eigen::Vector3f(sign(i.x), sign(i.y), sign(i.z)) * tnode->half_length / 2);
+			tnode->children[i]->node[0] = tnode->children[i]->center[0];
+			tnode->children[i]->node[1] = tnode->children[i]->center[1];
+			tnode->children[i]->node[2] = tnode->children[i]->center[2];
+			// #pragma omp task
+			// eval(tnode->children[i]);
+		}
+		// printf("generate:%f, sampling:%f\n", generate_time, sampling_time);
+	}
+	else
+	{
+		tnode->type = LEAF;
+		// calc_time = get_time();
+		tnode->NodeCalcNode(sample_points, sample_grads, sampling_idx, oversample);
+		// calc_time = get_time() - calc_time;
+		// printf("generate:%f, sampling:%f, calc:%f\n", generate_time, sampling_time, calc_time);
 	}
 }
 
@@ -380,12 +516,12 @@ void SurfReconstructor::genIsoOurs()
 		root->half_length = _RootHalfLength;
 		_OurRoot = root;
 	}
+	// else if (_STATE == 1)
+	// {
+	// 	printf("-= Our Method =-\n");
+	// 	root = _OurRoot;
+	// }
 	else if (_STATE == 1)
-	{
-		printf("-= Our Method =-\n");
-		root = _OurRoot;
-	}
-	else if (_STATE == 2)
 	{
 		printf("-= Generate Surface =-\n");
 		double t_gen_mesh = get_time();
@@ -418,6 +554,86 @@ void SurfReconstructor::genIsoOurs()
 		printf("Time generating polygons = %f\n", t_alldone - t_gen_mesh);
 		return;
 	}
+	if (1)
+	{
+		float* sample_points;
+		float* sample_grads;
+		float* cuvrs;
+		float* min_raiduses;
+		bool* emptys;
+		int* oversamples;
+		int all_sampling = 0;
+		WaitingStack.push_back(root);
+		while (!WaitingStack.empty())
+		{
+			all_sampling = 0;
+			for (queue_flag = 0; queue_flag < inProcessSize && !WaitingStack.empty(); queue_flag++)
+			{
+				ProcessArray[queue_flag] = WaitingStack.back();
+				WaitingStack.pop_back();
+			}
+			sample_points;
+			sample_grads;
+			cuvrs = new float[queue_flag];
+			min_raiduses = new float[queue_flag];
+			emptys = new bool[queue_flag];
+			oversamples = new int[queue_flag]();
+			#pragma omp parallel //for schedule(dynamic, OMP_THREADS_NUM) 
+			{
+				#pragma omp single
+				{
+					for (size_t i = 0; i < queue_flag; i++)
+					{
+						#pragma omp task
+							beforeSampleEval(ProcessArray[i], cuvrs[i], min_raiduses[i], emptys[i], oversamples[i]);
+					}
+				}
+			}
+			for (size_t i = 0; i < queue_flag; i++)
+			{
+				all_sampling += pow(oversamples[i]+1, 3);
+			}
+			printf("%d\n", all_sampling);
+			sample_points = new float[all_sampling * 4];
+			sample_grads = new float[all_sampling * 3];
+			//TODO: Sampling
+			#pragma omp parallel //for schedule(dynamic, OMP_THREADS_NUM)
+			{
+				#pragma omp single
+				{
+					for (size_t i = 0; i < queue_flag; i++)
+					{
+						if (!emptys[i])
+						{
+							#pragma omp task
+								afterSampleEval(ProcessArray[i], cuvrs[i], min_raiduses[i], oversamples, i, sample_points, sample_grads);
+						}
+					}
+				}
+			}
+			// delete(sample_points);
+			// delete(sample_grads);
+			// delete(cuvrs);
+			// delete(min_raiduses);
+			// delete(emptys);
+			// delete(oversamples);
+			for (size_t i = 0; i < queue_flag; i++)
+			{
+				for (size_t j = 0; j < 8; j++)
+				{
+					if (ProcessArray[i]->children[0] == 0)
+					{
+						break;
+					}
+					
+					if (ProcessArray[i]->children[j]->type == UNCERTAIN)
+					{
+						WaitingStack.push_back(ProcessArray[i]->children[j]);
+					}
+				}
+			}
+		}
+	} else {
 #pragma omp parallel
 {
 	#pragma omp single
@@ -426,10 +642,9 @@ void SurfReconstructor::genIsoOurs()
 		eval(root);
 	}
 }
-
+	}
 	double t_finish = get_time();
-	printf("Time generating tree = %f\n", t_finish - t_start);
-	
+	printf("Time generating tree = %f\n", t_finish - t_start);	
 	_STATE++;
 }
 
@@ -492,7 +707,7 @@ void SurfReconstructor::generalModeRun()
 
 	genIsoOurs();
 	genIsoOurs();
-	genIsoOurs();
+	//genIsoOurs();
 
 	printf("-=  Total time= %f  =-\n", get_time() - time_all_start);
 	if (IS_CONST_RADIUS)

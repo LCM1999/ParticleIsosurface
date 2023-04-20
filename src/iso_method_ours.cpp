@@ -19,12 +19,14 @@ TNode::TNode(SurfReconstructor* surf_constructor)
 	type = UNCERTAIN;
 }
 
-double TNode::calcErrorDMC(Eigen::Vector4f p, std::vector<Eigen::Vector4f>& verts, std::vector<Eigen::Vector3f>& verts_grad)
+double TNode::calcErrorDMC(Eigen::Vector4f p, float* verts, float* verts_grad, const int oversample)
 {
 	double err = 0;
-	for (size_t i = 0; i < verts.size(); i++)
+	for (size_t i = 0; i < pow(oversample + 1, 3); i++)
 	{
-		err += squared(p[3] - verts_grad[i].dot((p - verts[i]).head(3))) / (1 + verts_grad[i].squaredNorm());
+		Eigen::Vector4f v(verts[i * 4 + 0], verts[i * 4 + 1], verts[i * 4 + 2], verts[i * 4 + 3]);
+		Eigen::Vector3f g(verts_grad[i * 3 + 0], verts_grad[i * 3 + 1], verts_grad[i * 3 + 2]);
+		err += squared(p[3] - g.dot((p - v).head(3))) / (1 + g.squaredNorm());
 	}
 	return err;
 }
@@ -38,18 +40,10 @@ void TNode::vertAll(float& curv, bool& signchange, float& qef_error, float& samp
 		return x ? 1 : -1;
 	};
 
-	double sampling_time = 0, features_time = 0, error_time = 0, temp_time = 0;
-
-	Eigen::Vector3f verts[8];
-	
-	for (Index i = 0; i < 8; i++)
-	{
-		verts[i][0] = center[0] + sign(i.x) * half_length;
-		verts[i][1] = center[1] + sign(i.y) * half_length;
-		verts[i][2] = center[2] + sign(i.z) * half_length;
-	}
 	const float cellsize = 2 * half_length;
 	const float border = constructor->getBorder() * cellsize;
+	Eigen::Vector3f minV(center[0] - half_length + border, center[1] - half_length + border, center[2] - half_length + border);
+	Eigen::Vector3f maxV(center[0] + half_length - border, center[1] + half_length - border, center[2] + half_length - border);
 	float sampling_step = sample_radius;
 	int oversample = int(ceil(cellsize / sampling_step) + 2);
 	if (depth < constructor->getDepthMin())
@@ -58,57 +52,50 @@ void TNode::vertAll(float& curv, bool& signchange, float& qef_error, float& samp
 	}
 	bool is_out;
 	double err;
-	std::vector<Eigen::Vector4f> sample_points;
-	std::vector<Eigen::Vector3f> field_gradient;
+	float* sample_points = new float[pow(oversample+1, 3) * 4];
+	float* field_gradient = new float[pow(oversample+1, 3) * 3];
 	for (int z = 0; z <= oversample; z++)
 	{
 		for (int y = 0; y <= oversample; y++)
 		{
 			for (int x = 0; x <= oversample; x++)
 			{
-				sample_points.push_back(
-					Eigen::Vector4f(
-						(1 - float(x) / oversample) * verts[0][0] + (float(x) / oversample) * verts[7][0],
-						(1 - float(y) / oversample) * verts[0][1] + (float(y) / oversample) * verts[7][1],
-						(1 - float(z) / oversample) * verts[0][2] + (float(z) / oversample) * verts[7][2],
-						0));
+				sample_points[(z * (oversample+1) * (oversample+1) + y * (oversample+1) + x) * 4 + 0] = 
+				(1 - float(x) / oversample) * minV[0] + (float(x) / oversample) * maxV[0];
+				sample_points[(z * (oversample+1) * (oversample+1) + y * (oversample+1) + x) * 4 + 1] = 
+				(1 - float(y) / oversample) * minV[1] + (float(y) / oversample) * maxV[1];
+				sample_points[(z * (oversample+1) * (oversample+1) + y * (oversample+1) + x) * 4 + 2] = 
+				(1 - float(z) / oversample) * minV[2] + (float(z) / oversample) * maxV[2];
+				sample_points[(z * (oversample+1) * (oversample+1) + y * (oversample+1) + x) * 4 + 3] = 0;
 			}
 		}
 	}
-	sampling_time = get_time();
 	constructor->getEvaluator()->GridEval(sample_points, field_gradient, signchange, oversample, false);
-	sampling_time = get_time() - sampling_time;
-	// for (Index i = 0; i < 8; i++)
-	// {
-	// 	verts[i][3] = sample_points[i.x * oversample + i.y * oversample * (oversample + 1) + i.z * oversample * (oversample + 1) * (oversample + 1)][3];
-	// }
+
 	// calculate curvature
 	Eigen::Vector3f norms(0, 0, 0);
 	float area = 0;
-	for (Eigen::Vector3f n : field_gradient)
+	for (size_t i = 0; i < pow(oversample+1, 3); i++)
 	{
+		Eigen::Vector3f n(field_gradient[i * 3 + 0], field_gradient[i * 3 + 1], field_gradient[i * 3 + 2]);
 		n.normalize();
 		norms += n;
 		area += n.norm();
 	}
-	// if (curv == 0)
-	// {
-	float field_curv = (norms.norm() / area);
-	if (!std::isnan(field_curv))
+	float field_curv = (area == 0) ? 0.0 : (norms.norm() / area);
+	if (field_curv == 0.0)
 	{
+		return;
+	} else if (curv == 0.0) {
+		curv = field_curv;
+	} else if (std::abs(curv - field_curv) < 0.25) {
 		curv += field_curv;
 		curv /= 2;
+	} else {
+		curv = std::max(curv, field_curv);
 	}
-	// }
-	// else if (curv < 0) {
-	// 	curv = 0;
-	// } 
-	// else {
-	// 	curv = std::min(norms.norm() / area, curv);
-	// }
 	
-	/*--------------------VERT NODE-----------------------*/
-	temp_time = get_time();
+	//--------------------VERT NODE-----------------------
 	QEFNormal<double, 4> node_q;
 	node_q.zero();
 	std::vector<Eigen::Vector3f> node_plane_norms, node_plane_pts;
@@ -120,13 +107,16 @@ void TNode::vertAll(float& curv, bool& signchange, float& qef_error, float& samp
 			for (int x = 0; x <= oversample; x++)
 			{
 				node_index = (z * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + x);
-				Eigen::Vector3f p(sample_points[node_index][0], sample_points[node_index][1], sample_points[node_index][2]);
+				Eigen::Vector3f p(
+					sample_points[node_index * 4 + 0], 
+					sample_points[node_index * 4 + 1], 
+					sample_points[node_index * 4 + 2]);
 				Vector5f pl = Vector5f::Zero();
-				pl[0] = field_gradient[node_index][0];
-				pl[1] = field_gradient[node_index][1];
-				pl[2] = field_gradient[node_index][2];
+				pl[0] = field_gradient[node_index * 3 + 0];
+				pl[1] = field_gradient[node_index * 3 + 1];
+				pl[2] = field_gradient[node_index * 3 + 2];
 				pl[3] = -1;
-				pl[4] = -(p[0] * pl[0] + p[1] * pl[1] + p[2] * pl[2]) + sample_points[node_index][3];
+				pl[4] = -(p[0] * pl[0] + p[1] * pl[1] + p[2] * pl[2]) + sample_points[node_index * 4 + 3];
 				node_q.combineSelf(Vector5d(pl.cast<double>()).data());
 				node_plane_pts.push_back(p);
 				node_plane_norms.push_back(Eigen::Vector3f(pl[0], pl[1], pl[2]));
@@ -150,17 +140,13 @@ void TNode::vertAll(float& curv, bool& signchange, float& qef_error, float& samp
 	// minimize QEF constrained to cell
 	is_out = true;
 	err = 1e30;
-	Eigen::Vector3f node_mine(verts[0][0] + border, verts[0][1] + border, verts[0][2] + border);
-	Eigen::Vector3f node_maxe(verts[7][0] - border, verts[7][1] - border, verts[7][2] - border);
 	Eigen::Vector4f pc = Eigen::Vector4f::Zero();
 	Eigen::Vector3f pcg = Eigen::Vector3f::Zero();
-	features_time += get_time() - temp_time;
 	for (int cell_dim = 3; cell_dim >= 0 && is_out; cell_dim--)
 	{
 		if (cell_dim == 3)
 		{
 			// find minimal point
-			temp_time = get_time();
 			Eigen::Vector4d rvalue = Eigen::Vector4d::Zero();
 			Eigen::Matrix4d inv = node_A.inverse();
 			for (int i = 0; i < node_n; i++)
@@ -170,16 +156,13 @@ void TNode::vertAll(float& curv, bool& signchange, float& qef_error, float& samp
 					rvalue[i] += inv(j, i) * node_B[j];
 			}
 			pc << rvalue[0], rvalue[1], rvalue[2], rvalue[3];
-			features_time += get_time() - temp_time;
 			// check bounds
-			if (pc[0] >= node_mine[0] && pc[0] <= node_maxe[0] &&
-				pc[1] >= node_mine[1] && pc[1] <= node_maxe[1] &&
-				pc[2] >= node_mine[2] && pc[2] <= node_maxe[2])
+			if (pc[0] >= minV[0] && pc[0] <= maxV[0] &&
+				pc[1] >= minV[1] && pc[1] <= maxV[1] &&
+				pc[2] >= minV[2] && pc[2] <= maxV[2])
 			{
 				is_out = false;
-				temp_time = get_time();
-				err = calcErrorDMC(pc, sample_points, field_gradient);
-				error_time += get_time() - temp_time;
+				err = calcErrorDMC(pc, sample_points, field_gradient, oversample);
 				node << pc;
 			}
 		}
@@ -187,10 +170,9 @@ void TNode::vertAll(float& curv, bool& signchange, float& qef_error, float& samp
 		{
 			for (int face = 0; face < 6; face++)
 			{
-				temp_time = get_time();
 				int dir = face / 2;
 				int side = face % 2;
-				Eigen::Vector3f corners[2] = { node_mine, node_maxe };
+				Eigen::Vector3f corners[2] = { minV, maxV };
 				// build constrained system
 				Matrix5d AC = Matrix5d::Zero();
 				double BC[node_n + 1];
@@ -214,17 +196,14 @@ void TNode::vertAll(float& curv, bool& signchange, float& qef_error, float& samp
 						rvalue[i] += inv(j, i) * BC[j];
 				}
 				pc << rvalue[0], rvalue[1], rvalue[2], rvalue[3];
-				features_time += get_time() - temp_time;
 				// check bounds
 				int dp = (dir + 1) % 3;
 				int dpp = (dir + 2) % 3;
-				if (pc[dp] >= node_mine[dp] && pc[dp] <= node_maxe[dp] &&
-					pc[dpp] >= node_mine[dpp] && pc[dpp] <= node_maxe[dpp])
+				if (pc[dp] >= minV[dp] && pc[dp] <= minV[dp] &&
+					pc[dpp] >= maxV[dpp] && pc[dpp] <= maxV[dpp])
 				{
 					is_out = false;
-					temp_time = get_time();
-					double e = calcErrorDMC(pc, sample_points, field_gradient);
-					error_time += get_time() - temp_time;
+					double e = calcErrorDMC(pc, sample_points, field_gradient, oversample);
 					if (e < err)
 					{
 						err = e;
@@ -237,10 +216,9 @@ void TNode::vertAll(float& curv, bool& signchange, float& qef_error, float& samp
 		{
 			for (int edge = 0; edge < 12; edge++)
 			{
-				temp_time = get_time();
 				int dir = edge / 4;
 				int side = edge % 4;
-				Eigen::Vector3f corners[2] = { node_mine, node_maxe };
+				Eigen::Vector3f corners[2] = { minV, maxV };
 				// build constrained system
 				Matrix6d AC = Matrix6d::Zero();
 				double BC[node_n + 2];
@@ -268,14 +246,11 @@ void TNode::vertAll(float& curv, bool& signchange, float& qef_error, float& samp
 						rvalue[i] += inv(j, i) * BC[j];
 				}
 				pc << rvalue[0], rvalue[1], rvalue[2], rvalue[3];
-				features_time += get_time() - temp_time;
 				// check bounds
-				if (pc[dir] >= node_mine[dir] && pc[dir] <= node_maxe[dir])
+				if (pc[dir] >= minV[dir] && pc[dir] <= maxV[dir])
 				{
 					is_out = false;
-					temp_time = get_time();
-					double e = calcErrorDMC(pc, sample_points, field_gradient);
-					error_time += get_time() - temp_time;
+					double e = calcErrorDMC(pc, sample_points, field_gradient, oversample);
 					if (e < err)
 					{
 						err = e;
@@ -288,8 +263,7 @@ void TNode::vertAll(float& curv, bool& signchange, float& qef_error, float& samp
 		{
 			for (int vertex = 0; vertex < 8; vertex++)
 			{
-				temp_time = get_time();
-				Eigen::Vector3f corners[2] = { node_mine, node_maxe };
+				Eigen::Vector3f corners[2] = { minV, maxV };
 				// build constrained system
 				Matrix7d AC = Matrix7d::Zero();
 				double BC[node_n + 3];
@@ -316,11 +290,8 @@ void TNode::vertAll(float& curv, bool& signchange, float& qef_error, float& samp
 						rvalue[i] += inv(j, i) * BC[j];
 				}
 				pc << rvalue[0], rvalue[1], rvalue[2], rvalue[3];
-				features_time += get_time() - temp_time;
 				// check bounds
-				temp_time = get_time();
-				double e = calcErrorDMC(pc, sample_points, field_gradient);
-				error_time += get_time() - temp_time;
+				double e = calcErrorDMC(pc, sample_points, field_gradient, oversample);
 				if (e < err)
 				{
 					err = e;
@@ -329,14 +300,12 @@ void TNode::vertAll(float& curv, bool& signchange, float& qef_error, float& samp
 			}
 		}
 	}
-	// printf("%f %f %f\n", sampling_time, features_time, error_time);
 	constructor->getEvaluator()->SingleEval(node.head(3), node[3], pcg);
 	qef_error += err;
 }
 
 void TNode::GenerateSampling(
-	std::vector<Eigen::Vector4f>& sample_points, std::vector<Eigen::Vector3f>& sample_grads, 
-	int& oversample, const float sample_radius)
+	float* sample_points, const int sampling_idx, int oversample)
 {
 	auto sign = [&](unsigned int x)
 	{
@@ -348,60 +317,63 @@ void TNode::GenerateSampling(
 	Eigen::Vector3f minV(center[0] - half_length + border, center[1] - half_length + border, center[2] - half_length + border);
 	Eigen::Vector3f maxV(center[0] + half_length - border, center[1] + half_length - border, center[2] + half_length - border);
 
-	oversample = int(ceil(cellsize / sample_radius) + 2);
-	if (depth < constructor->getDepthMin())
-	{
-		oversample = constructor->getOverSampleQEF();
-	}
 	for (int z = 0; z <= oversample; z++)
 	{
 		for (int y = 0; y <= oversample; y++)
 		{
 			for (int x = 0; x <= oversample; x++)
 			{
-				sample_points.push_back(
-					Eigen::Vector4f(
-						(1 - float(x) / oversample) * minV[0] + (float(x) / oversample) * maxV[0],
-						(1 - float(y) / oversample) * minV[1] + (float(y) / oversample) * maxV[1],
-						(1 - float(z) / oversample) * minV[2] + (float(z) / oversample) * maxV[2],
-						0));
+				sample_points[(sampling_idx + z * (oversample+1) * (oversample+1) + y * (oversample+1) + x) * 4 + 0] = 
+				(1 - float(x) / oversample) * minV[0] + (float(x) / oversample) * maxV[0];
+				sample_points[(sampling_idx + z * (oversample+1) * (oversample+1) + y * (oversample+1) + x) * 4 + 1] = 
+				(1 - float(y) / oversample) * minV[1] + (float(y) / oversample) * maxV[1];
+				sample_points[(sampling_idx + z * (oversample+1) * (oversample+1) + y * (oversample+1) + x) * 4 + 2] = 
+				(1 - float(z) / oversample) * minV[2] + (float(z) / oversample) * maxV[2];
+				sample_points[(sampling_idx + z * (oversample+1) * (oversample+1) + y * (oversample+1) + x) * 4 + 3] = 0;
 			}
 		}
 	}
+	// sample_grads.resize(sample_points.size());
 }
 
 void TNode::NodeSampling(
 	float& curv, bool& signchange, 
-	std::vector<Eigen::Vector4f>& sample_points, std::vector<Eigen::Vector3f>& sample_grads, 
-	const int oversample)
+	float* sample_points, float* sample_grads, 
+	const int sampling_idx, const int oversample)
 {
 	bool origin_sign;
 	signchange = false;
-	constructor->getEvaluator()->GridEval(sample_points, sample_grads, signchange, oversample, false);
-
+	constructor->getEvaluator()->GridEval(sample_points + sampling_idx * 4, sample_grads + sampling_idx * 3, signchange, oversample, false);
 	Eigen::Vector3f norms(0, 0, 0);
 	float area = 0;
-	for (Eigen::Vector3f n : sample_grads)
+	for (int i = 0; i < pow(oversample + 1, 3); i++)
 	{
+		Eigen::Vector3f n(
+			sample_grads[(sampling_idx + i) * 3 + 0], 
+			sample_grads[(sampling_idx + i) * 3 + 1], 
+			sample_grads[(sampling_idx + i) * 3 + 2]);
 		n.normalize();
 		norms += n;
 		area += n.norm();
 	}
 
 	float field_curv = (area == 0) ? 0.0 : (norms.norm() / area);
+	// printf("%f %f\n", curv, field_curv);
 	if (field_curv == 0.0)
 	{
 		return;
 	} else if (curv == 0.0) {
 		curv = field_curv;
+	} else if (std::abs(curv - field_curv) < 0.25) {
+		curv += field_curv;
+		curv /= 2;
 	} else {
-		curv = std::min(curv, field_curv);
+		curv = std::max(curv, field_curv);
 	}
 }
 
 void TNode::NodeCalcNode(
-	std::vector<Eigen::Vector4f>& sample_points, std::vector<Eigen::Vector3f>& sample_grads, 
-	const int oversample)
+	float* sample_points, float* sample_grads, const int sampling_idx, const int oversample)
 {
 	const float cellsize = 2 * half_length;
 	const float border = constructor->getBorder() * cellsize;
@@ -418,13 +390,16 @@ void TNode::NodeCalcNode(
 			for (int x = 0; x <= oversample; x++)
 			{
 				node_index = (z * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + x);
-				Eigen::Vector3f p(sample_points[node_index][0], sample_points[node_index][1], sample_points[node_index][2]);
+				Eigen::Vector3f p(
+					sample_points[(node_index + sampling_idx) * 4 + 0], 
+					sample_points[(node_index + sampling_idx) * 4 + 1], 
+					sample_points[(node_index + sampling_idx) * 4 + 2]);
 				Vector5f pl = Vector5f::Zero();
-				pl[0] = sample_grads[node_index][0];
-				pl[1] = sample_grads[node_index][1];
-				pl[2] = sample_grads[node_index][2];
+				pl[0] = sample_grads[(node_index + sampling_idx) * 3 + 0];
+				pl[1] = sample_grads[(node_index + sampling_idx) * 3 + 1];
+				pl[2] = sample_grads[(node_index + sampling_idx) * 3 + 2];
 				pl[3] = -1;
-				pl[4] = -(p[0] * pl[0] + p[1] * pl[1] + p[2] * pl[2]) + sample_points[node_index][3];
+				pl[4] = -(p[0] * pl[0] + p[1] * pl[1] + p[2] * pl[2]) + sample_points[(node_index + sampling_idx) * 4 + 3];
 				node_q.combineSelf(Vector5d(pl.cast<double>()).data());
 				node_plane_pts.push_back(p);
 				node_plane_norms.push_back(Eigen::Vector3f(pl[0], pl[1], pl[2]));
@@ -471,7 +446,7 @@ void TNode::NodeCalcNode(
 				pc[2] >= minV[2] && pc[2] <= maxV[2])
 			{
 				is_out = false;
-				err = calcErrorDMC(pc, sample_points, sample_grads);
+				err = calcErrorDMC(pc, sample_points + sampling_idx * 4, sample_grads + sampling_idx * 3, oversample);
 				node << pc;
 			}
 		}
@@ -513,7 +488,7 @@ void TNode::NodeCalcNode(
 					pc[dpp] >= minV[dpp] && pc[dpp] <= maxV[dpp])
 				{
 					is_out = false;
-					double e = calcErrorDMC(pc, sample_points, sample_grads);
+					double e = calcErrorDMC(pc, sample_points + sampling_idx * 4, sample_grads + sampling_idx * 3, oversample);
 					if (e < err)
 					{
 						err = e;
@@ -561,7 +536,7 @@ void TNode::NodeCalcNode(
 				if (pc[dir] >= minV[dir] && pc[dir] <= maxV[dir])
 				{
 					is_out = false;
-					double e = calcErrorDMC(pc, sample_points, sample_grads);
+					double e = calcErrorDMC(pc, sample_points + sampling_idx * 4, sample_grads + sampling_idx * 3, oversample);
 					if (e < err)
 					{
 						err = e;
@@ -603,7 +578,7 @@ void TNode::NodeCalcNode(
 				pc << rvalue[0], rvalue[1], rvalue[2], rvalue[3];
 				// constructor->getEvaluator()->SingleEval(pc.head(3), pc[3], pcg);
 				// check bounds
-				double e = calcErrorDMC(pc, sample_points, sample_grads);
+				double e = calcErrorDMC(pc, sample_points + sampling_idx * 4, sample_grads + sampling_idx * 3, oversample);
 				if (e < err)
 				{
 					err = e;
