@@ -106,7 +106,7 @@ struct TNode
 		return t * t;
 	}
 
-	double calcErrorDMC(
+	float calcErrorDMC(
 		Eigen::Vector4f p, float* verts, float* verts_grad, const int oversample);
 
 	void vertAll(float& curv, bool& signchange, float& qef_error, float& sample);

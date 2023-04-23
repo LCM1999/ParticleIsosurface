@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16.0 FATAL_ERROR)
 
 project(Isosurface_smiplify CXX C)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -13,7 +14,17 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
 set(EIGEN3_DIR C:/Lib/Eigen-3.4.0-MSVC/share/eigen3/cmake)
 set(HDF5_DIR C:/Lib/HDF5-1.10.7-MSVC/cmake/hdf5)
 
+
 find_package(CUDA  REQUIRED)
+if(NOT CUDA_FOUND)
+    message(FATAL_ERROR "CUDA not found!")    
+endif(NOT CUDA_FOUND)
+
+find_package(Thrust REQUIRED)
+if(NOT Thrust_FOUND)
+    message(FATAL_ERROR "Thrust not found!")    
+endif(NOT Thrust_FOUND)
+
 
 find_package(OpenMP REQUIRED)
 if(NOT OpenMP_FOUND)
@@ -70,8 +81,10 @@ add_executable(${PROJECT_NAME}
     src/pugixml.cpp
     src/hdf5Utils.cpp
     src/multi_level_reseacher.cpp
-    src/sampling.cu
+    src/node_calc.cu
 )
+
+
 
 target_include_directories(${PROJECT_NAME} 
     PUBLIC
@@ -80,7 +93,11 @@ target_include_directories(${PROJECT_NAME}
     ${MPI_CXX_INCLUDE_DIRS}
     ${HDF5_INCLUDE_DIR}
     ${EIGEN3_INCLUDE_DIR}
+    ${CUDA_INCLUDE_DIRS}
+    ${THRUST_INCLUDE_DIRS}
 )
+
+cuda_add_library(node_calc_lib src/node_calc.cu)
 
 target_link_libraries(${PROJECT_NAME} 
     PUBLIC
@@ -88,4 +105,7 @@ target_link_libraries(${PROJECT_NAME}
     ${HDF5_C_STATIC_LIBRARY}
     Eigen3::Eigen
     OpenMP::OpenMP_CXX
+    node_calc_lib
+    ${CUDA_LIBRARIES}
+    ${THRUST_LIBRARIES}
 )

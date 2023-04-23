@@ -232,9 +232,9 @@ int main(int argc, char **argv)
     else
     {
         std::string dataDirPath =
-            "E:/data/oil_csv";
+            // "E:/data/oil_csv";
             // "E:/data/multiR/mr_csv";
-            // "E:\\data\\vtk\\csv";
+            "E:\\data\\vtk\\csv";
         run(dataDirPath);
     }
 

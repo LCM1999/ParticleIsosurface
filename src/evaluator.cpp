@@ -366,7 +366,7 @@ inline void Evaluator::compute_Gs_xMeans()
         if (tempNeighbors.empty())
         {
             G = Eigen::DiagonalMatrix<float, 3>(invH, invH, invH);
-            GlobalSplash[pIdx] = 1;
+            GlobalSplash[pIdx] = true;
         }
         double nR, nR2, nD, nD2, nI, nI2;
         for (int nIdx : tempNeighbors)
@@ -414,7 +414,7 @@ inline void Evaluator::compute_Gs_xMeans()
         if (neighbors.size() < 1)
         {
             G = Eigen::DiagonalMatrix<float, 3>(invH, invH, invH);
-            GlobalSplash[pIdx] = 1;
+            GlobalSplash[pIdx] = true;
         } 
         else
         {

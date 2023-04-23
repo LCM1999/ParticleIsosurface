@@ -19,9 +19,9 @@ TNode::TNode(SurfReconstructor* surf_constructor)
 	type = UNCERTAIN;
 }
 
-double TNode::calcErrorDMC(Eigen::Vector4f p, float* verts, float* verts_grad, const int oversample)
+float TNode::calcErrorDMC(Eigen::Vector4f p, float* verts, float* verts_grad, const int oversample)
 {
-	double err = 0;
+	float err = 0;
 	for (size_t i = 0; i < pow(oversample + 1, 3); i++)
 	{
 		Eigen::Vector4f v(verts[i * 4 + 0], verts[i * 4 + 1], verts[i * 4 + 2], verts[i * 4 + 3]);
@@ -379,7 +379,7 @@ void TNode::NodeCalcNode(
 	const float border = constructor->getBorder() * cellsize;
 	Eigen::Vector3f minV(center[0] - half_length + border, center[1] - half_length + border, center[2] - half_length + border);
 	Eigen::Vector3f maxV(center[0] + half_length - border, center[1] + half_length - border, center[2] + half_length - border);
-	QEFNormal<double, 4> node_q;
+	QEFNormal<float, 4> node_q;
 	node_q.zero();
 	std::vector<Eigen::Vector3f> node_plane_norms, node_plane_pts;
 	int node_index;
@@ -400,7 +400,7 @@ void TNode::NodeCalcNode(
 				pl[2] = sample_grads[(node_index + sampling_idx) * 3 + 2];
 				pl[3] = -1;
 				pl[4] = -(p[0] * pl[0] + p[1] * pl[1] + p[2] * pl[2]) + sample_points[(node_index + sampling_idx) * 4 + 3];
-				node_q.combineSelf(Vector5d(pl.cast<double>()).data());
+				node_q.combineSelf(Vector5f(pl.cast<float>()).data());
 				node_plane_pts.push_back(p);
 				node_plane_norms.push_back(Eigen::Vector3f(pl[0], pl[1], pl[2]));
 			}
@@ -408,8 +408,8 @@ void TNode::NodeCalcNode(
 	}
 	// build system to solve
 	const int node_n = 4;
-	Eigen::Matrix4d node_A = Eigen::Matrix4d::Zero();
-	double node_B[node_n];
+	Eigen::Matrix4f node_A = Eigen::Matrix4f::Zero();
+	float node_B[node_n];
 	for (int i = 0; i < node_n; i++)
 	{
 		int index = ((2 * node_n + 3 - i) * i) / 2;
@@ -430,8 +430,8 @@ void TNode::NodeCalcNode(
 		if (cell_dim == 3)
 		{
 			// find minimal point
-			Eigen::Vector4d rvalue = Eigen::Vector4d::Zero();
-			Eigen::Matrix4d inv = node_A.inverse();
+			Eigen::Vector4f rvalue = Eigen::Vector4f::Zero();
+			Eigen::Matrix4f inv = node_A.inverse();
 			for (int i = 0; i < node_n; i++)
 			{
 				rvalue[i] = 0;
@@ -458,8 +458,8 @@ void TNode::NodeCalcNode(
 				int side = face % 2;
 				Eigen::Vector3f corners[2] = { minV, maxV };
 				// build constrained system
-				Matrix5d AC = Matrix5d::Zero();
-				double BC[node_n + 1];
+				Matrix5f AC = Matrix5f::Zero();
+				float BC[node_n + 1];
 				for (int i = 0; i < node_n + 1; i++)
 				{
 					for (int j = 0; j < node_n + 1; j++)
@@ -471,8 +471,8 @@ void TNode::NodeCalcNode(
 				AC(node_n, dir) = AC(dir, node_n) = 1;
 				BC[node_n] = corners[side][dir];
 				// find minimal point
-				double rvalue[node_n + 1];
-				Matrix5d inv = AC.inverse();
+				float rvalue[node_n + 1];
+				Matrix5f inv = AC.inverse();
 				for (int i = 0; i < node_n + 1; i++)
 				{
 					rvalue[i] = 0;
@@ -488,7 +488,7 @@ void TNode::NodeCalcNode(
 					pc[dpp] >= minV[dpp] && pc[dpp] <= maxV[dpp])
 				{
 					is_out = false;
-					double e = calcErrorDMC(pc, sample_points + sampling_idx * 4, sample_grads + sampling_idx * 3, oversample);
+					float e = calcErrorDMC(pc, sample_points + sampling_idx * 4, sample_grads + sampling_idx * 3, oversample);
 					if (e < err)
 					{
 						err = e;
@@ -505,8 +505,8 @@ void TNode::NodeCalcNode(
 				int side = edge % 4;
 				Eigen::Vector3f corners[2] = { minV, maxV };
 				// build constrained system
-				Matrix6d AC = Matrix6d::Zero();
-				double BC[node_n + 2];
+				Matrix6f AC = Matrix6f::Zero();
+				float BC[node_n + 2];
 				for (int i = 0; i < node_n + 2; i++)
 				{
 					for (int j = 0; j < node_n + 2; j++)
@@ -522,8 +522,8 @@ void TNode::NodeCalcNode(
 				BC[node_n] = corners[side & 1][dp];
 				BC[node_n + 1] = corners[side >> 1][dpp];
 				// find minimal point
-				double rvalue[node_n + 2];
-				Matrix6d inv = AC.inverse();
+				float rvalue[node_n + 2];
+				Matrix6f inv = AC.inverse();
 				for (int i = 0; i < node_n + 2; i++)
 				{
 					rvalue[i] = 0;
@@ -536,7 +536,7 @@ void TNode::NodeCalcNode(
 				if (pc[dir] >= minV[dir] && pc[dir] <= maxV[dir])
 				{
 					is_out = false;
-					double e = calcErrorDMC(pc, sample_points + sampling_idx * 4, sample_grads + sampling_idx * 3, oversample);
+					float e = calcErrorDMC(pc, sample_points + sampling_idx * 4, sample_grads + sampling_idx * 3, oversample);
 					if (e < err)
 					{
 						err = e;
@@ -551,8 +551,8 @@ void TNode::NodeCalcNode(
 			{
 				Eigen::Vector3f corners[2] = { minV, maxV };
 				// build constrained system
-				Matrix7d AC = Matrix7d::Zero();
-				double BC[node_n + 3];
+				Matrix7f AC = Matrix7f::Zero();
+				float BC[node_n + 3];
 				for (int i = 0; i < node_n + 3; i++)
 				{
 					for (int j = 0; j < node_n + 3; j++)
@@ -567,8 +567,8 @@ void TNode::NodeCalcNode(
 					BC[node_n + i] = corners[(vertex >> i) & 1][i];
 				}
 				// find minimal point
-				double rvalue[node_n + 3];
-				Matrix7d inv = AC.inverse();
+				float rvalue[node_n + 3];
+				Matrix7f inv = AC.inverse();
 				for (int i = 0; i < node_n + 3; i++)
 				{
 					rvalue[i] = 0;
@@ -578,7 +578,7 @@ void TNode::NodeCalcNode(
 				pc << rvalue[0], rvalue[1], rvalue[2], rvalue[3];
 				// constructor->getEvaluator()->SingleEval(pc.head(3), pc[3], pcg);
 				// check bounds
-				double e = calcErrorDMC(pc, sample_points + sampling_idx * 4, sample_grads + sampling_idx * 3, oversample);
+				float e = calcErrorDMC(pc, sample_points + sampling_idx * 4, sample_grads + sampling_idx * 3, oversample);
 				if (e < err)
 				{
 					err = e;
