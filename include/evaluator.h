@@ -23,9 +23,8 @@ public:
     float _MAX_RADIUS, _MIN_RADIUS;
 
     float Radius = 0;
-    std::vector<char> GlobalSplash;
+    std::vector<std::uint8_t> GlobalSplash;
     std::vector<Eigen::Vector3f> PariclesNormals;
-    std::vector<int> SurfaceParticles;
 	Eigen::Vector3f* GlobalxMeans;
     Eigen::Matrix3f* GlobalGs;
 
@@ -36,7 +35,7 @@ public:
 	void SingleEval(const Eigen::Vector3f& pos, float& scalar, Eigen::Vector3f& gradient, bool use_normalize = true, bool use_signed = true, bool grad_normalize = true);
 
     void GridEval(
-        std::vector<Eigen::Vector4f>& sample_points, std::vector<Eigen::Vector3f>& field_gradients,
+        float* sample_points, float* field_gradients,
         bool& signchange, int oversample, bool grad_normalize = true);
 
     bool CheckSplash(const int& pIdx);

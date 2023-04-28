@@ -20,7 +20,6 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3f>* particles, 
                 minRadius+(i*bin_extent), 
                 std::min(minRadius+((i+1)*bin_extent), maxRadius)));
     }
-
     auto whichBin = [&](const float r)
     {
         for (auto tit = bin_bounds.begin(); tit < bin_bounds.end(); tit++)
@@ -30,9 +29,16 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3f>* particles, 
         }
         return -1;
     };
-    
+    sortedParticles.clear();
+    sortedIndex.clear();
     sortedParticles.resize(bins);
     sortedIndex.resize(bins);
+    for (size_t i = 0; i < bins; i++)
+    {
+        sortedParticles[i].clear();
+        sortedIndex[i].clear();
+    }
+
     for (int i = 0; i < radiuses->size(); i++)
     {
         sortedParticles[whichBin(radiuses->at(i))].push_back(particles->at(i));

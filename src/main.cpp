@@ -19,6 +19,11 @@
 #include "unistd.h"
 #endif
 
+#define DEFAULT_SCALE 1
+#define DEFAULT_FLATNESS 0.99
+#define DEFAULT_INF_FACTOR 4.0
+#define DEFAULT_MESH_REFINE_LEVEL 4
+
 int OMP_USE_DYNAMIC_THREADS = 0;
 int OMP_THREADS_NUM = 16;
 
@@ -32,9 +37,8 @@ bool WITH_NORMAL;
 std::vector<std::string> DATA_PATHES;
 std::string OUTPUT_TYPE = "ply";
 float RADIUS = 0;
-float SCALE = 1;
-float FLATNESS = 0.99;
-float INF_FACTOR = 4.0;
+bool USE_CUDA = false;
+
 
 void writeObjFile(Mesh &m, std::string fn)
 {
@@ -143,17 +147,11 @@ void loadConfigJson(const std::string controlJsonDir)
         } else {
             IS_CONST_RADIUS = false;
         }
-        if (readInJSON.contains("SCALE"))
+        if (readInJSON.contains("USE_CUDA"))
         {
-            SCALE = readInJSON.at("SCALE");
-        }
-        if (readInJSON.contains("FLATNESS"))
-        {
-            FLATNESS = readInJSON.at("FLATNESS");
-        }
-        if (readInJSON.contains("INF_FACTOR"))
-        {
-            INF_FACTOR = readInJSON.at("INF_FACTOR");
+            USE_CUDA = readInJSON.at("USE_CUDA");
+        } else {
+            USE_CUDA = false;
         }
         if (readInJSON.contains("NEED_RECORD"))
         {
@@ -189,10 +187,11 @@ void loadParticlesFromCSV(std::string &csvPath,
     parseString(&titles, line, ",");
     if (!IS_CONST_RADIUS)
     {
+        radiuses->clear();
         radiusIdx = std::distance(titles.begin(),
         std::find_if(titles.begin(), titles.end(), 
         [&](const std::string &title) {
-            std::regex reg(".*radius.*", std::regex::icase);
+            std::regex reg("^(radius|r)$", std::regex::icase);
             return std::regex_match(title, reg);
         }));
     }
@@ -212,7 +211,7 @@ void loadParticlesFromCSV(std::string &csvPath,
         return std::regex_match(title, reg);
     }));
 
-    printf("%d %d %d \n", xIdx, yIdx, zIdx);
+    printf("%d %d %d %d \n", xIdx, yIdx, zIdx, radiusIdx);
 
     if (xIdx == titles.size() || yIdx == titles.size() || zIdx == titles.size())
     {
@@ -229,7 +228,7 @@ void loadParticlesFromCSV(std::string &csvPath,
         particles.push_back(Eigen::Vector3f(elements[xIdx], elements[yIdx], elements[zIdx]));
         if (!IS_CONST_RADIUS)
         {
-            radiuses->push_back(elements[radiusIdx] * SCALE);
+            radiuses->push_back(elements[radiusIdx] * DEFAULT_SCALE);
         }
         getline(ifn, line);
     }
@@ -244,7 +243,7 @@ void run(std::string &dataDirPath)
     std::vector<float>* radiuses = (IS_CONST_RADIUS ? nullptr : new std::vector<float>());
     for (const std::string frame : DATA_PATHES)
     {
-        Mesh mesh;
+        Mesh* mesh = new Mesh(int(pow(10, DEFAULT_MESH_REFINE_LEVEL)));
         std::cout << "-=   Frame " << index << " " << frame << "   =-"
                   << std::endl;
         std::string dataPath = dataDirPath + "/" + frame;
@@ -256,7 +255,7 @@ void run(std::string &dataDirPath)
             loadParticlesFromCSV(dataPath, particles, radiuses);
             break;
         case 1:
-            readShonDyParticleData(dataPath, particles, radiuses, SCALE);
+            readShonDyParticleData(dataPath, particles, radiuses, DEFAULT_SCALE);
             break;
         default:
             printf("ERROR: Unknown DATA TYPE;");
@@ -264,17 +263,15 @@ void run(std::string &dataDirPath)
         }
 
         printf("Particles Number = %zd\n", particles.size());
-
-        SurfReconstructor constructor(particles, radiuses, mesh, RADIUS, FLATNESS, INF_FACTOR);
-        Recorder recorder(dataDirPath, frame.substr(0, frame.size() - 4),
-                          &constructor);
-        constructor.Run();
+        SurfReconstructor* constructor = new SurfReconstructor(particles, radiuses, mesh, RADIUS, DEFAULT_FLATNESS, DEFAULT_INF_FACTOR);
+        Recorder* recorder = new Recorder(dataDirPath, frame.substr(0, frame.size() - 4), constructor);
+        constructor->Run();
 
         if (NEED_RECORD)
         {
             // recorder.RecordProgress();
-            // recorder.RecordParticles();
-            recorder.RecordFeatures();
+            recorder->RecordParticles();
+            recorder->RecordFeatures();
         }
 
         std::string output_name = frame.substr(0, frame.find_last_of('_') + 1);
@@ -299,6 +296,9 @@ void run(std::string &dataDirPath)
                   dataDirPath + "/" + output_name + ".ply");
         }        
         index++;
+        delete(mesh);
+        delete(constructor);
+        delete(recorder);
     }
 }
 

@@ -24,21 +24,16 @@ typedef Eigen::Matrix<double, 7, 7> Matrix7d;
 
 extern int tree_cells;
 
-const short EMPTY = 0;
-const short INTERNAL = 1;
-const short LEAF = 2;
-const short UNCERTAIN = 3;
-
-const short CONTAIN = 0;
-const short CONTAIN_IN = 1;
-const short INTERSECT = 2;
-const short DISJOINT = 3;
+const char EMPTY = 0;
+const char INTERNAL = 1;
+const char LEAF = 2;
+const char UNCERTAIN = 3;
 
 struct TNode
 {
 	TNode() {}
 
-	TNode(SurfReconstructor* surf_constructor, int id);
+	TNode(SurfReconstructor* surf_constructor);
 
 	~TNode()
 	{
@@ -51,9 +46,8 @@ struct TNode
 	float half_length;
 	Eigen::Vector4f node = Eigen::Vector4f::Zero();
 
-	short depth = 0;
-	unsigned long long nId;
-	short type;
+	char depth = 0;
+	char type;
 
 	TNode *children[8];
 
@@ -107,9 +101,26 @@ struct TNode
 		return t * t;
 	}
 
-	double calcErrorDMC(Eigen::Vector4f p, std::vector<Eigen::Vector4f>& verts, std::vector<Eigen::Vector3f>& verts_grad);
+	float calcErrorDMC(
+		Eigen::Vector4f p, float* verts, float* verts_grad, const int oversample);
 
-	void vertAll(float& curv, bool& signchange, Eigen::Vector3f* grad, Eigen::Vector4f* verts, float& qef_error, float& sample);
+	void vertAll(float& curv, bool& signchange, float& qef_error, float& sample);
+
+	void GenerateSampling(
+		float* sample_points, const int sampling_idx, const int oversample);
+
+	void NodeSampling(
+		float& curv, bool& signchange, 
+		float* sample_points, float* sample_grads, 
+		const int sampling_idx, const int oversample);
+
+	void NodeCalcNode(
+		float* sample_points, float* sample_grads, 
+		const int sampling_idx, const int oversample);
+
+	// void NodeFeatureCalc();
+
+	// void NodeErrorMinimize();
 
 	int CountLeaves()
 	{

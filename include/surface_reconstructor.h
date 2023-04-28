@@ -4,6 +4,8 @@
 
 #include <vector>
 #include <string.h>
+#include <queue>
+#include <atomic>
 #include "timer.h"
 #include "utils.h"
 
@@ -17,8 +19,8 @@ class SurfReconstructor
 {
 private:
     // Global Parameters
-    int _OVERSAMPLE_QEF = 4;
-    float _BORDER = (1.0 / 4096.0);
+    int _OVERSAMPLE_QEF = 3;
+    float _BORDER = (1.0 / 16.0);
     int _DEPTH_MAX = 6; // 7
     int _DEPTH_MIN = 5; // 4
     float _INFLUENCE_FACTOR = 0.0f;
@@ -33,7 +35,7 @@ private:
 
     bool _USE_ANI = true;
     bool _USE_XMEAN = true;
-    float _XMEAN_DELTA = 0.0f;
+    float _XMEAN_DELTA = 1.0f;
 
     float _TOLERANCE = 1e-8;
     float _RATIO_TOLERANCE = 0.1f;
@@ -45,11 +47,13 @@ private:
 
     std::vector<Eigen::Vector3f> _GlobalParticles;
     std::vector<float>* _GlobalRadiuses;
-
+    
     float _RADIUS = 0;
 
     int _GlobalParticlesNum = 0;
     int _STATE = 0;
+
+    static const int inProcessSize = 10000000; //
 
     double _BoundingBox[6] = {0.0f};
     double _RootHalfLength;
@@ -58,6 +62,10 @@ private:
     TNode* _OurRoot;
 	Mesh* _OurMesh;
 
+    std::vector<TNode*> WaitingStack;
+    TNode* ProcessArray[inProcessSize];
+
+    std::atomic<int> queue_flag;
 protected:
     void loadRootBox();
 
@@ -72,23 +80,27 @@ protected:
     // Method for CSV mode
     void genIsoOurs();
     void checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& curv, float& min_radius);
-    void eval(TNode* tnode, Eigen::Vector3f* grad);
+    void eval(TNode* tnode);
+    void beforeSampleEval(TNode* tnode, float& curv, float& min_radius, bool& empty, int& oversample);
+    void afterSampleEval(
+        TNode* tnode, float& curv, float& min_radius, int* oversample, const int index,
+        float* sample_points, float* sample_grads);
 
 public:
     SurfReconstructor() {};
     SurfReconstructor(
         std::vector<Eigen::Vector3f>& particles,
         std::vector<float>* radiuses, 
-        Mesh& mesh, 
+        Mesh* mesh, 
         float radius, 
-        float flatness = 0.98,
-        float inf_factor = 2.0f);
+        float flatness,
+        float inf_factor);
 
     ~SurfReconstructor() {};
 
     void Run();
 
-    inline float getOverSampleQEF() {return _OVERSAMPLE_QEF;}
+    inline int getOverSampleQEF() {return _OVERSAMPLE_QEF;}
     inline float getBorder() {return _BORDER;}
     inline int getDepthMax() {return _DEPTH_MAX;}
     inline int getDepthMin() {return _DEPTH_MIN;}
