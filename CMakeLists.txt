@@ -83,6 +83,7 @@ add_executable(${PROJECT_NAME}
     src/hdf5Utils.cpp
     src/multi_level_reseacher.cpp
     # src/node_calc.cu
+    src/rply.c
 )
 
 target_include_directories(${PROJECT_NAME} 

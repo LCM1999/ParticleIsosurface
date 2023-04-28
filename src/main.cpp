@@ -10,9 +10,11 @@
 #include "json.hpp"
 #include "recorder.h"
 #include "surface_reconstructor.h"
+#include "rply.h"
 
 #ifdef _WIN32
 #include <windows.h>
+#include <io.h>
 #else
 #include "unistd.h"
 #endif
@@ -29,39 +31,115 @@ bool IS_CONST_RADIUS = false;
 
 // variants for test
 short DATA_TYPE = 0;    // CSV:0, H5: 1
-bool NEED_RECORD;
+bool NEED_RECORD = false;
+std::string PREFIX = "";
+bool WITH_NORMAL;
 std::vector<std::string> DATA_PATHES;
+std::string OUTPUT_TYPE = "ply";
 float RADIUS = 0;
 bool USE_CUDA = false;
 
 
-void writeFile(Mesh &m, std::string fn)
+void writeObjFile(Mesh &m, std::string fn)
 {
     FILE *f = fopen(fn.c_str(), "w");
     for (auto &p : m.vertices)
     {
         fprintf(f, "v %f %f %f\n", p[0], p[1], p[2]);
     }
-    for (Triangle<int> &t : m.tris)
+    for (Triangle &t : m.tris)
     {
         fprintf(f, "f %d %d %d\n", t.v[0], t.v[1], t.v[2]);
     }
     fclose(f);
 }
 
-void loadConfigJson(const std::string controlJsonPath)
+int writePlyFile(Mesh& m, std::string fn)
+{
+    int num_vertices = int(m.verticesNum);
+    int num_faces = int(m.trianglesNum);
+    float version;
+    p_ply ply = ply_create(fn.c_str(), PLY_DEFAULT, NULL, 0, NULL);
+    if (!ply) 
+        return 0;   
+
+    ply_add_element(ply, "vertex", num_vertices);
+    ply_add_scalar_property(ply, "x", PLY_FLOAT32);
+    ply_add_scalar_property(ply, "y", PLY_FLOAT32);
+    ply_add_scalar_property(ply, "z", PLY_FLOAT32);
+    
+    ply_add_element(ply, "face", num_faces);
+    ply_add_list_property(ply, "vertex_indices", PLY_UCHAR, PLY_INT);
+
+    if (WITH_NORMAL)
+    {
+        //TODO
+    }
+
+    if (!ply_write_header(ply))
+        return 0;
+
+    for (size_t i = 0; i < num_vertices; i++)
+    {
+        ply_write(ply, m.vertices[i].v[0]);
+        ply_write(ply, m.vertices[i].v[1]);
+        ply_write(ply, m.vertices[i].v[2]);
+    }
+    
+    for (size_t i = 0; i < num_faces; i++)
+    {
+        ply_write(ply, 3);
+        for (size_t j = 0; j < 3; j++)
+        {
+            ply_write(ply, m.tris[i].v[j] - 1);
+        }
+    }
+    if (!ply_close(ply))
+    {
+        return 0;
+    }
+    
+    return 1;
+}
+
+void loadConfigJson(const std::string controlJsonDir)
 {
     nlohmann::json readInJSON;
-    std::ifstream inJSONFile(controlJsonPath.c_str(), std::fstream::in);
+    std::ifstream inJSONFile(controlJsonDir+"/controlData.json", std::fstream::in);
 
     if (inJSONFile.good())
     {
         inJSONFile >> readInJSON;
         inJSONFile.close();
         DATA_TYPE = readInJSON.at("DATA_TYPE");
-        const std::string filePath = readInJSON.at("DATA_FILE");
-        std::string data_pathes = filePath;
-        parseString(&DATA_PATHES, data_pathes, ",");
+        if (readInJSON.contains("PREFIX"))
+        {
+            PREFIX = readInJSON.at("PREFIX");
+        }
+        if (PREFIX.empty() || PREFIX == "")
+        {
+            const std::string filePath = readInJSON.at("DATA_FILE");
+            std::string data_pathes = filePath;
+            parseString(&DATA_PATHES, data_pathes, ",");
+        } else {
+#ifdef _WIN32
+            intptr_t hFile;
+            struct _finddata_t fileInfo;
+            std::string p;
+            if ((hFile = _findfirst(p.assign(controlJsonDir).append("\\").append(PREFIX).append("*.csv").c_str(), &fileInfo)) != -1)
+            {
+                do
+                {
+                    if (!(fileInfo.attrib & _A_SUBDIR))
+                    {
+                        DATA_PATHES.push_back(std::string(fileInfo.name));
+                    }
+                } while (_findnext(hFile, &fileInfo) == 0);
+            }   
+#else
+            // TODO: In Linux
+#endif
+        }
         if (readInJSON.contains("RADIUS"))
         {
             RADIUS = readInJSON.at("RADIUS");
@@ -75,7 +153,14 @@ void loadConfigJson(const std::string controlJsonPath)
         } else {
             USE_CUDA = false;
         }
-        NEED_RECORD = readInJSON.at("NEED_RECORD");
+        if (readInJSON.contains("NEED_RECORD"))
+        {
+            NEED_RECORD = readInJSON.at("NEED_RECORD");
+        }
+        if (readInJSON.contains("OUTPUT_TYPE"))
+        {
+            OUTPUT_TYPE = readInJSON.at("OUTPUT_TYPE");
+        }
     }
     else
     {
@@ -151,7 +236,7 @@ void loadParticlesFromCSV(std::string &csvPath,
 
 void run(std::string &dataDirPath)
 {
-    loadConfigJson(dataDirPath + "/controlData.json");
+    loadConfigJson(dataDirPath);
     double frameStart = 0;
     int index = 0;
     std::vector<Eigen::Vector3f> particles;
@@ -189,8 +274,27 @@ void run(std::string &dataDirPath)
             recorder->RecordFeatures();
         }
 
-        writeFile(*mesh,
-                  dataDirPath + "/" + frame.substr(0, frame.size() - 4) + ".obj");
+        std::string output_name = frame.substr(0, frame.find_last_of('_') + 1);
+        std::string timestamp = frame.substr(frame.find_last_of('_') + 1, frame.size() - frame.find_last_of('_') - 5);
+        std::string int_part = timestamp.substr(0, std::distance(timestamp.begin(), std::find(timestamp.begin(), timestamp.end(), '.')));
+        std::string float_part = "";
+        if (timestamp.find('.') != timestamp.npos)
+        {
+            float_part = timestamp.substr(std::distance(timestamp.begin(), std::find(timestamp.begin(), timestamp.end(), '.')) + 1, timestamp.size());
+        }
+        output_name += std::string(6 - int_part.size(), '0') + int_part + float_part + std::string(6 - float_part.size(), '0');
+        if ("ply" == OUTPUT_TYPE || "PLY" == OUTPUT_TYPE)
+        {
+            writePlyFile(mesh,
+                  dataDirPath + "/" + output_name + ".ply");
+        } else if ("obj" == OUTPUT_TYPE || "OBJ" == OUTPUT_TYPE) 
+        {
+            writeObjFile(mesh,
+                  dataDirPath + "/" + output_name + ".obj");    
+        } else {
+            writePlyFile(mesh,
+                  dataDirPath + "/" + output_name + ".ply");
+        }        
         index++;
         delete(mesh);
         delete(constructor);
@@ -225,9 +329,9 @@ int main(int argc, char **argv)
     else
     {
         std::string dataDirPath =
-            // "E:/data/oil_csv";
-            "E:/data/multiR/mr_csv";
-            // "E:\\data\\vtk\\csv";
+            // "C:/Users/11379/Desktop/protein";
+            // "E:/data/multiR/mr_csv";
+            "E:/data/vtk/csv/test";
         run(dataDirPath);
     }
 
