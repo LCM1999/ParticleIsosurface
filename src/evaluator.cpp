@@ -21,7 +21,7 @@ Evaluator::Evaluator(SurfReconstructor* surf_constructor,
 
     PariclesNormals.clear();
     GlobalSplash.clear();
-    PariclesNormals.resize(constructor->getGlobalParticlesNum(), Eigen::Vector3f(FLT_MAX, FLT_MAX, FLT_MAX));
+    PariclesNormals.resize(constructor->getGlobalParticlesNum(), Eigen::Vector3f(0, 0, 0));
     GlobalSplash.resize(constructor->getGlobalParticlesNum(), 0);
 
     GlobalxMeans = new Eigen::Vector3f[constructor->getGlobalParticlesNum()];
@@ -292,7 +292,6 @@ void Evaluator::CalcParticlesNormal()
             PariclesNormals[pIdx][0] = tempGrad[0];
             PariclesNormals[pIdx][1] = tempGrad[1];
             PariclesNormals[pIdx][2] = tempGrad[2];
-
         }
     }
 }
@@ -366,13 +365,13 @@ inline void Evaluator::compute_Gs_xMeans()
         if (tempNeighbors.empty())
         {
             G = Eigen::DiagonalMatrix<float, 3>(invH, invH, invH);
-            GlobalSplash[pIdx] = true;
+            GlobalSplash[pIdx] = 1;
         }
         double nR, nR2, nD, nD2, nI, nI2;
         for (int nIdx : tempNeighbors)
         {
-            if (nIdx == pIdx)
-                continue;
+            // if (nIdx == pIdx)
+            //     continue;
             nR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(nIdx);
             nR2 = nR * nR;
             nD = 2.5 * nR;
@@ -389,7 +388,7 @@ inline void Evaluator::compute_Gs_xMeans()
             wSum += wj;
             xMean += ((GlobalPoses->at(nIdx))) * wj;
             neighbors.push_back(nIdx);
-            if (d2 <= std::max(pD2, nD2))
+            if (d2 <= std::max(pD2, nD2) && d2 != 0)
             {
                 closerNeigbors++;
             }
@@ -414,7 +413,7 @@ inline void Evaluator::compute_Gs_xMeans()
         if (neighbors.size() < 1)
         {
             G = Eigen::DiagonalMatrix<float, 3>(invH, invH, invH);
-            GlobalSplash[pIdx] = true;
+            GlobalSplash[pIdx] = 1;
         } 
         else
         {

@@ -23,7 +23,7 @@ public:
     float _MAX_RADIUS, _MIN_RADIUS;
 
     float Radius = 0;
-    std::vector<bool> GlobalSplash;
+    std::vector<std::uint8_t> GlobalSplash;
     std::vector<Eigen::Vector3f> PariclesNormals;
 	Eigen::Vector3f* GlobalxMeans;
     Eigen::Matrix3f* GlobalGs;

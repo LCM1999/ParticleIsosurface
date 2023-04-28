@@ -17,6 +17,11 @@
 #include "unistd.h"
 #endif
 
+#define DEFAULT_SCALE 1
+#define DEFAULT_FLATNESS 0.99
+#define DEFAULT_INF_FACTOR 4.0
+#define DEFAULT_MESH_REFINE_LEVEL 4
+
 int OMP_USE_DYNAMIC_THREADS = 0;
 int OMP_THREADS_NUM = 16;
 
@@ -27,10 +32,8 @@ short DATA_TYPE = 0;    // CSV:0, H5: 1
 bool NEED_RECORD;
 std::vector<std::string> DATA_PATHES;
 float RADIUS = 0;
-float SCALE = 1;
-float FLATNESS = 0.99;
-float INF_FACTOR = 4.0;
-int MESH_REFINE_LEVEL = 4;
+bool USE_CUDA = false;
+
 
 void writeFile(Mesh &m, std::string fn)
 {
@@ -66,21 +69,11 @@ void loadConfigJson(const std::string controlJsonPath)
         } else {
             IS_CONST_RADIUS = false;
         }
-        if (readInJSON.contains("SCALE"))
+        if (readInJSON.contains("USE_CUDA"))
         {
-            SCALE = readInJSON.at("SCALE");
-        }
-        if (readInJSON.contains("FLATNESS"))
-        {
-            FLATNESS = readInJSON.at("FLATNESS");
-        }
-        if (readInJSON.contains("INF_FACTOR"))
-        {
-            INF_FACTOR = readInJSON.at("INF_FACTOR");
-        }
-        if (readInJSON.contains("MESH_REFINE_LEVEL"))
-        {
-            MESH_REFINE_LEVEL = readInJSON.at("MESH_REFINE_LEVEL");
+            USE_CUDA = readInJSON.at("USE_CUDA");
+        } else {
+            USE_CUDA = false;
         }
         NEED_RECORD = readInJSON.at("NEED_RECORD");
     }
@@ -150,7 +143,7 @@ void loadParticlesFromCSV(std::string &csvPath,
         particles.push_back(Eigen::Vector3f(elements[xIdx], elements[yIdx], elements[zIdx]));
         if (!IS_CONST_RADIUS)
         {
-            radiuses->push_back(elements[radiusIdx] * SCALE);
+            radiuses->push_back(elements[radiusIdx] * DEFAULT_SCALE);
         }
         getline(ifn, line);
     }
@@ -165,7 +158,7 @@ void run(std::string &dataDirPath)
     std::vector<float>* radiuses = (IS_CONST_RADIUS ? nullptr : new std::vector<float>());
     for (const std::string frame : DATA_PATHES)
     {
-        Mesh* mesh = new Mesh(int(pow(10, MESH_REFINE_LEVEL)));
+        Mesh* mesh = new Mesh(int(pow(10, DEFAULT_MESH_REFINE_LEVEL)));
         std::cout << "-=   Frame " << index << " " << frame << "   =-"
                   << std::endl;
         std::string dataPath = dataDirPath + "/" + frame;
@@ -177,7 +170,7 @@ void run(std::string &dataDirPath)
             loadParticlesFromCSV(dataPath, particles, radiuses);
             break;
         case 1:
-            readShonDyParticleData(dataPath, particles, radiuses, SCALE);
+            readShonDyParticleData(dataPath, particles, radiuses, DEFAULT_SCALE);
             break;
         default:
             printf("ERROR: Unknown DATA TYPE;");
@@ -185,7 +178,7 @@ void run(std::string &dataDirPath)
         }
 
         printf("Particles Number = %zd\n", particles.size());
-        SurfReconstructor* constructor = new SurfReconstructor(particles, radiuses, mesh, RADIUS, FLATNESS, INF_FACTOR);
+        SurfReconstructor* constructor = new SurfReconstructor(particles, radiuses, mesh, RADIUS, DEFAULT_FLATNESS, DEFAULT_INF_FACTOR);
         Recorder* recorder = new Recorder(dataDirPath, frame.substr(0, frame.size() - 4), constructor);
         constructor->Run();
 
@@ -233,8 +226,8 @@ int main(int argc, char **argv)
     {
         std::string dataDirPath =
             // "E:/data/oil_csv";
-            // "E:/data/multiR/mr_csv";
-            "E:\\data\\vtk\\csv";
+            "E:/data/multiR/mr_csv";
+            // "E:\\data\\vtk\\csv";
         run(dataDirPath);
     }
 

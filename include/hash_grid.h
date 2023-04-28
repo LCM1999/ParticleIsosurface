@@ -16,8 +16,8 @@ public:
 
 	std::vector<Eigen::Vector3f>* Particles;
 	unsigned int ParticlesNum;
-	double CellSize;
-	double Bounding[6];
+	float CellSize;
+	float Bounding[6];
 	unsigned int XYZCellNum[3];
 	unsigned long long CellNum;
 	std::vector<long long> HashList;

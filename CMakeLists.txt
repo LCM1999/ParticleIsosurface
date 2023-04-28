@@ -4,6 +4,8 @@ project(Isosurface_smiplify CXX C)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+SET(COMPUTE_CAPABILITY 75)
+
 
 set(PROJECT_NAME Isosurface_smiplify)
 
@@ -15,15 +17,15 @@ set(EIGEN3_DIR C:/Lib/Eigen-3.4.0-MSVC/share/eigen3/cmake)
 set(HDF5_DIR C:/Lib/HDF5-1.10.7-MSVC/cmake/hdf5)
 
 
-find_package(CUDA  REQUIRED)
-if(NOT CUDA_FOUND)
-    message(FATAL_ERROR "CUDA not found!")    
-endif(NOT CUDA_FOUND)
+# find_package(CUDA  REQUIRED)
+# if(NOT CUDA_FOUND)
+#     message(FATAL_ERROR "CUDA not found!")    
+# endif(NOT CUDA_FOUND)
 
-find_package(Thrust REQUIRED)
-if(NOT Thrust_FOUND)
-    message(FATAL_ERROR "Thrust not found!")    
-endif(NOT Thrust_FOUND)
+# find_package(Thrust REQUIRED)
+# if(NOT Thrust_FOUND)
+#     message(FATAL_ERROR "Thrust not found!")    
+# endif(NOT Thrust_FOUND)
 
 
 find_package(OpenMP REQUIRED)
@@ -61,9 +63,8 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     add_compile_options("-openmp:llvm")
 endif()
-SET(COMPUTE_CAPABILITY 75)
-SET(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -gencode arch=compute_${COMPUTE_CAPABILITY},code=compute_${COMPUTE_CAPABILITY};-g;-G;)
 
+# SET(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -gencode arch=compute_${COMPUTE_CAPABILITY},code=compute_${COMPUTE_CAPABILITY};-g;-G;)
 
 add_executable(${PROJECT_NAME}
     src/cube_arrays.cpp
@@ -81,10 +82,8 @@ add_executable(${PROJECT_NAME}
     src/pugixml.cpp
     src/hdf5Utils.cpp
     src/multi_level_reseacher.cpp
-    src/node_calc.cu
+    # src/node_calc.cu
 )
-
-
 
 target_include_directories(${PROJECT_NAME} 
     PUBLIC
@@ -93,11 +92,11 @@ target_include_directories(${PROJECT_NAME}
     ${MPI_CXX_INCLUDE_DIRS}
     ${HDF5_INCLUDE_DIR}
     ${EIGEN3_INCLUDE_DIR}
-    ${CUDA_INCLUDE_DIRS}
-    ${THRUST_INCLUDE_DIRS}
+    # ${CUDA_INCLUDE_DIRS}
+    # ${THRUST_INCLUDE_DIRS}
 )
 
-cuda_add_library(node_calc_lib src/node_calc.cu)
+# cuda_add_library(node_calc_lib SHARED src/node_calc.cu)
 
 target_link_libraries(${PROJECT_NAME} 
     PUBLIC
@@ -105,7 +104,7 @@ target_link_libraries(${PROJECT_NAME}
     ${HDF5_C_STATIC_LIBRARY}
     Eigen3::Eigen
     OpenMP::OpenMP_CXX
-    node_calc_lib
-    ${CUDA_LIBRARIES}
-    ${THRUST_LIBRARIES}
+    # node_calc_lib
+    # ${CUDA_LIBRARIES}
+    # ${THRUST_LIBRARIES}
 )

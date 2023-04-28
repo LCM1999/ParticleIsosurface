@@ -307,11 +307,6 @@ void TNode::vertAll(float& curv, bool& signchange, float& qef_error, float& samp
 void TNode::GenerateSampling(
 	float* sample_points, const int sampling_idx, int oversample)
 {
-	auto sign = [&](unsigned int x)
-	{
-		return x ? 1 : -1;
-	};
-
 	const float cellsize = 2 * half_length;
 	const float border = constructor->getBorder() * cellsize;
 	Eigen::Vector3f minV(center[0] - half_length + border, center[1] - half_length + border, center[2] - half_length + border);
@@ -352,7 +347,7 @@ void TNode::NodeSampling(
 			sample_grads[(sampling_idx + i) * 3 + 0], 
 			sample_grads[(sampling_idx + i) * 3 + 1], 
 			sample_grads[(sampling_idx + i) * 3 + 2]);
-		n.normalize();
+		// n.normalize();
 		norms += n;
 		area += n.norm();
 	}
@@ -364,11 +359,11 @@ void TNode::NodeSampling(
 		return;
 	} else if (curv == 0.0) {
 		curv = field_curv;
-	} else if (std::abs(curv - field_curv) < 0.25) {
-		curv += field_curv;
-		curv /= 2;
+	// } else if (std::abs(curv - field_curv) < 0.25) {
+	// 	curv += field_curv;
+	// 	curv /= 2;
 	} else {
-		curv = std::max(curv, field_curv);
+		curv = std::min(curv, field_curv);
 	}
 }
 
@@ -578,12 +573,12 @@ void TNode::NodeCalcNode(
 				pc << rvalue[0], rvalue[1], rvalue[2], rvalue[3];
 				// constructor->getEvaluator()->SingleEval(pc.head(3), pc[3], pcg);
 				// check bounds
-				float e = calcErrorDMC(pc, sample_points + sampling_idx * 4, sample_grads + sampling_idx * 3, oversample);
-				if (e < err)
-				{
-					err = e;
-					node << pc;
-				}
+				node << pc;
+				// float e = calcErrorDMC(pc, sample_points + sampling_idx * 4, sample_grads + sampling_idx * 3, oversample);
+				// if (e < err)
+				// {
+					
+				// }
 			}
 		}
 	}

@@ -19,7 +19,7 @@ class SurfReconstructor
 {
 private:
     // Global Parameters
-    int _OVERSAMPLE_QEF = 4;
+    int _OVERSAMPLE_QEF = 3;
     float _BORDER = (1.0 / 16.0);
     int _DEPTH_MAX = 6; // 7
     int _DEPTH_MIN = 5; // 4
@@ -34,7 +34,7 @@ private:
     int _SPARSE_NEIGHBORS_NUM = 16;
 
     bool _USE_ANI = true;
-    bool _USE_XMEAN = false;
+    bool _USE_XMEAN = true;
     float _XMEAN_DELTA = 1.0f;
 
     float _TOLERANCE = 1e-8;
