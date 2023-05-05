@@ -1,2 +1,0 @@
-#ifndef SAMPLING_CUH
-#define SAMPLING_CUH

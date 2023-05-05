@@ -1,7 +1,7 @@
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
-#include "cuda.h"
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
 #include "math.h"
+// #include "node_calc.cuh"
 
 #define TOLERANCE 1e-5f
 #define FLATNESS 0.99f
@@ -774,4 +774,19 @@ __global__ void cuda_node_calc_const_r(
             types[index] = 2;
         }
     }
+}
+
+extern "C" void cuda_node_calc_const_r_kernel(
+	int blocks, int threads,
+	float* particles, float* Gs, bool* splashs, float* particles_gradients, 
+    long long* hash_list, int* index_list, long long* start_list_keys, int* start_list_values, long long* end_list_keys, int* end_list_values,
+    char* types, char* depths, float* centers, float* half_lengthes, int* tnode_num,
+    float* nodes
+) {
+    cuda_node_calc_const_r<<<blocks, threads>>>(
+        particles, Gs, splashs, particles_gradients, 
+        hash_list, index_list, start_list_keys, start_list_values, end_list_keys, end_list_values,
+        types, depths, centers, half_lengthes, tnode_num,
+        nodes
+    );
 }
