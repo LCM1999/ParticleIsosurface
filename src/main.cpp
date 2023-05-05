@@ -285,14 +285,14 @@ void run(std::string &dataDirPath)
         output_name += std::string(6 - int_part.size(), '0') + int_part + float_part + std::string(6 - float_part.size(), '0');
         if ("ply" == OUTPUT_TYPE || "PLY" == OUTPUT_TYPE)
         {
-            writePlyFile(mesh,
+            writePlyFile(*mesh,
                   dataDirPath + "/" + output_name + ".ply");
         } else if ("obj" == OUTPUT_TYPE || "OBJ" == OUTPUT_TYPE) 
         {
-            writeObjFile(mesh,
+            writeObjFile(*mesh,
                   dataDirPath + "/" + output_name + ".obj");    
         } else {
-            writePlyFile(mesh,
+            writePlyFile(*mesh,
                   dataDirPath + "/" + output_name + ".ply");
         }        
         index++;
@@ -330,8 +330,8 @@ int main(int argc, char **argv)
     {
         std::string dataDirPath =
             // "C:/Users/11379/Desktop/protein";
-            // "E:/data/multiR/mr_csv";
-            "E:/data/vtk/csv/test";
+            "E:/data/multiR/mr_csv";
+            // "E:/data/vtk/csv/test";
         run(dataDirPath);
     }
 
