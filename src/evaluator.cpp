@@ -365,7 +365,7 @@ inline void Evaluator::compute_Gs_xMeans()
         } else {
             constructor->getSearcher()->GetNeighbors((GlobalPoses->at(pIdx)), tempNeighbors);
         }
-        if (tempNeighbors.empty())
+        if (tempNeighbors.size() <= 1)
         {
             G = Eigen::DiagonalMatrix<float, 3>(invH, invH, invH);
             GlobalSplash[pIdx] = 1;
@@ -391,7 +391,7 @@ inline void Evaluator::compute_Gs_xMeans()
             wSum += wj;
             xMean += ((GlobalPoses->at(nIdx))) * wj;
             neighbors.push_back(nIdx);
-            if (d2 <= std::max(pI2, nI2) && d2 != 0)
+            if (d2 <= std::max(pI2, nI2) && d2 > 0)
             {
                 closerNeigbors++;
             }
