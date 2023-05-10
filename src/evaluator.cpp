@@ -26,7 +26,6 @@ Evaluator::Evaluator(SurfReconstructor* surf_constructor,
 
     GlobalxMeans = new Eigen::Vector3f[constructor->getGlobalParticlesNum()];
     GlobalGs = new Eigen::Matrix3f[constructor->getGlobalParticlesNum()];
-
 	if (constructor->getUseAni())
 	{
         compute_Gs_xMeans();
@@ -255,7 +254,8 @@ float Evaluator::RecommendIsoValueConstR()
     const double influnce = radius * inf_factor;
     const double influnce2 = influnce * influnce;
 
-    k_value += general_kernel(2 * radius2, influnce2, influnce) * 2;
+    k_value += general_kernel(radius2, influnce2, influnce);
+    k_value += general_kernel(5 * radius2, influnce2, influnce);
 
     return (((radius2 * radius * k_value) 
     - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
@@ -266,13 +266,16 @@ float Evaluator::RecommendIsoValueVarR()
     double recommend = 0.0;
     std::vector<float>* radiuses = constructor->getSearcher()->getCheckedRadiuses();
 
-    double radius2, influnce, influnce2;
+    double radius2, influnce, influnce2, k_value;
     for (const float r : *radiuses)
     {
         radius2 = r * r;
         influnce = r * inf_factor;
         influnce2 = influnce * influnce;
-        recommend += (radius2 * r) * general_kernel(2 * radius2, influnce2, influnce) * 2;
+        k_value = 0;
+        k_value += general_kernel(radius2, influnce2, influnce);
+        k_value += general_kernel(5 * radius2, influnce2, influnce);
+        recommend += (radius2 * r) * k_value;
     }
     return ((recommend / radiuses->size()) - constructor->getMinScalar()) / constructor->getMaxScalar() * 255;
 }
@@ -388,7 +391,7 @@ inline void Evaluator::compute_Gs_xMeans()
             wSum += wj;
             xMean += ((GlobalPoses->at(nIdx))) * wj;
             neighbors.push_back(nIdx);
-            if (d2 <= std::max(pD2, nD2) && d2 != 0)
+            if (d2 <= std::max(pI2, nI2) && d2 != 0)
             {
                 closerNeigbors++;
             }

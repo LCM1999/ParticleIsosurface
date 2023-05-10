@@ -22,7 +22,7 @@
 #define DEFAULT_SCALE 1
 #define DEFAULT_FLATNESS 0.99
 #define DEFAULT_INF_FACTOR 4.0
-#define DEFAULT_MESH_REFINE_LEVEL 4
+// #define DEFAULT_MESH_REFINE_LEVEL 4
 
 int OMP_USE_DYNAMIC_THREADS = 0;
 int OMP_THREADS_NUM = 16;
@@ -38,6 +38,8 @@ std::vector<std::string> DATA_PATHES;
 std::string OUTPUT_TYPE = "ply";
 float RADIUS = 0;
 bool USE_CUDA = false;
+
+char SCALE = 0;
 
 
 void writeObjFile(Mesh &m, std::string fn)
@@ -234,6 +236,38 @@ void loadParticlesFromCSV(std::string &csvPath,
     }
 }
 
+void global_scale(std::vector<Eigen::Vector3f> &particles, std::vector<float>* radiuses)
+{
+    SCALE = 0;
+    float temp_radius = (IS_CONST_RADIUS ? RADIUS : *std::min_element(radiuses->begin(), radiuses->end()));
+    if (temp_radius > 1)
+    {
+        while (int(temp_radius/10) > 0.1)
+        {
+            temp_radius /= 10;
+            SCALE++;
+        }
+    } else {
+        while (int(temp_radius*10) < 1)
+        {
+            temp_radius *= 10;
+            SCALE--;
+        }
+    }
+    for (size_t i = 0; i < particles.size(); i++)
+    {
+        particles[i] /= pow(10, SCALE);
+        if (!IS_CONST_RADIUS)
+        {
+            radiuses->at(i) /= pow(10, SCALE);
+        }
+    }
+    if (IS_CONST_RADIUS)
+    {
+        RADIUS /= pow(10, SCALE);
+    }
+}
+
 void run(std::string &dataDirPath)
 {
     loadConfigJson(dataDirPath);
@@ -243,7 +277,7 @@ void run(std::string &dataDirPath)
     std::vector<float>* radiuses = (IS_CONST_RADIUS ? nullptr : new std::vector<float>());
     for (const std::string frame : DATA_PATHES)
     {
-        Mesh* mesh = new Mesh(int(pow(10, DEFAULT_MESH_REFINE_LEVEL)));
+        Mesh* mesh = new Mesh(int(pow(10, 4)));
         std::cout << "-=   Frame " << index << " " << frame << "   =-"
                   << std::endl;
         std::string dataPath = dataDirPath + "/" + frame;
@@ -261,7 +295,7 @@ void run(std::string &dataDirPath)
             printf("ERROR: Unknown DATA TYPE;");
             exit(1);
         }
-
+        // global_scale(particles, radiuses);
         printf("Particles Number = %zd\n", particles.size());
         SurfReconstructor* constructor = new SurfReconstructor(particles, radiuses, mesh, RADIUS, DEFAULT_FLATNESS, DEFAULT_INF_FACTOR);
         Recorder* recorder = new Recorder(dataDirPath, frame.substr(0, frame.size() - 4), constructor);
@@ -330,8 +364,8 @@ int main(int argc, char **argv)
     {
         std::string dataDirPath =
             // "C:/Users/11379/Desktop/protein";
-            "E:/data/multiR/mr_csv";
-            // "E:/data/vtk/csv/test";
+            // "E:/data/multiR/mr_csv";
+            "E:/data/vtk/csv";
         run(dataDirPath);
     }
 

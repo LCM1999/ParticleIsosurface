@@ -50,7 +50,7 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3f>* particles, 
     if (avgRadius > maxRadius) avgRadius = maxRadius;
     for (int i = 0; i < sortedParticles.size(); i++)
     {
-        double bounding [6] = {0.0f};
+        float bounding [6] = {0.0f};
         bounding[0] = (*std::min_element(sortedParticles[i].begin(), sortedParticles[i].end(), [&](const Eigen::Vector3f& v1, const Eigen::Vector3f& v2) {
             return v1.x() < v2.x();
         })).x();
@@ -69,7 +69,7 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3f>* particles, 
         bounding[5] = (*std::max_element(sortedParticles[i].begin(), sortedParticles[i].end(), [&](const Eigen::Vector3f& v1, const Eigen::Vector3f& v2) {
             return v1.z() < v2.z();
         })).z();
-        searchers.push_back(new HashGrid(sortedParticles[i], bounding, bin_bounds[i].second * infFactor));
+        searchers.push_back(new HashGrid(sortedParticles[i], bounding, bin_bounds[i].second, inf_factor));
     }
     std::set<float> st(radiuses->begin(), radiuses->end());
     checkedRadiuses.assign(st.begin(), st.end());

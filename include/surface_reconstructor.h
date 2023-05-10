@@ -19,7 +19,7 @@ class SurfReconstructor
 {
 private:
     // Global Parameters
-    int _OVERSAMPLE_QEF = 3;
+    int _OVERSAMPLE_QEF = 2;
     float _BORDER = (1.0 / 16.0);
     int _DEPTH_MAX = 6; // 7
     int _DEPTH_MIN = 5; // 4
@@ -35,7 +35,7 @@ private:
 
     bool _USE_ANI = true;
     bool _USE_XMEAN = true;
-    float _XMEAN_DELTA = 1.0f;
+    float _XMEAN_DELTA = 0.0f;
 
     float _TOLERANCE = 1e-8;
     float _RATIO_TOLERANCE = 0.1f;
@@ -55,8 +55,8 @@ private:
 
     static const int inProcessSize = 10000000; //
 
-    double _BoundingBox[6] = {0.0f};
-    double _RootHalfLength;
+    float _BoundingBox[6] = {0.0f};
+    float _RootHalfLength;
     float _RootCenter[3] = {0.0f};
 
     TNode* _OurRoot;

@@ -115,7 +115,7 @@ void SurfReconstructor::shrinkBox()
 
 void SurfReconstructor::resizeRootBoxConstR()
 {
-    double maxLen, resizeLen;
+    float maxLen, resizeLen;
 	float r = _RADIUS;
 	maxLen = (std::max)({ 
 		(_BoundingBox[1] - _BoundingBox[0]) , 
@@ -137,7 +137,7 @@ void SurfReconstructor::resizeRootBoxConstR()
 		_RootCenter[i] = center;
 	}
 	
-	_DEPTH_MIN = (_DEPTH_MAX - int(_DEPTH_MAX / 3));
+	_DEPTH_MIN = (_DEPTH_MAX - 2);	//int(_DEPTH_MAX / 3));
 }
 
 void SurfReconstructor::resizeRootBoxVarR()
@@ -165,7 +165,7 @@ void SurfReconstructor::resizeRootBoxVarR()
 		_RootCenter[i] = center;
 	}
 
-	_DEPTH_MIN = int(ceil(log2(ceil(maxLen / maxR)))) - 1; //, _DEPTH_MAX - int(_DEPTH_MAX / 3));
+	_DEPTH_MIN = int(ceil(log2(ceil(maxLen / maxR)))) - 2; //, _DEPTH_MAX - int(_DEPTH_MAX / 3));
 }
 
 
@@ -223,7 +223,7 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 		// 	empty = true;
 		// }
 	}
-	curv = (area == 0) ? 0.0 : (norms.norm() / area);
+	curv = (area == 0) ? 1.0 : (norms.norm() / area);
 }
 /*
 void SurfReconstructor::eval(TNode* tnode)
@@ -388,7 +388,7 @@ void SurfReconstructor::afterSampleEval(
 	float* sample_points, float* sample_grads)
 {
 	// double generate_time = 0, sampling_time = 0, calc_time = 0;
-	bool isbig = (tnode->depth <= _DEPTH_MIN);
+	bool isbig = (tnode->depth < _DEPTH_MIN);
 	bool signchange = false;
 	// tnode->vertAll(curv, signchange, qef_error, min_radius);
 	int sampling_idx = 0, oversample = oversamples[index];
@@ -916,7 +916,7 @@ void SurfReconstructor::generalModeRun()
 	printf("-= Build Neighbor Searcher =-\n");
 	if (IS_CONST_RADIUS)
 	{
-    	_hashgrid = new HashGrid(_GlobalParticles, _BoundingBox, _INFLUENCE_FACTOR * _RADIUS);
+    	_hashgrid = new HashGrid(_GlobalParticles, _BoundingBox, _RADIUS, _INFLUENCE_FACTOR);
 	} else {
 		_searcher = new MultiLevelSearcher(&_GlobalParticles, _GlobalRadiuses, _INFLUENCE_FACTOR);
 	}
