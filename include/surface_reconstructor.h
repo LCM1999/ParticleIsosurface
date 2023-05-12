@@ -23,7 +23,8 @@ private:
     float _BORDER = (1.0 / 16.0);
     int _DEPTH_MAX = 6; // 7
     int _DEPTH_MIN = 5; // 4
-    float _INFLUENCE_FACTOR = 0.0f;
+    float _NEIGHBOR_FACTOR = 0.0f;
+    float _SMOOTH_FACTOR = 2.0f;
     float _ISO_VALUE = 0.0f;
 
     float _MAX_SCALAR = -1.0f;
@@ -104,7 +105,8 @@ public:
     inline float getBorder() {return _BORDER;}
     inline int getDepthMax() {return _DEPTH_MAX;}
     inline int getDepthMin() {return _DEPTH_MIN;}
-    inline float getInfluenceFactor() {return _INFLUENCE_FACTOR;}
+    inline float getNeighborFactor() {return _NEIGHBOR_FACTOR;}
+    inline float getSmoothFactor() {return _SMOOTH_FACTOR;}
     inline float getIsoValue() {return _ISO_VALUE;}
     inline float getMaxScalar() {return _MAX_SCALAR;}
     inline float getMinScalar() {return _MIN_SCALAR;}

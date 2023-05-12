@@ -24,9 +24,9 @@ HashGrid::HashGrid(std::vector<Eigen::Vector3f>& particles, float* bounding, flo
 		Bounding[i * 2] = center - length / 2;
 		Bounding[i * 2 + 1] = center + length / 2;
 	}
-	XYZCellNum[0] = int(ceil((Bounding[1] - Bounding[0]) / CellSize));
-	XYZCellNum[1] = int(ceil((Bounding[3] - Bounding[2]) / CellSize));
-	XYZCellNum[2] = int(ceil((Bounding[5] - Bounding[4]) / CellSize));
+	XYZCellNum[0] = std::max(int(ceil((Bounding[1] - Bounding[0]) / CellSize)), 1);
+	XYZCellNum[1] = std::max(int(ceil((Bounding[3] - Bounding[2]) / CellSize)), 1);
+	XYZCellNum[2] = std::max(int(ceil((Bounding[5] - Bounding[4]) / CellSize)), 1);
 	CellNum = (long long)XYZCellNum[0] * (long long)XYZCellNum[1] * (long long)XYZCellNum[2];
 
 	HashList.resize(ParticlesNum, 0);

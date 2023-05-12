@@ -17,7 +17,9 @@ Evaluator::Evaluator(SurfReconstructor* surf_constructor,
     }
     Radius = radius;
 
-    inf_factor = constructor->getInfluenceFactor();
+    neighbor_factor = constructor->getNeighborFactor();
+    smooth_factor = constructor->getSmoothFactor();
+
 
     PariclesNormals.clear();
     GlobalSplash.clear();
@@ -213,7 +215,7 @@ float Evaluator::CalculateMaxScalarConstR()
     double k_value = 0;
     const double radius = Radius;
     const double radius2 = radius * radius;
-    const double influnce = radius * inf_factor;
+    const double influnce = radius * smooth_factor;
     const double influnce2 = influnce * influnce;
 
     k_value += general_kernel(3 * radius2, influnce2, influnce) * 8;
@@ -232,7 +234,7 @@ float Evaluator::CalculateMaxScalarVarR()
     {
         double temp_scalar = 0;
         radius2 = r * r;
-        influnce = r * inf_factor;
+        influnce = r * smooth_factor;
         influnce2 = influnce * influnce;
         temp_scalar += general_kernel(3 * radius2, influnce2, influnce) * 8;
         temp_scalar += general_kernel(11 * radius2, influnce2, influnce) * 4 * 6;
@@ -251,11 +253,26 @@ float Evaluator::RecommendIsoValueConstR()
     const double radius = Radius;
     const double radius2 = radius * radius;
 
-    const double influnce = radius * inf_factor;
+    const double influnce = radius * smooth_factor;
     const double influnce2 = influnce * influnce;
 
-    k_value += general_kernel(radius2, influnce2, influnce);
+    // const double invH = 1.0;
+    // double wSum = 0, d, wj;
+    // double nR, nI;
+    // Eigen::Vector3f p1(radius, 0, 0);
+    // Eigen::Vector3f p2(-radius, 0, 0);
+    // Eigen::Vector3f sample(radius, radius,0);
+    // Eigen::Matrix3f G1 = Eigen::Matrix3f::Zero();
+    // Eigen::Matrix3f G2 = Eigen::Matrix3f::Zero();
+    // compute_single_G(p1, p2, G1, radius);
+    // compute_single_G(p2, p1, G2, radius);
+
+    // k_value += general_kernel((G1 * (sample - p1)).squaredNorm(), influnce2, influnce);
+    // k_value += general_kernel((G2 * (sample - p2)).squaredNorm(), influnce2, influnce);
+
+    k_value += general_kernel(2 * radius2, influnce2, influnce);
     k_value += general_kernel(5 * radius2, influnce2, influnce);
+
 
     return (((radius2 * radius * k_value) 
     - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
@@ -270,10 +287,10 @@ float Evaluator::RecommendIsoValueVarR()
     for (const float r : *radiuses)
     {
         radius2 = r * r;
-        influnce = r * inf_factor;
+        influnce = r * smooth_factor;
         influnce2 = influnce * influnce;
         k_value = 0;
-        k_value += general_kernel(radius2, influnce2, influnce);
+        k_value += general_kernel(2 * radius2, influnce2, influnce);
         k_value += general_kernel(5 * radius2, influnce2, influnce);
         recommend += (radius2 * r) * k_value;
     }
@@ -323,7 +340,7 @@ inline float Evaluator::viscosity_kernel(double d, double h)
 inline float Evaluator::IsotropicInterpolate(const int pIdx, const double d2)
 {
     double radius = (IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx));
-    double influnce = radius * inf_factor;
+    double influnce = radius * smooth_factor;
     double influnce2 = influnce * influnce;
 	if (d2 > influnce2)
 		return 0.0f;
@@ -334,10 +351,90 @@ inline float Evaluator::IsotropicInterpolate(const int pIdx, const double d2)
 inline float Evaluator::AnisotropicInterpolate(const int pIdx, const Eigen::Vector3f& diff)
 {
     double radius = (IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx));
-    double influnce = radius * inf_factor;
+    double influnce = radius * smooth_factor;
     double influnce2 = influnce * influnce;
     double k_value = general_kernel((GlobalGs[pIdx] * diff).squaredNorm(), influnce2, influnce);
     return (pow(radius, 3)) * (GlobalGs[pIdx].determinant() * k_value);
+}
+
+inline void Evaluator::compute_single_G(Eigen::Vector3f p, Eigen::Vector3f neighbor, Eigen::Matrix3f &G, float r)
+{
+    const double invH = 1.0;
+    double wSum = 0, d, wj;
+
+    Eigen::Vector3f wd = Eigen::Vector3f::Zero();
+    Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
+    cov += Eigen::DiagonalMatrix<double, 3>(invH, invH, invH);
+    wSum = 0.0f;
+    d = (p - neighbor).norm();
+    wj = wij(d, r * neighbor_factor);
+    wSum += wj;
+    wd = neighbor - p;
+    cov += ((wd * wd.transpose()).cast<double>() * wj);
+    cov /= wSum;
+
+    Eigen::JacobiSVD<Eigen::Matrix3d> svd(cov, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    
+    Eigen::Matrix3d u = svd.matrixU();
+    Eigen::Vector3d w = svd.singularValues();
+    Eigen::Matrix3d v = svd.matrixV();
+    
+    w = Eigen::Vector3d(w.array().abs());
+    const double maxSingularVal = w.maxCoeff();
+
+    const double kr = 4.0;
+    w[0] = std::max(w[0], maxSingularVal / kr);
+    w[1] = std::max(w[1], maxSingularVal / kr);
+    w[2] = std::max(w[2], maxSingularVal / kr);
+
+    Eigen::Matrix3d invSigma = w.asDiagonal().inverse();
+    // Compute G
+    const double scale =
+        std::pow(w[0] * w[1] * w[2], 1.0 / 3.0);  // volume preservation
+    G = ((v * invSigma * u.transpose()) * invH * scale).cast<float>();
+}
+
+inline void Evaluator::compute_G(Eigen::Vector3f p, Eigen::Vector3f xMean, std::vector<int> neighbors, Eigen::Matrix3f &G)
+{
+    const double invH = 1/smooth_factor;
+    double wSum = 0, d, wj;
+    double nR, nI;
+
+    Eigen::Vector3f wd = Eigen::Vector3f::Zero();
+    Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
+    cov += Eigen::DiagonalMatrix<double, 3>(invH, invH, invH);
+    wSum = 0.0f;
+    for (int nIdx : neighbors)
+    {
+        nR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(nIdx);
+        nI = nR * neighbor_factor;
+        d = (p - GlobalPoses->at(nIdx)).norm();
+        wj = wij(d, nI);
+        wSum += wj;
+        wd = ((GlobalPoses->at(nIdx))) - xMean;
+        cov += ((wd * wd.transpose()).cast<double>() * wj);
+    }
+    cov /= wSum;
+
+    Eigen::JacobiSVD<Eigen::Matrix3d> svd(cov, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    
+    Eigen::Matrix3d u = svd.matrixU();
+    Eigen::Vector3d w = svd.singularValues();
+    Eigen::Matrix3d v = svd.matrixV();
+    
+    w = Eigen::Vector3d(w.array().abs());
+    const double maxSingularVal = w.maxCoeff();
+
+    const double kr = 4.0;
+    w[0] = std::max(w[0], maxSingularVal / kr);
+    w[1] = std::max(w[1], maxSingularVal / kr);
+    w[2] = std::max(w[2], maxSingularVal / kr);
+
+    Eigen::Matrix3d invSigma = w.asDiagonal().inverse();
+    // Compute G
+    const double scale =
+        std::pow(w[0] * w[1] * w[2], 1.0 / 3.0);  // volume preservation
+    G = ((v * invSigma * u.transpose()) * invH * scale).cast<float>();
 }
 
 inline void Evaluator::compute_Gs_xMeans()
@@ -355,9 +452,9 @@ inline void Evaluator::compute_Gs_xMeans()
         double pR, pR2, pD, pD2, pI, pI2;
         pR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx);
         pR2 = pR * pR;
-        pD = 2.5 * pR;
+        pD = smooth_factor * pR;
         pD2 = pD * pD;
-        pI = pR * inf_factor;
+        pI = pR * neighbor_factor;
         pI2 = pI * pI;
         if (IS_CONST_RADIUS)
         {
@@ -373,13 +470,13 @@ inline void Evaluator::compute_Gs_xMeans()
         double nR, nR2, nD, nD2, nI, nI2;
         for (int nIdx : tempNeighbors)
         {
-            // if (nIdx == pIdx)
-            //     continue;
+            if (nIdx == pIdx)
+                continue;
             nR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(nIdx);
             nR2 = nR * nR;
-            nD = 2.5 * nR;
+            nD = smooth_factor * nR;
             nD2 = nD * nD;
-            nI = nR * inf_factor;
+            nI = nR * neighbor_factor;
             nI2 = nI * nI;
             d2 = (((GlobalPoses->at(nIdx))) - ((GlobalPoses->at(pIdx)))).squaredNorm();
             if (d2 >= nI2)
@@ -391,7 +488,7 @@ inline void Evaluator::compute_Gs_xMeans()
             wSum += wj;
             xMean += ((GlobalPoses->at(nIdx))) * wj;
             neighbors.push_back(nIdx);
-            if (d2 <= std::max(pI2, nI2) && d2 > 0)
+            if (d2 <= std::max(pD2, nD2) && d2 > 0)
             {
                 closerNeigbors++;
             }
@@ -420,39 +517,7 @@ inline void Evaluator::compute_Gs_xMeans()
         } 
         else
         {
-            Eigen::Vector3f wd = Eigen::Vector3f::Zero();
-            Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
-            cov += Eigen::DiagonalMatrix<double, 3>(invH, invH, invH);
-            wSum = 0.0f;
-            for (int nIdx : neighbors)
-            {
-                d = ((GlobalPoses->at(pIdx)) - ((GlobalPoses->at(nIdx)))).norm();
-                wj = wij(d, nI);
-                wSum += wj;
-                wd = ((GlobalPoses->at(nIdx))) - xMean;
-                cov += ((wd * wd.transpose()).cast<double>() * wj);
-            }
-            cov /= wSum;
-
-            Eigen::JacobiSVD<Eigen::Matrix3d> svd(cov, Eigen::ComputeFullU | Eigen::ComputeFullV);
-            
-            Eigen::Matrix3d u = svd.matrixU();
-            Eigen::Vector3d w = svd.singularValues();
-            Eigen::Matrix3d v = svd.matrixV();
-            
-            w = Eigen::Vector3d(w.array().abs());
-            const double maxSingularVal = w.maxCoeff();
-
-            const double kr = 4.0;
-            w[0] = std::max(w[0], maxSingularVal / kr);
-            w[1] = std::max(w[1], maxSingularVal / kr);
-            w[2] = std::max(w[2], maxSingularVal / kr);
-
-            Eigen::Matrix3d invSigma = w.asDiagonal().inverse();
-            // Compute G
-            const double scale =
-                std::pow(w[0] * w[1] * w[2], 1.0 / 3.0);  // volume preservation
-            G = ((v * invSigma * u.transpose()) * invH * scale).cast<float>();
+            compute_G(GlobalPoses->at(pIdx), xMean, neighbors, G);
         }
         GlobalxMeans[pIdx] = Eigen::Vector3f(xMean);
         GlobalGs[pIdx] = Eigen::Matrix3f(G);

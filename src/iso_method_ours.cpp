@@ -361,9 +361,9 @@ void TNode::NodeSampling(
 		curv = field_curv;
 	// // } else if (std::abs(curv - field_curv) < 0.25) {
 	} else {
-		curv += field_curv;
-		curv /= 2;
-		// curv = std::min(curv, field_curv);
+		// curv += field_curv;
+		// curv /= 2;
+		curv = std::min(curv, field_curv);
 		// curv = field_curv;
 	}
 }
@@ -574,16 +574,20 @@ void TNode::NodeCalcNode(
 				pc << rvalue[0], rvalue[1], rvalue[2], rvalue[3];
 				// constructor->getEvaluator()->SingleEval(pc.head(3), pc[3], pcg);
 				// check bounds
-				node << pc;
-				// float e = calcErrorDMC(pc, sample_points + sampling_idx * 4, sample_grads + sampling_idx * 3, oversample);
-				// if (e < err)
-				// {
-					
-				// }
+				float e = calcErrorDMC(pc, sample_points + sampling_idx * 4, sample_grads + sampling_idx * 3, oversample);
+				if (e < err)
+				{
+					err = e;
+					node << pc;
+				}
 			}
 		}
 	}
 	constructor->getEvaluator()->SingleEval(node.head(3), node[3], pcg);
+	if (err/cellsize < 0.001)
+	{
+		node[3] = 0;
+	}
 }
 
 bool TNode::changeSignDMC(Eigen::Vector4f* verts)

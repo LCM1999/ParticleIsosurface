@@ -12,7 +12,8 @@ Mesh::Mesh(const int mesh_precision)
 
 int Mesh::insert_vert(const Eigen::Vector3f& p)
 {
-	vect3<int> tmp = vect3f2vect3i(vect3<float>(p));
+	vect3<float> tp(p);
+	vect3<int> tmp = vect3f2vect3i(tp);
 	// vect3<float> tmp(float(precise(p[0])), float(precise(p[1])), float(precise(p[2])));
 	if (vertices_map.find(tmp) == vertices_map.end())
 	{
