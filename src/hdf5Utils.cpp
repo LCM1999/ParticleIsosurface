@@ -32,7 +32,7 @@ bool readShonDyParticleData(const std::string &fileName,
     // read particle densities
     if (radiuses != nullptr)
     {
-        readDouble(hdf5FileID, "radius", radiusesDouble);
+        readDouble(hdf5FileID, "particleRadius", radiusesDouble);
         radiuses->resize(numberOfNodes);
     }
     
