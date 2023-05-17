@@ -26,7 +26,7 @@ float TNode::calcErrorDMC(Eigen::Vector4f p, float* verts, float* verts_grad, co
 	{
 		Eigen::Vector4f v(verts[i * 4 + 0], verts[i * 4 + 1], verts[i * 4 + 2], verts[i * 4 + 3]);
 		Eigen::Vector3f g(verts_grad[i * 3 + 0], verts_grad[i * 3 + 1], verts_grad[i * 3 + 2]);
-		err += squared(p[3] - g.dot((p - v).head(3))) / (1 + g.squaredNorm());
+		err += squared(g.dot((p - v).head(3)) - p[3]) / (1 + g.squaredNorm());
 	}
 	return err;
 }
@@ -52,8 +52,8 @@ void TNode::vertAll(float& curv, bool& signchange, float& qef_error, float& samp
 	}
 	bool is_out;
 	double err;
-	float* sample_points = new float[pow(oversample+1, 3) * 4];
-	float* field_gradient = new float[pow(oversample+1, 3) * 3];
+	float* sample_points = new float[int(pow(oversample+1, 3) * 4)];
+	float* field_gradient = new float[int(pow(oversample+1, 3) * 3)];
 	for (int z = 0; z <= oversample; z++)
 	{
 		for (int y = 0; y <= oversample; y++)
@@ -352,18 +352,19 @@ void TNode::NodeSampling(
 		area += n.norm();
 	}
 
-	float field_curv = (area == 0) ? 0.0 : (norms.norm() / area);
+	float field_curv = (area == 0) ? 1.0 : (norms.norm() / area);
 	// printf("%f %f\n", curv, field_curv);
 	if (field_curv == 0.0)
 	{
 		return;
 	} else if (curv == 0.0) {
 		curv = field_curv;
-	// } else if (std::abs(curv - field_curv) < 0.25) {
-	// 	curv += field_curv;
-	// 	curv /= 2;
+	// // } else if (std::abs(curv - field_curv) < 0.25) {
 	} else {
+		// curv += field_curv;
+		// curv /= 2;
 		curv = std::min(curv, field_curv);
+		// curv = field_curv;
 	}
 }
 
@@ -573,16 +574,20 @@ void TNode::NodeCalcNode(
 				pc << rvalue[0], rvalue[1], rvalue[2], rvalue[3];
 				// constructor->getEvaluator()->SingleEval(pc.head(3), pc[3], pcg);
 				// check bounds
-				node << pc;
-				// float e = calcErrorDMC(pc, sample_points + sampling_idx * 4, sample_grads + sampling_idx * 3, oversample);
-				// if (e < err)
-				// {
-					
-				// }
+				float e = calcErrorDMC(pc, sample_points + sampling_idx * 4, sample_grads + sampling_idx * 3, oversample);
+				if (e < err)
+				{
+					err = e;
+					node << pc;
+				}
 			}
 		}
 	}
 	constructor->getEvaluator()->SingleEval(node.head(3), node[3], pcg);
+	if (err/cellsize < 0.001)
+	{
+		node[3] = 0;
+	}
 }
 
 bool TNode::changeSignDMC(Eigen::Vector4f* verts)

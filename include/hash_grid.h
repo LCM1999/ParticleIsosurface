@@ -12,7 +12,7 @@ public:
 	HashGrid();
 	~HashGrid() {};
 
-	HashGrid(std::vector<Eigen::Vector3f>& particles, double* bounding, double cellsize);
+	HashGrid(std::vector<Eigen::Vector3f>& particles, float* bounding, float radius, float inf_factor);
 
 	std::vector<Eigen::Vector3f>* Particles;
 	unsigned int ParticlesNum;

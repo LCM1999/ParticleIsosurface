@@ -31,7 +31,7 @@ float radius, float flatness, float inf_factor)
 	_GlobalParticlesNum = _GlobalParticles.size();
 	_GlobalRadiuses = radiuses;
 	_RADIUS = radius;
-	_INFLUENCE_FACTOR = inf_factor;
+	_NEIGHBOR_FACTOR = inf_factor;
 
 	WaitingStack.clear();
 
@@ -104,7 +104,7 @@ void SurfReconstructor::shrinkBox()
 
 void SurfReconstructor::resizeRootBoxConstR()
 {
-    double maxLen, resizeLen;
+    float maxLen, resizeLen;
 	float r = _RADIUS;
 	maxLen = (std::max)({ 
 		(_BoundingBox[1] - _BoundingBox[0]) , 
@@ -112,7 +112,7 @@ void SurfReconstructor::resizeRootBoxConstR()
 		(_BoundingBox[5] - _BoundingBox[4]) });
 	_DEPTH_MAX = int(ceil(log2(ceil(maxLen / r))));
 	resizeLen = pow(2, _DEPTH_MAX) * r;
-	while (resizeLen - maxLen < (_INFLUENCE_FACTOR * _RADIUS))
+	while (resizeLen - maxLen < (_NEIGHBOR_FACTOR * _RADIUS))
 	{
 		_DEPTH_MAX++;
 		resizeLen = pow(2, _DEPTH_MAX) * r;
@@ -126,7 +126,7 @@ void SurfReconstructor::resizeRootBoxConstR()
 		_RootCenter[i] = center;
 	}
 	
-	_DEPTH_MIN = (_DEPTH_MAX - int(_DEPTH_MAX / 3));
+	_DEPTH_MIN = (_DEPTH_MAX - 2);	//int(_DEPTH_MAX / 3));
 }
 
 void SurfReconstructor::resizeRootBoxVarR()
@@ -139,7 +139,7 @@ void SurfReconstructor::resizeRootBoxVarR()
 		(_BoundingBox[5] - _BoundingBox[4]) });
 	_DEPTH_MAX = int(ceil(log2(ceil(maxLen / minR))));
 	resizeLen = pow(2, _DEPTH_MAX) * minR;
-	while (resizeLen - maxLen < (_INFLUENCE_FACTOR * maxR))
+	while (resizeLen - maxLen < (_NEIGHBOR_FACTOR * maxR))
 	{
 		_DEPTH_MAX++;
 		resizeLen = pow(2, _DEPTH_MAX) * avgR;
@@ -154,7 +154,7 @@ void SurfReconstructor::resizeRootBoxVarR()
 		_RootCenter[i] = center;
 	}
 
-	_DEPTH_MIN = int(ceil(log2(ceil(maxLen / maxR)))) - 1; //, _DEPTH_MAX - int(_DEPTH_MAX / 3));
+	_DEPTH_MIN = int(ceil(log2(ceil(maxLen / maxR)))) - 2; //, _DEPTH_MAX - int(_DEPTH_MAX / 3));
 }
 
 
@@ -183,12 +183,12 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 		{
 			if (!_evaluator->CheckSplash(in))
 			{
-				if (_GlobalParticles[in].x() > (box1.x() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _INFLUENCE_FACTOR)) && 
-					_GlobalParticles[in].x() < (box2.x() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _INFLUENCE_FACTOR)) &&
-					_GlobalParticles[in].y() > (box1.y() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _INFLUENCE_FACTOR)) && 
-					_GlobalParticles[in].y() < (box2.y() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _INFLUENCE_FACTOR)) &&
-					_GlobalParticles[in].z() > (box1.z() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _INFLUENCE_FACTOR)) && 
-					_GlobalParticles[in].z() < (box2.z() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _INFLUENCE_FACTOR)))
+				if (_GlobalParticles[in].x() > (box1.x() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _SMOOTH_FACTOR)) && 
+					_GlobalParticles[in].x() < (box2.x() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _SMOOTH_FACTOR)) &&
+					_GlobalParticles[in].y() > (box1.y() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _SMOOTH_FACTOR)) && 
+					_GlobalParticles[in].y() < (box2.y() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _SMOOTH_FACTOR)) &&
+					_GlobalParticles[in].z() > (box1.z() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _SMOOTH_FACTOR)) && 
+					_GlobalParticles[in].z() < (box2.z() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _SMOOTH_FACTOR)))
 				{
 					Eigen::Vector3f tempNorm = _evaluator->PariclesNormals[in];
 					if (tempNorm == Eigen::Vector3f(0, 0, 0))	{continue;}
@@ -212,7 +212,7 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 		// 	empty = true;
 		// }
 	}
-	curv = (area == 0) ? 0.0 : (norms.norm() / area);
+	curv = (area == 0) ? 1.0 : (norms.norm() / area);
 }
 /*
 void SurfReconstructor::eval(TNode* tnode)
@@ -377,7 +377,7 @@ void SurfReconstructor::afterSampleEval(
 	float* sample_points, float* sample_grads)
 {
 	// double generate_time = 0, sampling_time = 0, calc_time = 0;
-	bool isbig = (tnode->depth <= _DEPTH_MIN);
+	bool isbig = (tnode->depth < _DEPTH_MIN);
 	bool signchange = false;
 	// tnode->vertAll(curv, signchange, qef_error, min_radius);
 	int sampling_idx = 0, oversample = oversamples[index];
@@ -653,228 +653,228 @@ void SurfReconstructor::genIsoOurs()
 		delete[] emptys;
 		delete[] oversamples;
 	} else {
-		if (IS_CONST_RADIUS)
-		{
-			int threadsPerBlock = 512, blocksPerGrid;
-			// memory on host
-			float* xmeans_cpu = new float[_GlobalParticlesNum * 3];
-			float* Gs_cpu = new float[_GlobalParticlesNum * 9];
-			float* particles_grads_cpu = new float[_GlobalParticlesNum * 3];
-			for (size_t i = 0; i < _GlobalParticlesNum; i++)
-			{
-				xmeans_cpu[i * 3 + 0] = _evaluator->GlobalxMeans[i][0];
-				xmeans_cpu[i * 3 + 1] = _evaluator->GlobalxMeans[i][1];
-				xmeans_cpu[i * 3 + 2] = _evaluator->GlobalxMeans[i][2];
-				Gs_cpu[i * 9 + 0] = _evaluator->GlobalGs[i].data()[0];
-				Gs_cpu[i * 9 + 1] = _evaluator->GlobalGs[i].data()[1];
-				Gs_cpu[i * 9 + 2] = _evaluator->GlobalGs[i].data()[2];
-				Gs_cpu[i * 9 + 3] = _evaluator->GlobalGs[i].data()[3];
-				Gs_cpu[i * 9 + 4] = _evaluator->GlobalGs[i].data()[4];
-				Gs_cpu[i * 9 + 5] = _evaluator->GlobalGs[i].data()[5];
-				Gs_cpu[i * 9 + 6] = _evaluator->GlobalGs[i].data()[6];
-				Gs_cpu[i * 9 + 7] = _evaluator->GlobalGs[i].data()[7];
-				Gs_cpu[i * 9 + 8] = _evaluator->GlobalGs[i].data()[8];
-				particles_grads_cpu[i * 3 + 0] = _evaluator->PariclesNormals[i][0];
-				particles_grads_cpu[i * 3 + 1] = _evaluator->PariclesNormals[i][1];
-				particles_grads_cpu[i * 3 + 2] = _evaluator->PariclesNormals[i][2];
-			}
-			long long* start_list_keys_cpu = new long long[_hashgrid->StartList.size()];
-			int* start_list_values_cpu = new int[_hashgrid->StartList.size()];
-			long long* end_list_keys_cpu = new long long[_hashgrid->EndList.size()];
-			int* end_list_values_cpu = new int[_hashgrid->EndList.size()];
-			std::transform(_hashgrid->StartList.begin(), _hashgrid->EndList.end(), start_list_keys_cpu, [](const std::pair<long long, int>& p) {return p.first;});
-			std::transform(_hashgrid->StartList.begin(), _hashgrid->EndList.end(), start_list_values_cpu, [](const std::pair<long long, int>& p) {return p.second;});
-			std::transform(_hashgrid->StartList.begin(), _hashgrid->EndList.end(), end_list_keys_cpu, [](const std::pair<long long, int>& p) {return p.first;});
-			std::transform(_hashgrid->StartList.begin(), _hashgrid->EndList.end(), end_list_values_cpu, [](const std::pair<long long, int>& p) {return p.second;});
-			char* types_cpu;
-			char* depths_cpu;
-			float* centers_cpu;
-			float* half_lengthes_cpu;
-			int tnode_num_cpu[1];
-			float* nodes_cpu;
-			size_t start_end_list_size[2] = {_hashgrid->StartList.size(), _hashgrid->EndList.size()};
-			int particels_num_min_depth[2] = {_GlobalParticlesNum, _DEPTH_MIN};
-			float radius_inf_factor_iso_min_max_scalar_cell_size[6] = {_RADIUS, _INFLUENCE_FACTOR, _ISO_VALUE, _MIN_SCALAR, _MAX_SCALAR, _hashgrid->CellSize};
-			// memory on device
-			float* bounding_gpu;
-			unsigned int* xyz_cell_num_gpu;
-			size_t* start_end_list_size_gpu;
-			int* particels_num_min_depth_gpu;
-			float* radius_inf_factor_iso_min_max_scalar_cell_size_gpu;
-			cudaMalloc(&bounding_gpu, 6 * sizeof(float));
-			cudaMalloc(&xyz_cell_num_gpu, 3 * sizeof(unsigned int));
-			cudaMalloc(&start_end_list_size_gpu, 2 * sizeof(size_t));
-			cudaMalloc(&particels_num_min_depth_gpu, 2 * sizeof(int));
-			cudaMalloc(&radius_inf_factor_iso_min_max_scalar_cell_size_gpu, 6 * sizeof(float));
-			cudaMemcpyToSymbol(bounding_gpu, _hashgrid->Bounding, 6 * sizeof(float));
-			cudaMemcpyToSymbol(xyz_cell_num_gpu, _hashgrid->XYZCellNum, 3 * sizeof(unsigned int));
-			cudaMemcpyToSymbol(start_end_list_size_gpu, start_end_list_size, 2 * sizeof(size_t));
-			cudaMemcpyToSymbol(particels_num_min_depth_gpu, particels_num_min_depth, 2 * sizeof(int));
-			cudaMemcpyToSymbol(radius_inf_factor_iso_min_max_scalar_cell_size_gpu, radius_inf_factor_iso_min_max_scalar_cell_size, 6 * sizeof(float));
-			float* particles_gpu;
-			float* Gs_gpu; 
-			bool* splashs_gpu; 
-			float* particles_gradients_gpu; 
-    		long long* hash_list_gpu;
-			int* index_list_gpu;
-			long long* start_list_keys_gpu;
-			int* start_list_values_gpu;
-			long long* end_list_keys_gpu;
-			int* end_list_values_gpu;
-			char* types_gpu; 
-			char* depths_gpu; 
-			float* centers_gpu; 
-			float* half_lengthes_gpu; 
-			int* tnode_num_gpu;
-    		float* nodes_gpu; 
-			WaitingStack.push_back(root);
-			while (!WaitingStack.empty())
-			{
-				for (queue_flag = 0; queue_flag < inProcessSize && !WaitingStack.empty(); queue_flag++)
-				{
-					ProcessArray[queue_flag] = WaitingStack.back();
-					WaitingStack.pop_back();
-				}
-				blocksPerGrid = int(queue_flag + (threadsPerBlock - 1) / threadsPerBlock);
-				types_cpu = new char[queue_flag];
-				depths_cpu = new char[queue_flag];
-				centers_cpu = new float[queue_flag * 3];
-				half_lengthes_cpu = new float[queue_flag];
-				tnode_num_cpu[0] = queue_flag;
-				nodes_cpu = new float[queue_flag * 4];
-				for (size_t i = 0; i < queue_flag; i++)
-				{
-					types_cpu[i] = ProcessArray[i]->type;
-					depths_cpu[i] = ProcessArray[i]->depth;
-					centers_cpu[i * 3 + 0] = ProcessArray[i]->center[0];
-					centers_cpu[i * 3 + 1] = ProcessArray[i]->center[1];
-					centers_cpu[i * 3 + 2] = ProcessArray[i]->center[2];
-					half_lengthes_cpu[i] = ProcessArray[i]->half_length;
-					nodes_cpu[i * 4 + 0] = ProcessArray[i]->center[0];
-					nodes_cpu[i * 4 + 1] = ProcessArray[i]->center[1];
-					nodes_cpu[i * 4 + 2] = ProcessArray[i]->center[2];
-					nodes_cpu[i * 4 + 3] = ProcessArray[i]->center[3];
-				}
-				cudaMalloc((void**)& tnode_num_gpu, sizeof(int));
-				cudaMemcpy(tnode_num_gpu, tnode_num_cpu, sizeof(int), cudaMemcpyHostToDevice);
-				cudaMalloc((void**)& particles_gpu, _GlobalParticlesNum * 3 * sizeof(float));
-				cudaMalloc((void**)& Gs_gpu, _GlobalParticlesNum * 9 * sizeof(float));
-				cudaMalloc((void**)& splashs_gpu, _GlobalParticlesNum * sizeof(bool));
-				cudaMalloc((void**)& particles_gradients_gpu, _GlobalParticlesNum * 3 * sizeof(float));
-				cudaMalloc((void**)& hash_list_gpu, _hashgrid->HashList.size() * sizeof(long long));
-				cudaMalloc((void**)& index_list_gpu, _hashgrid->IndexList.size() * sizeof(int));
-				cudaMalloc((void**)& start_list_keys_gpu, _hashgrid->StartList.size() * sizeof(long long));
-				cudaMalloc((void**)& start_list_values_gpu, _hashgrid->StartList.size() * sizeof(int));
-				cudaMalloc((void**)& end_list_keys_gpu, _hashgrid->StartList.size() * sizeof(long long));
-				cudaMalloc((void**)& end_list_values_gpu, _hashgrid->StartList.size() * sizeof(int));
-				cudaMalloc((void**)& types_gpu, queue_flag * sizeof(char));
-				cudaMalloc((void**)& depths_gpu, queue_flag * sizeof(char));
-				cudaMalloc((void**)& centers_gpu, queue_flag * 3 * sizeof(float));
-				cudaMalloc((void**)& half_lengthes_gpu, queue_flag * sizeof(float));
-				cudaMalloc((void**)& nodes_gpu, queue_flag * 4 * sizeof(float));
-				cudaMemcpy(particles_gpu, xmeans_cpu, _GlobalParticlesNum * 3 * sizeof(float), cudaMemcpyHostToDevice);
-				cudaMemcpy(Gs_gpu, Gs_cpu, _GlobalParticlesNum * 9 * sizeof(float), cudaMemcpyHostToDevice);
-				cudaMemcpy(splashs_gpu, _evaluator->GlobalSplash.data(), _GlobalParticlesNum * sizeof(bool), cudaMemcpyHostToDevice);
-				cudaMemcpy(particles_gradients_gpu, particles_grads_cpu, _GlobalParticlesNum * 3 * sizeof(float), cudaMemcpyHostToDevice);
-				cudaMemcpy(hash_list_gpu, _hashgrid->HashList.data(), _hashgrid->HashList.size() * sizeof(long long), cudaMemcpyHostToDevice);
-				cudaMemcpy(index_list_gpu, _hashgrid->IndexList.data(), _hashgrid->IndexList.size() * sizeof(int), cudaMemcpyHostToDevice);
-				cudaMemcpy(start_list_keys_gpu, start_list_keys_cpu, _hashgrid->StartList.size() * sizeof(long long), cudaMemcpyHostToDevice);
-				cudaMemcpy(start_list_values_gpu, start_list_values_cpu, _hashgrid->StartList.size() * sizeof(int), cudaMemcpyHostToDevice);
-				cudaMemcpy(end_list_keys_gpu, end_list_keys_cpu, _hashgrid->EndList.size() * sizeof(long long), cudaMemcpyHostToDevice);
-				cudaMemcpy(end_list_values_gpu, end_list_values_cpu, _hashgrid->EndList.size() * sizeof(int), cudaMemcpyHostToDevice);
-				cudaMemcpy(types_gpu, types_cpu, queue_flag * sizeof(char), cudaMemcpyHostToDevice);
-				cudaMemcpy(depths_gpu, depths_cpu, queue_flag * sizeof(char), cudaMemcpyHostToDevice);
-				cudaMemcpy(centers_gpu, centers_cpu, queue_flag * 3 * sizeof(float), cudaMemcpyHostToDevice);
-				cudaMemcpy(half_lengthes_gpu, half_lengthes_cpu, queue_flag * sizeof(float), cudaMemcpyHostToDevice);
-				cudaMemcpy(nodes_gpu, nodes_cpu, queue_flag * 4 * sizeof(float), cudaMemcpyHostToDevice);
-				cuda_node_calc_const_r_kernel (
-					blocksPerGrid, threadsPerBlock,
-					particles_gpu, Gs_gpu, splashs_gpu, particles_gradients_gpu, 
-					hash_list_gpu, index_list_gpu, start_list_keys_gpu, start_list_values_gpu, end_list_keys_gpu, end_list_values_gpu, 
-					types_gpu, depths_gpu, centers_gpu, half_lengthes_gpu, tnode_num_gpu, nodes_gpu
-				);
-				cudaMemcpy(types_cpu, types_gpu, queue_flag * sizeof(char), cudaMemcpyDeviceToHost);
-				cudaMemcpy(nodes_cpu, nodes_gpu, queue_flag * 4 * sizeof(float), cudaMemcpyDeviceToHost);
-				cudaFree(particles_gpu);
-				cudaFree(Gs_gpu);
-				cudaFree(splashs_gpu);
-				cudaFree(particles_gradients_gpu);
-				cudaFree(hash_list_gpu);
-				cudaFree(index_list_gpu);
-				cudaFree(start_list_keys_gpu);
-				cudaFree(start_list_values_gpu);
-				cudaFree(end_list_keys_gpu);
-				cudaFree(end_list_values_gpu);
-				cudaFree(types_gpu);
-				cudaFree(depths_gpu);
-				cudaFree(centers_gpu);
-				cudaFree(half_lengthes_gpu);
-				cudaFree(nodes_gpu);
-				cudaFree(tnode_num_gpu);
-				for (size_t i = 0; i < queue_flag; i++)
-				{
-					ProcessArray[i]->type = types_cpu[i];
-					if (ProcessArray[i]->type == EMPTY || ProcessArray[i]->type == LEAF)
-					{
-						ProcessArray[i]->node[0] = nodes_cpu[i * 3 + 0];
-						ProcessArray[i]->node[1] = nodes_cpu[i * 3 + 1];
-						ProcessArray[i]->node[2] = nodes_cpu[i * 3 + 2];
-						ProcessArray[i]->node[3] = nodes_cpu[i * 3 + 3];
-					} else if (ProcessArray[i]->type == INTERNAL) {
-						for (Index t = 0; t.v < 8; t++)
-						{
-							ProcessArray[i]->children[t.v] = new TNode(this);
-							ProcessArray[i]->children[t.v]->depth = ProcessArray[i]->depth + 1;
-							ProcessArray[i]->children[t.v]->half_length = ProcessArray[i]->half_length / 2;
-							ProcessArray[i]->children[t.v]->center =
-								ProcessArray[i]->center + (Eigen::Vector3f(sign(t.x), sign(t.y), sign(t.z)) * ProcessArray[i]->half_length / 2);
-							ProcessArray[i]->children[t.v]->node[0] = ProcessArray[i]->children[t.v]->center[0];
-							ProcessArray[i]->children[t.v]->node[1] = ProcessArray[i]->children[t.v]->center[1];
-							ProcessArray[i]->children[t.v]->node[2] = ProcessArray[i]->children[t.v]->center[2];
-							WaitingStack.push_back(ProcessArray[i]->children[t.v]);
-						}
-					} else {
-						exit(1);
-					}
-				}
-			}
-			delete[] xmeans_cpu;
-			delete[] Gs_cpu;
-			delete[] particles_grads_cpu;
-			delete[] start_list_keys_cpu;
-			delete[] start_list_values_cpu;
-			delete[] end_list_keys_cpu;
-			delete[] end_list_values_cpu;
-			delete[] types_cpu;
-			delete[] depths_cpu;
-			delete[] centers_cpu;
-			delete[] half_lengthes_cpu;
-			delete[] nodes_cpu;
-			delete[] bounding_gpu;
-			delete[] xyz_cell_num_gpu;
-			delete[] start_end_list_size_gpu;
-			delete[] particels_num_min_depth_gpu;
-			delete[] radius_inf_factor_iso_min_max_scalar_cell_size_gpu;
-			delete[] particles_gpu;
-			delete[] Gs_gpu; 
-			delete[] splashs_gpu; 
-			delete[] particles_gradients_gpu; 
-			delete[] hash_list_gpu;
-			delete[] index_list_gpu;
-			delete[] start_list_keys_gpu;
-			delete[] start_list_values_gpu;
-			delete[] end_list_keys_gpu;
-			delete[] end_list_values_gpu;
-			delete[] types_gpu; 
-			delete[] depths_gpu; 
-			delete[] centers_gpu; 
-			delete[] half_lengthes_gpu; 
-			delete[] tnode_num_gpu;
-			delete[] nodes_gpu; 
-		} else {
-			printf("GPU acceleration for multi resolution particle data is not yet supported.");
-			exit(0);
-		}
+		// if (IS_CONST_RADIUS)
+		// {
+		// 	int threadsPerBlock = 512, blocksPerGrid;
+		// 	// memory on host
+		// 	float* xmeans_cpu = new float[_GlobalParticlesNum * 3];
+		// 	float* Gs_cpu = new float[_GlobalParticlesNum * 9];
+		// 	float* particles_grads_cpu = new float[_GlobalParticlesNum * 3];
+		// 	for (size_t i = 0; i < _GlobalParticlesNum; i++)
+		// 	{
+		// 		xmeans_cpu[i * 3 + 0] = _evaluator->GlobalxMeans[i][0];
+		// 		xmeans_cpu[i * 3 + 1] = _evaluator->GlobalxMeans[i][1];
+		// 		xmeans_cpu[i * 3 + 2] = _evaluator->GlobalxMeans[i][2];
+		// 		Gs_cpu[i * 9 + 0] = _evaluator->GlobalGs[i].data()[0];
+		// 		Gs_cpu[i * 9 + 1] = _evaluator->GlobalGs[i].data()[1];
+		// 		Gs_cpu[i * 9 + 2] = _evaluator->GlobalGs[i].data()[2];
+		// 		Gs_cpu[i * 9 + 3] = _evaluator->GlobalGs[i].data()[3];
+		// 		Gs_cpu[i * 9 + 4] = _evaluator->GlobalGs[i].data()[4];
+		// 		Gs_cpu[i * 9 + 5] = _evaluator->GlobalGs[i].data()[5];
+		// 		Gs_cpu[i * 9 + 6] = _evaluator->GlobalGs[i].data()[6];
+		// 		Gs_cpu[i * 9 + 7] = _evaluator->GlobalGs[i].data()[7];
+		// 		Gs_cpu[i * 9 + 8] = _evaluator->GlobalGs[i].data()[8];
+		// 		particles_grads_cpu[i * 3 + 0] = _evaluator->PariclesNormals[i][0];
+		// 		particles_grads_cpu[i * 3 + 1] = _evaluator->PariclesNormals[i][1];
+		// 		particles_grads_cpu[i * 3 + 2] = _evaluator->PariclesNormals[i][2];
+		// 	}
+		// 	long long* start_list_keys_cpu = new long long[_hashgrid->StartList.size()];
+		// 	int* start_list_values_cpu = new int[_hashgrid->StartList.size()];
+		// 	long long* end_list_keys_cpu = new long long[_hashgrid->EndList.size()];
+		// 	int* end_list_values_cpu = new int[_hashgrid->EndList.size()];
+		// 	std::transform(_hashgrid->StartList.begin(), _hashgrid->EndList.end(), start_list_keys_cpu, [](const std::pair<long long, int>& p) {return p.first;});
+		// 	std::transform(_hashgrid->StartList.begin(), _hashgrid->EndList.end(), start_list_values_cpu, [](const std::pair<long long, int>& p) {return p.second;});
+		// 	std::transform(_hashgrid->StartList.begin(), _hashgrid->EndList.end(), end_list_keys_cpu, [](const std::pair<long long, int>& p) {return p.first;});
+		// 	std::transform(_hashgrid->StartList.begin(), _hashgrid->EndList.end(), end_list_values_cpu, [](const std::pair<long long, int>& p) {return p.second;});
+		// 	char* types_cpu;
+		// 	char* depths_cpu;
+		// 	float* centers_cpu;
+		// 	float* half_lengthes_cpu;
+		// 	int tnode_num_cpu[1];
+		// 	float* nodes_cpu;
+		// 	size_t start_end_list_size[2] = {_hashgrid->StartList.size(), _hashgrid->EndList.size()};
+		// 	int particels_num_min_depth[2] = {_GlobalParticlesNum, _DEPTH_MIN};
+		// 	float radius_inf_factor_iso_min_max_scalar_cell_size[6] = {_RADIUS, _INFLUENCE_FACTOR, _ISO_VALUE, _MIN_SCALAR, _MAX_SCALAR, _hashgrid->CellSize};
+		// 	// memory on device
+		// 	float* bounding_gpu;
+		// 	unsigned int* xyz_cell_num_gpu;
+		// 	size_t* start_end_list_size_gpu;
+		// 	int* particels_num_min_depth_gpu;
+		// 	float* radius_inf_factor_iso_min_max_scalar_cell_size_gpu;
+		// 	cudaMalloc(&bounding_gpu, 6 * sizeof(float));
+		// 	cudaMalloc(&xyz_cell_num_gpu, 3 * sizeof(unsigned int));
+		// 	cudaMalloc(&start_end_list_size_gpu, 2 * sizeof(size_t));
+		// 	cudaMalloc(&particels_num_min_depth_gpu, 2 * sizeof(int));
+		// 	cudaMalloc(&radius_inf_factor_iso_min_max_scalar_cell_size_gpu, 6 * sizeof(float));
+		// 	cudaMemcpyToSymbol(bounding_gpu, _hashgrid->Bounding, 6 * sizeof(float));
+		// 	cudaMemcpyToSymbol(xyz_cell_num_gpu, _hashgrid->XYZCellNum, 3 * sizeof(unsigned int));
+		// 	cudaMemcpyToSymbol(start_end_list_size_gpu, start_end_list_size, 2 * sizeof(size_t));
+		// 	cudaMemcpyToSymbol(particels_num_min_depth_gpu, particels_num_min_depth, 2 * sizeof(int));
+		// 	cudaMemcpyToSymbol(radius_inf_factor_iso_min_max_scalar_cell_size_gpu, radius_inf_factor_iso_min_max_scalar_cell_size, 6 * sizeof(float));
+		// 	float* particles_gpu;
+		// 	float* Gs_gpu; 
+		// 	bool* splashs_gpu; 
+		// 	float* particles_gradients_gpu; 
+    	// 	long long* hash_list_gpu;
+		// 	int* index_list_gpu;
+		// 	long long* start_list_keys_gpu;
+		// 	int* start_list_values_gpu;
+		// 	long long* end_list_keys_gpu;
+		// 	int* end_list_values_gpu;
+		// 	char* types_gpu; 
+		// 	char* depths_gpu; 
+		// 	float* centers_gpu; 
+		// 	float* half_lengthes_gpu; 
+		// 	int* tnode_num_gpu;
+    	// 	float* nodes_gpu; 
+		// 	WaitingStack.push_back(root);
+		// 	while (!WaitingStack.empty())
+		// 	{
+		// 		for (queue_flag = 0; queue_flag < inProcessSize && !WaitingStack.empty(); queue_flag++)
+		// 		{
+		// 			ProcessArray[queue_flag] = WaitingStack.back();
+		// 			WaitingStack.pop_back();
+		// 		}
+		// 		blocksPerGrid = int(queue_flag + (threadsPerBlock - 1) / threadsPerBlock);
+		// 		types_cpu = new char[queue_flag];
+		// 		depths_cpu = new char[queue_flag];
+		// 		centers_cpu = new float[queue_flag * 3];
+		// 		half_lengthes_cpu = new float[queue_flag];
+		// 		tnode_num_cpu[0] = queue_flag;
+		// 		nodes_cpu = new float[queue_flag * 4];
+		// 		for (size_t i = 0; i < queue_flag; i++)
+		// 		{
+		// 			types_cpu[i] = ProcessArray[i]->type;
+		// 			depths_cpu[i] = ProcessArray[i]->depth;
+		// 			centers_cpu[i * 3 + 0] = ProcessArray[i]->center[0];
+		// 			centers_cpu[i * 3 + 1] = ProcessArray[i]->center[1];
+		// 			centers_cpu[i * 3 + 2] = ProcessArray[i]->center[2];
+		// 			half_lengthes_cpu[i] = ProcessArray[i]->half_length;
+		// 			nodes_cpu[i * 4 + 0] = ProcessArray[i]->center[0];
+		// 			nodes_cpu[i * 4 + 1] = ProcessArray[i]->center[1];
+		// 			nodes_cpu[i * 4 + 2] = ProcessArray[i]->center[2];
+		// 			nodes_cpu[i * 4 + 3] = ProcessArray[i]->center[3];
+		// 		}
+		// 		cudaMalloc((void**)& tnode_num_gpu, sizeof(int));
+		// 		cudaMemcpy(tnode_num_gpu, tnode_num_cpu, sizeof(int), cudaMemcpyHostToDevice);
+		// 		cudaMalloc((void**)& particles_gpu, _GlobalParticlesNum * 3 * sizeof(float));
+		// 		cudaMalloc((void**)& Gs_gpu, _GlobalParticlesNum * 9 * sizeof(float));
+		// 		cudaMalloc((void**)& splashs_gpu, _GlobalParticlesNum * sizeof(bool));
+		// 		cudaMalloc((void**)& particles_gradients_gpu, _GlobalParticlesNum * 3 * sizeof(float));
+		// 		cudaMalloc((void**)& hash_list_gpu, _hashgrid->HashList.size() * sizeof(long long));
+		// 		cudaMalloc((void**)& index_list_gpu, _hashgrid->IndexList.size() * sizeof(int));
+		// 		cudaMalloc((void**)& start_list_keys_gpu, _hashgrid->StartList.size() * sizeof(long long));
+		// 		cudaMalloc((void**)& start_list_values_gpu, _hashgrid->StartList.size() * sizeof(int));
+		// 		cudaMalloc((void**)& end_list_keys_gpu, _hashgrid->StartList.size() * sizeof(long long));
+		// 		cudaMalloc((void**)& end_list_values_gpu, _hashgrid->StartList.size() * sizeof(int));
+		// 		cudaMalloc((void**)& types_gpu, queue_flag * sizeof(char));
+		// 		cudaMalloc((void**)& depths_gpu, queue_flag * sizeof(char));
+		// 		cudaMalloc((void**)& centers_gpu, queue_flag * 3 * sizeof(float));
+		// 		cudaMalloc((void**)& half_lengthes_gpu, queue_flag * sizeof(float));
+		// 		cudaMalloc((void**)& nodes_gpu, queue_flag * 4 * sizeof(float));
+		// 		cudaMemcpy(particles_gpu, xmeans_cpu, _GlobalParticlesNum * 3 * sizeof(float), cudaMemcpyHostToDevice);
+		// 		cudaMemcpy(Gs_gpu, Gs_cpu, _GlobalParticlesNum * 9 * sizeof(float), cudaMemcpyHostToDevice);
+		// 		cudaMemcpy(splashs_gpu, _evaluator->GlobalSplash.data(), _GlobalParticlesNum * sizeof(bool), cudaMemcpyHostToDevice);
+		// 		cudaMemcpy(particles_gradients_gpu, particles_grads_cpu, _GlobalParticlesNum * 3 * sizeof(float), cudaMemcpyHostToDevice);
+		// 		cudaMemcpy(hash_list_gpu, _hashgrid->HashList.data(), _hashgrid->HashList.size() * sizeof(long long), cudaMemcpyHostToDevice);
+		// 		cudaMemcpy(index_list_gpu, _hashgrid->IndexList.data(), _hashgrid->IndexList.size() * sizeof(int), cudaMemcpyHostToDevice);
+		// 		cudaMemcpy(start_list_keys_gpu, start_list_keys_cpu, _hashgrid->StartList.size() * sizeof(long long), cudaMemcpyHostToDevice);
+		// 		cudaMemcpy(start_list_values_gpu, start_list_values_cpu, _hashgrid->StartList.size() * sizeof(int), cudaMemcpyHostToDevice);
+		// 		cudaMemcpy(end_list_keys_gpu, end_list_keys_cpu, _hashgrid->EndList.size() * sizeof(long long), cudaMemcpyHostToDevice);
+		// 		cudaMemcpy(end_list_values_gpu, end_list_values_cpu, _hashgrid->EndList.size() * sizeof(int), cudaMemcpyHostToDevice);
+		// 		cudaMemcpy(types_gpu, types_cpu, queue_flag * sizeof(char), cudaMemcpyHostToDevice);
+		// 		cudaMemcpy(depths_gpu, depths_cpu, queue_flag * sizeof(char), cudaMemcpyHostToDevice);
+		// 		cudaMemcpy(centers_gpu, centers_cpu, queue_flag * 3 * sizeof(float), cudaMemcpyHostToDevice);
+		// 		cudaMemcpy(half_lengthes_gpu, half_lengthes_cpu, queue_flag * sizeof(float), cudaMemcpyHostToDevice);
+		// 		cudaMemcpy(nodes_gpu, nodes_cpu, queue_flag * 4 * sizeof(float), cudaMemcpyHostToDevice);
+		// 		cuda_node_calc_const_r_kernel (
+		// 			blocksPerGrid, threadsPerBlock,
+		// 			particles_gpu, Gs_gpu, splashs_gpu, particles_gradients_gpu, 
+		// 			hash_list_gpu, index_list_gpu, start_list_keys_gpu, start_list_values_gpu, end_list_keys_gpu, end_list_values_gpu, 
+		// 			types_gpu, depths_gpu, centers_gpu, half_lengthes_gpu, tnode_num_gpu, nodes_gpu
+		// 		);
+		// 		cudaMemcpy(types_cpu, types_gpu, queue_flag * sizeof(char), cudaMemcpyDeviceToHost);
+		// 		cudaMemcpy(nodes_cpu, nodes_gpu, queue_flag * 4 * sizeof(float), cudaMemcpyDeviceToHost);
+		// 		cudaFree(particles_gpu);
+		// 		cudaFree(Gs_gpu);
+		// 		cudaFree(splashs_gpu);
+		// 		cudaFree(particles_gradients_gpu);
+		// 		cudaFree(hash_list_gpu);
+		// 		cudaFree(index_list_gpu);
+		// 		cudaFree(start_list_keys_gpu);
+		// 		cudaFree(start_list_values_gpu);
+		// 		cudaFree(end_list_keys_gpu);
+		// 		cudaFree(end_list_values_gpu);
+		// 		cudaFree(types_gpu);
+		// 		cudaFree(depths_gpu);
+		// 		cudaFree(centers_gpu);
+		// 		cudaFree(half_lengthes_gpu);
+		// 		cudaFree(nodes_gpu);
+		// 		cudaFree(tnode_num_gpu);
+		// 		for (size_t i = 0; i < queue_flag; i++)
+		// 		{
+		// 			ProcessArray[i]->type = types_cpu[i];
+		// 			if (ProcessArray[i]->type == EMPTY || ProcessArray[i]->type == LEAF)
+		// 			{
+		// 				ProcessArray[i]->node[0] = nodes_cpu[i * 3 + 0];
+		// 				ProcessArray[i]->node[1] = nodes_cpu[i * 3 + 1];
+		// 				ProcessArray[i]->node[2] = nodes_cpu[i * 3 + 2];
+		// 				ProcessArray[i]->node[3] = nodes_cpu[i * 3 + 3];
+		// 			} else if (ProcessArray[i]->type == INTERNAL) {
+		// 				for (Index t = 0; t.v < 8; t++)
+		// 				{
+		// 					ProcessArray[i]->children[t.v] = new TNode(this);
+		// 					ProcessArray[i]->children[t.v]->depth = ProcessArray[i]->depth + 1;
+		// 					ProcessArray[i]->children[t.v]->half_length = ProcessArray[i]->half_length / 2;
+		// 					ProcessArray[i]->children[t.v]->center =
+		// 						ProcessArray[i]->center + (Eigen::Vector3f(sign(t.x), sign(t.y), sign(t.z)) * ProcessArray[i]->half_length / 2);
+		// 					ProcessArray[i]->children[t.v]->node[0] = ProcessArray[i]->children[t.v]->center[0];
+		// 					ProcessArray[i]->children[t.v]->node[1] = ProcessArray[i]->children[t.v]->center[1];
+		// 					ProcessArray[i]->children[t.v]->node[2] = ProcessArray[i]->children[t.v]->center[2];
+		// 					WaitingStack.push_back(ProcessArray[i]->children[t.v]);
+		// 				}
+		// 			} else {
+		// 				exit(1);
+		// 			}
+		// 		}
+		// 	}
+		// 	delete[] xmeans_cpu;
+		// 	delete[] Gs_cpu;
+		// 	delete[] particles_grads_cpu;
+		// 	delete[] start_list_keys_cpu;
+		// 	delete[] start_list_values_cpu;
+		// 	delete[] end_list_keys_cpu;
+		// 	delete[] end_list_values_cpu;
+		// 	delete[] types_cpu;
+		// 	delete[] depths_cpu;
+		// 	delete[] centers_cpu;
+		// 	delete[] half_lengthes_cpu;
+		// 	delete[] nodes_cpu;
+		// 	delete[] bounding_gpu;
+		// 	delete[] xyz_cell_num_gpu;
+		// 	delete[] start_end_list_size_gpu;
+		// 	delete[] particels_num_min_depth_gpu;
+		// 	delete[] radius_inf_factor_iso_min_max_scalar_cell_size_gpu;
+		// 	delete[] particles_gpu;
+		// 	delete[] Gs_gpu; 
+		// 	delete[] splashs_gpu; 
+		// 	delete[] particles_gradients_gpu; 
+		// 	delete[] hash_list_gpu;
+		// 	delete[] index_list_gpu;
+		// 	delete[] start_list_keys_gpu;
+		// 	delete[] start_list_values_gpu;
+		// 	delete[] end_list_keys_gpu;
+		// 	delete[] end_list_values_gpu;
+		// 	delete[] types_gpu; 
+		// 	delete[] depths_gpu; 
+		// 	delete[] centers_gpu; 
+		// 	delete[] half_lengthes_gpu; 
+		// 	delete[] tnode_num_gpu;
+		// 	delete[] nodes_gpu; 
+		// } else {
+		// 	printf("GPU acceleration for multi resolution particle data is not yet supported.");
+		// 	exit(0);
+		// }
 	}
 	double t_finish = get_time();
 	printf("Time generating tree = %f\n", t_finish - t_start);	
@@ -904,9 +904,9 @@ void SurfReconstructor::generalModeRun()
 	printf("-= Build Neighbor Searcher =-\n");
 	if (IS_CONST_RADIUS)
 	{
-    	_hashgrid = new HashGrid(_GlobalParticles, _BoundingBox, _INFLUENCE_FACTOR * _RADIUS);
+    	_hashgrid = new HashGrid(_GlobalParticles, _BoundingBox, _RADIUS, _NEIGHBOR_FACTOR);
 	} else {
-		_searcher = new MultiLevelSearcher(&_GlobalParticles, _GlobalRadiuses, _INFLUENCE_FACTOR);
+		_searcher = new MultiLevelSearcher(&_GlobalParticles, _BoundingBox, _GlobalRadiuses, _NEIGHBOR_FACTOR);
 	}
     last_temp_time = temp_time;
     temp_time = get_time();

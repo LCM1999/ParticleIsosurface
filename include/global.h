@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <assert.h>
 #include <Eigen/Dense>
-
+#include "rply.h"
 
 struct TNode;
 
@@ -44,12 +44,12 @@ struct vect3
 	}
 };
 
+typedef vect3<float> Vertex;
 
-template<class T>
 struct Triangle
 {
 	Triangle() {};
-	Triangle(const T& a, const T& b, const T& c)
+	Triangle(const int& a, const int& b, const int& c)
 	{
 		v[0] = a;
 		v[1] = b;
@@ -57,12 +57,12 @@ struct Triangle
 		//std::sort(v.begin(), v.end());
 	}
 
-	std::array<T, 3> v;
+	std::array<int, 3> v;
 
-	bool operator<(const Triangle<T>& t) const
+	bool operator<(const Triangle& t) const
 	{
-		std::array<T, 3> temp_v(v);
-		std::array<T, 3> temp_t = {t.v[0], t.v[1], t.v[2]};
+		std::array<int, 3> temp_v(v);
+		std::array<int, 3> temp_t = {t.v[0], t.v[1], t.v[2]};
 		std::sort(temp_v.begin(), temp_v.end());
 		std::sort(temp_t.begin(), temp_t.end());
 
@@ -71,15 +71,16 @@ struct Triangle
 };
 
 
-struct Mesh
+class Mesh
 {
+public:
 	Mesh(int mesh_precision = 1e4);
     int MESH_PRECISION;
 	std::vector<Eigen::Vector3f> IcosaTable;
 	std::map<vect3<int>, int> vertices_map;
-	std::vector<vect3<float>> vertices;
-	std::map<Triangle<int>, int> tris_map;
-	std::vector<Triangle<int>> tris;
+	std::vector<Vertex> vertices;
+	std::map<Triangle, int> tris_map;
+	std::vector<Triangle> tris;
 	unsigned int verticesNum = 0;
 	unsigned int trianglesNum = 0;
 	const int theta = 5;
@@ -95,7 +96,7 @@ struct Mesh
 
 	const int triangle_edge2vert[3][2] = { {1, 2}, {2, 0}, {0, 1} };
 
-	std::vector<Eigen::Vector3f> norms;
+	//std::vector<Eigen::Vector3f> norms;
 
 	void BuildIcosaTable();
 	void AppendSplash_ConstR(std::vector<Eigen::Vector3f>& splash_particles, const float radius);

@@ -82,6 +82,7 @@ add_executable(${PROJECT_NAME}
     src/pugixml.cpp
     src/hdf5Utils.cpp
     src/multi_level_reseacher.cpp
+    src/rply.c
 )
 
 cuda_add_library(node_calc_lib SHARED src/node_calc.cu)

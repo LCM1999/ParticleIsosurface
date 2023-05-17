@@ -1,14 +1,21 @@
 #include "hash_grid.h"
 
-HashGrid::HashGrid(std::vector<Eigen::Vector3f>& particles, double* bounding, double cellsize)
+HashGrid::HashGrid(std::vector<Eigen::Vector3f>& particles, float* bounding, float radius, float inf_factor)
 {
 	Particles = &particles;
 	ParticlesNum = Particles->size();
-	CellSize = cellsize;
+	CellSize = radius * inf_factor + radius  * 2;
 
 	int i = 0;
 	double length = 0.0;
 	double center = 0.0;
+
+	// bounding[0] -= radius;
+	// bounding[1] += radius;
+	// bounding[2] -= radius;
+	// bounding[3] += radius;
+	// bounding[4] -= radius;
+	// bounding[5] += radius;
 
 	for (i = 0; i < 3; i++)
 	{
@@ -17,9 +24,9 @@ HashGrid::HashGrid(std::vector<Eigen::Vector3f>& particles, double* bounding, do
 		Bounding[i * 2] = center - length / 2;
 		Bounding[i * 2 + 1] = center + length / 2;
 	}
-	XYZCellNum[0] = int(ceil((Bounding[1] - Bounding[0]) / CellSize));
-	XYZCellNum[1] = int(ceil((Bounding[3] - Bounding[2]) / CellSize));
-	XYZCellNum[2] = int(ceil((Bounding[5] - Bounding[4]) / CellSize));
+	XYZCellNum[0] = std::max(int(ceil((Bounding[1] - Bounding[0]) / CellSize)), 1);
+	XYZCellNum[1] = std::max(int(ceil((Bounding[3] - Bounding[2]) / CellSize)), 1);
+	XYZCellNum[2] = std::max(int(ceil((Bounding[5] - Bounding[4]) / CellSize)), 1);
 	CellNum = (long long)XYZCellNum[0] * (long long)XYZCellNum[1] * (long long)XYZCellNum[2];
 
 	HashList.resize(ParticlesNum, 0);

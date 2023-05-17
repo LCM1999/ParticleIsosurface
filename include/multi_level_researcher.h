@@ -15,7 +15,7 @@ private:
     float infFactor;
 
 public:
-    MultiLevelSearcher(std::vector<Eigen::Vector3f>* particles, std::vector<float>* radiuses, float inf_factor);
+    MultiLevelSearcher(std::vector<Eigen::Vector3f>* particles, float* bounding, std::vector<float>* radiuses, float inf_factor);
     MultiLevelSearcher() {};
     ~MultiLevelSearcher() {};
 

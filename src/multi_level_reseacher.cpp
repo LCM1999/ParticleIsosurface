@@ -3,7 +3,7 @@
 
 #include "hash_grid.h"
 
-MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3f>* particles, std::vector<float>* radiuses, float inf_factor)
+MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3f>* particles, float* bounding, std::vector<float>* radiuses, float inf_factor)
 {
     std::vector<std::vector<Eigen::Vector3f>> sortedParticles;
     maxRadius = *std::max_element(radiuses->begin(), radiuses->end());
@@ -11,7 +11,7 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3f>* particles, 
     infFactor = inf_factor;
     std::vector<std::pair<float, float>> bin_bounds;
     float bin_extent = minRadius * 0.5;
-    int bins = floor((maxRadius - minRadius) / bin_extent) + 1;
+    int bins = std::max(int(ceil((maxRadius - minRadius) / bin_extent)), 1);
     bin_extent = (maxRadius - minRadius) / bins;
     for (size_t i = 0; i < bins; i++)
     {
@@ -50,29 +50,18 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3f>* particles, 
     if (avgRadius > maxRadius) avgRadius = maxRadius;
     for (int i = 0; i < sortedParticles.size(); i++)
     {
-        double bounding [6] = {0.0f};
-        bounding[0] = (*std::min_element(sortedParticles[i].begin(), sortedParticles[i].end(), [&](const Eigen::Vector3f& v1, const Eigen::Vector3f& v2) {
-            return v1.x() < v2.x();
-        })).x();
-        bounding[2] = (*std::min_element(sortedParticles[i].begin(), sortedParticles[i].end(), [&](const Eigen::Vector3f& v1, const Eigen::Vector3f& v2) {
-            return v1.y() < v2.y();
-        })).y();
-        bounding[4] = (*std::min_element(sortedParticles[i].begin(), sortedParticles[i].end(), [&](const Eigen::Vector3f& v1, const Eigen::Vector3f& v2) {
-            return v1.z() < v2.z();
-        })).z();
-        bounding[1] = (*std::max_element(sortedParticles[i].begin(), sortedParticles[i].end(), [&](const Eigen::Vector3f& v1, const Eigen::Vector3f& v2) {
-            return v1.x() < v2.x();
-        })).x();
-        bounding[3] = (*std::max_element(sortedParticles[i].begin(), sortedParticles[i].end(), [&](const Eigen::Vector3f& v1, const Eigen::Vector3f& v2) {
-            return v1.y() < v2.y();
-        })).y();
-        bounding[5] = (*std::max_element(sortedParticles[i].begin(), sortedParticles[i].end(), [&](const Eigen::Vector3f& v1, const Eigen::Vector3f& v2) {
-            return v1.z() < v2.z();
-        })).z();
-        searchers.push_back(new HashGrid(sortedParticles[i], bounding, bin_bounds[i].second * infFactor));
+        float temp_bounding [6] = {0.0f};
+        temp_bounding[0] = bounding[0];
+        temp_bounding[1] = bounding[1];
+        temp_bounding[2] = bounding[2];
+        temp_bounding[3] = bounding[3];
+        temp_bounding[4] = bounding[4];
+        temp_bounding[5] = bounding[5];
+        searchers.push_back(new HashGrid(sortedParticles[i], temp_bounding, bin_bounds[i].second, inf_factor));
     }
     std::set<float> st(radiuses->begin(), radiuses->end());
     checkedRadiuses.assign(st.begin(), st.end());
+    printf("   Seachers level: %d.\n", searchers.size());
 }
 
 void MultiLevelSearcher::GetNeighbors(const Eigen::Vector3f& pos, std::vector<int>& neighbors)
