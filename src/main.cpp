@@ -364,9 +364,9 @@ int main(int argc, char **argv)
     {
         std::string dataDirPath =
             // "C:/Users/11379/Desktop/protein";
-            // "E:/data/multiR/mr_csv";
+            "E:/data/multiR/mr_csv";
             // "E:/BaiduNetdiskDownload/MultiResolutionResults/damcsv";
-            "E:/BaiduNetdiskDownload/MultiResolutionResults/watercsv";
+            // "E:/BaiduNetdiskDownload/MultiResolutionResults/watercsv";
             // "E:/data/vtk/csv";
         run(dataDirPath);
     }
