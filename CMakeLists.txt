@@ -64,9 +64,10 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     add_compile_options("-openmp:llvm")
 endif()
 
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 SET(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -gencode arch=compute_${COMPUTE_CAPABILITY},code=compute_${COMPUTE_CAPABILITY};-g;-G;)
 
-add_executable(${PROJECT_NAME}
+cuda_add_executable(${PROJECT_NAME}
     src/cube_arrays.cpp
     src/iso_method_ours.cpp
     src/main.cpp
@@ -79,32 +80,34 @@ add_executable(${PROJECT_NAME}
     src/surface_reconstructor.cpp
     src/global.cpp
     src/recorder.cpp
-    src/pugixml.cpp
-    src/hdf5Utils.cpp
+    # src/pugixml.cpp
+    # src/hdf5Utils.cpp
     src/multi_level_reseacher.cpp
     src/rply.c
+    cuda/node_calc.cuh
+    cuda/node_calc.cu
 )
 
-cuda_add_library(node_calc_lib SHARED src/node_calc.cu)
+# add_library(node_calc_lib SHARED cuda/node_calc.cuh cuda/node_calc.cu)
 
 target_include_directories(${PROJECT_NAME} 
     PUBLIC
     include
     #${METIS_INCLUDE_DIR}
     ${MPI_CXX_INCLUDE_DIRS}
-    ${HDF5_INCLUDE_DIR}
+    # ${HDF5_INCLUDE_DIR}
     ${EIGEN3_INCLUDE_DIR}
     ${CUDA_INCLUDE_DIRS}
     # ${THRUST_INCLUDE_DIRS}
 )
 
 target_link_libraries(${PROJECT_NAME} 
-    PUBLIC
+    # PUBLIC
+    # node_calc_lib
     #Metis::metis
-    ${HDF5_C_STATIC_LIBRARY}
+    # ${HDF5_C_STATIC_LIBRARY}
     Eigen3::Eigen
     OpenMP::OpenMP_CXX
     ${CUDA_LIBRARIES}
-    node_calc_lib
     # ${THRUST_LIBRARIES}
 )

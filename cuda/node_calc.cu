@@ -1,7 +1,8 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include "math.h"
-// #include "node_calc.cuh"
+
+#include "node_calc.cuh"
 
 #define TOLERANCE 1e-5f
 #define FLATNESS 0.99f
@@ -776,17 +777,193 @@ __global__ void cuda_node_calc_const_r(
     }
 }
 
-extern "C" void cuda_node_calc_const_r_kernel(
-	int blocks, int threads,
-	float* particles, float* Gs, bool* splashs, float* particles_gradients, 
-    long long* hash_list, int* index_list, long long* start_list_keys, int* start_list_values, long long* end_list_keys, int* end_list_values,
-    char* types, char* depths, float* centers, float* half_lengthes, int* tnode_num,
-    float* nodes
-) {
-    cuda_node_calc_const_r<<<blocks, threads>>>(
-        particles, Gs, splashs, particles_gradients, 
-        hash_list, index_list, start_list_keys, start_list_values, end_list_keys, end_list_values,
-        types, depths, centers, half_lengthes, tnode_num,
-        nodes
-    );
+void cuda_node_calc_const_r_kernel(
+    int GlobalParticlesNum, int DepthMin, int QueueFlag,
+    float R, float NeighborFactor, float IsoValue, float MinScalar, float MaxScalar,  
+    Evaluator* evaluator, HashGrid* hashgrid) {
+    	int threadsPerBlock = 512, blocksPerGrid;
+		blocksPerGrid = int(QueueFlag + (threadsPerBlock - 1) / threadsPerBlock);
+		// memory on host
+		float* xmeans_cpu = new float[GlobalParticlesNum * 3];
+		float* Gs_cpu = new float[GlobalParticlesNum * 9];
+		float* particles_grads_cpu = new float[GlobalParticlesNum * 3];
+		for (size_t i = 0; i < GlobalParticlesNum; i++)
+		{
+			xmeans_cpu[i * 3 + 0] = evaluator->GlobalxMeans[i][0];
+			xmeans_cpu[i * 3 + 1] = evaluator->GlobalxMeans[i][1];
+			xmeans_cpu[i * 3 + 2] = evaluator->GlobalxMeans[i][2];
+			Gs_cpu[i * 9 + 0] = evaluator->GlobalGs[i].data()[0];
+			Gs_cpu[i * 9 + 1] = evaluator->GlobalGs[i].data()[1];
+			Gs_cpu[i * 9 + 2] = evaluator->GlobalGs[i].data()[2];
+			Gs_cpu[i * 9 + 3] = evaluator->GlobalGs[i].data()[3];
+			Gs_cpu[i * 9 + 4] = evaluator->GlobalGs[i].data()[4];
+			Gs_cpu[i * 9 + 5] = evaluator->GlobalGs[i].data()[5];
+			Gs_cpu[i * 9 + 6] = evaluator->GlobalGs[i].data()[6];
+			Gs_cpu[i * 9 + 7] = evaluator->GlobalGs[i].data()[7];
+			Gs_cpu[i * 9 + 8] = evaluator->GlobalGs[i].data()[8];
+			particles_grads_cpu[i * 3 + 0] = evaluator->PariclesNormals[i][0];
+			particles_grads_cpu[i * 3 + 1] = evaluator->PariclesNormals[i][1];
+			particles_grads_cpu[i * 3 + 2] = evaluator->PariclesNormals[i][2];
+		}
+		long long* start_list_keys_cpu = new long long[_hashgrid->StartList.size()];
+		int* start_list_values_cpu = new int[_hashgrid->StartList.size()];
+		long long* end_list_keys_cpu = new long long[_hashgrid->EndList.size()];
+		int* end_list_values_cpu = new int[_hashgrid->EndList.size()];
+		std::transform(_hashgrid->StartList.begin(), _hashgrid->EndList.end(), start_list_keys_cpu, [](const std::pair<long long, int>& p) {return p.first;});
+		std::transform(_hashgrid->StartList.begin(), _hashgrid->EndList.end(), start_list_values_cpu, [](const std::pair<long long, int>& p) {return p.second;});
+		std::transform(_hashgrid->StartList.begin(), _hashgrid->EndList.end(), end_list_keys_cpu, [](const std::pair<long long, int>& p) {return p.first;});
+		std::transform(_hashgrid->StartList.begin(), _hashgrid->EndList.end(), end_list_values_cpu, [](const std::pair<long long, int>& p) {return p.second;});
+		char* types_cpu;
+		char* depths_cpu;
+		float* centers_cpu;
+		float* half_lengthes_cpu;
+		int tnode_num_cpu[1];
+		float* nodes_cpu;
+		size_t start_end_list_size[2] = {_hashgrid->StartList.size(), _hashgrid->EndList.size()};
+		int particels_num_min_depth[2] = {GlobalParticlesNum, DepthMin};
+		float radius_inf_factor_iso_min_max_scalar_cell_size[6] = {R, NeighborFactor, IsoValue, MinScalar, MaxScalar, _hashgrid->CellSize};
+        types_cpu = new char[QueueFlag];
+		depths_cpu = new char[QueueFlag];
+		centers_cpu = new float[QueueFlag * 3];
+		half_lengthes_cpu = new float[QueueFlag];
+		tnode_num_cpu[0] = QueueFlag;
+		nodes_cpu = new float[QueueFlag * 4];
+		for (size_t i = 0; i < QueueFlag; i++)
+		{
+			types_cpu[i] = ProcessArray[i]->type;
+			depths_cpu[i] = ProcessArray[i]->depth;
+			centers_cpu[i * 3 + 0] = ProcessArray[i]->center[0];
+			centers_cpu[i * 3 + 1] = ProcessArray[i]->center[1];
+			centers_cpu[i * 3 + 2] = ProcessArray[i]->center[2];
+			half_lengthes_cpu[i] = ProcessArray[i]->half_length;
+			nodes_cpu[i * 4 + 0] = ProcessArray[i]->center[0];
+			nodes_cpu[i * 4 + 1] = ProcessArray[i]->center[1];
+			nodes_cpu[i * 4 + 2] = ProcessArray[i]->center[2];
+			nodes_cpu[i * 4 + 3] = ProcessArray[i]->center[3];
+		}
+		// memory on device
+		float* bounding_gpu;
+		unsigned int* xyz_cell_num_gpu;
+		size_t* start_end_list_size_gpu;
+		int* particels_num_min_depth_gpu;
+		float* radius_inf_factor_iso_min_max_scalar_cell_size_gpu;
+		cudaMalloc(&bounding_gpu, 6 * sizeof(float));
+		cudaMalloc(&xyz_cell_num_gpu, 3 * sizeof(unsigned int));
+		cudaMalloc(&start_end_list_size_gpu, 2 * sizeof(size_t));
+		cudaMalloc(&particels_num_min_depth_gpu, 2 * sizeof(int));
+		cudaMalloc(&radius_inf_factor_iso_min_max_scalar_cell_size_gpu, 6 * sizeof(float));
+		cudaMemcpyToSymbol(bounding_gpu, _hashgrid->Bounding, 6 * sizeof(float));
+		cudaMemcpyToSymbol(xyz_cell_num_gpu, _hashgrid->XYZCellNum, 3 * sizeof(unsigned int));
+		cudaMemcpyToSymbol(start_end_list_size_gpu, start_end_list_size, 2 * sizeof(size_t));
+		cudaMemcpyToSymbol(particels_num_min_depth_gpu, particels_num_min_depth, 2 * sizeof(int));
+		cudaMemcpyToSymbol(radius_inf_factor_iso_min_max_scalar_cell_size_gpu, radius_inf_factor_iso_min_max_scalar_cell_size, 6 * sizeof(float));
+        float* particles_gpu;
+		float* Gs_gpu; 
+		bool* splashs_gpu; 
+		float* particles_gradients_gpu; 
+		long long* hash_list_gpu;
+		int* index_list_gpu;
+		long long* start_list_keys_gpu;
+		int* start_list_values_gpu;
+		long long* end_list_keys_gpu;
+		int* end_list_values_gpu;
+		char* types_gpu; 
+		char* depths_gpu; 
+		float* centers_gpu; 
+		float* half_lengthes_gpu; 
+		int* tnode_num_gpu;
+		float* nodes_gpu; 
+        cudaMalloc((void**)& tnode_num_gpu, sizeof(int));
+		cudaMemcpy(tnode_num_gpu, tnode_num_cpu, sizeof(int), cudaMemcpyHostToDevice);
+        
+		cudaMalloc((void**)& particles_gpu, GlobalParticlesNum * 3 * sizeof(float));
+		cudaMalloc((void**)& Gs_gpu, GlobalParticlesNum * 9 * sizeof(float));
+		cudaMalloc((void**)& splashs_gpu, GlobalParticlesNum * sizeof(bool));
+		cudaMalloc((void**)& particles_gradients_gpu, GlobalParticlesNum * 3 * sizeof(float));
+		cudaMalloc((void**)& hash_list_gpu, _hashgrid->HashList.size() * sizeof(long long));
+		cudaMalloc((void**)& index_list_gpu, _hashgrid->IndexList.size() * sizeof(int));
+		cudaMalloc((void**)& start_list_keys_gpu, _hashgrid->StartList.size() * sizeof(long long));
+		cudaMalloc((void**)& start_list_values_gpu, _hashgrid->StartList.size() * sizeof(int));
+		cudaMalloc((void**)& end_list_keys_gpu, _hashgrid->StartList.size() * sizeof(long long));
+		cudaMalloc((void**)& end_list_values_gpu, _hashgrid->StartList.size() * sizeof(int));
+		cudaMalloc((void**)& types_gpu, QueueFlag * sizeof(char));
+		cudaMalloc((void**)& depths_gpu, QueueFlag * sizeof(char));
+		cudaMalloc((void**)& centers_gpu, QueueFlag * 3 * sizeof(float));
+		cudaMalloc((void**)& half_lengthes_gpu, QueueFlag * sizeof(float));
+		cudaMalloc((void**)& nodes_gpu, QueueFlag * 4 * sizeof(float));
+		cudaMemcpy(particles_gpu, xmeans_cpu, GlobalParticlesNum * 3 * sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(Gs_gpu, Gs_cpu, GlobalParticlesNum * 9 * sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(splashs_gpu, _evaluator->GlobalSplash.data(), GlobalParticlesNum * sizeof(bool), cudaMemcpyHostToDevice);
+		cudaMemcpy(particles_gradients_gpu, particles_grads_cpu, GlobalParticlesNum * 3 * sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(hash_list_gpu, _hashgrid->HashList.data(), _hashgrid->HashList.size() * sizeof(long long), cudaMemcpyHostToDevice);
+		cudaMemcpy(index_list_gpu, _hashgrid->IndexList.data(), _hashgrid->IndexList.size() * sizeof(int), cudaMemcpyHostToDevice);
+		cudaMemcpy(start_list_keys_gpu, start_list_keys_cpu, _hashgrid->StartList.size() * sizeof(long long), cudaMemcpyHostToDevice);
+		cudaMemcpy(start_list_values_gpu, start_list_values_cpu, _hashgrid->StartList.size() * sizeof(int), cudaMemcpyHostToDevice);
+		cudaMemcpy(end_list_keys_gpu, end_list_keys_cpu, _hashgrid->EndList.size() * sizeof(long long), cudaMemcpyHostToDevice);
+		cudaMemcpy(end_list_values_gpu, end_list_values_cpu, _hashgrid->EndList.size() * sizeof(int), cudaMemcpyHostToDevice);
+		cudaMemcpy(types_gpu, types_cpu, QueueFlag * sizeof(char), cudaMemcpyHostToDevice);
+		cudaMemcpy(depths_gpu, depths_cpu, QueueFlag * sizeof(char), cudaMemcpyHostToDevice);
+		cudaMemcpy(centers_gpu, centers_cpu, QueueFlag * 3 * sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(half_lengthes_gpu, half_lengthes_cpu, QueueFlag * sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(nodes_gpu, nodes_cpu, QueueFlag * 4 * sizeof(float), cudaMemcpyHostToDevice);
+        
+        cuda_node_calc_const_r();
+        
+        cudaMemcpy(types_cpu, types_gpu, QueueFlag * sizeof(char), cudaMemcpyDeviceToHost);
+		cudaMemcpy(nodes_cpu, nodes_gpu, QueueFlag * 4 * sizeof(float), cudaMemcpyDeviceToHost);
+		cudaFree(particles_gpu);
+		cudaFree(Gs_gpu);
+		cudaFree(splashs_gpu);
+		cudaFree(particles_gradients_gpu);
+		cudaFree(hash_list_gpu);
+		cudaFree(index_list_gpu);
+		cudaFree(start_list_keys_gpu);
+		cudaFree(start_list_values_gpu);
+		cudaFree(end_list_keys_gpu);
+		cudaFree(end_list_values_gpu);
+		cudaFree(types_gpu);
+		cudaFree(depths_gpu);
+		cudaFree(centers_gpu);
+		cudaFree(half_lengthes_gpu);
+		cudaFree(nodes_gpu);
+		cudaFree(tnode_num_gpu);
+		delete[] xmeans_cpu;
+		delete[] Gs_cpu;
+		delete[] particles_grads_cpu;
+		delete[] start_list_keys_cpu;
+		delete[] start_list_values_cpu;
+		delete[] end_list_keys_cpu;
+		delete[] end_list_values_cpu;
+		delete[] types_cpu;
+		delete[] depths_cpu;
+		delete[] centers_cpu;
+		delete[] half_lengthes_cpu;
+		delete[] nodes_cpu;
+		delete[] bounding_gpu;
+		delete[] xyz_cell_num_gpu;
+		delete[] start_end_list_size_gpu;
+		delete[] particels_num_min_depth_gpu;
+		delete[] radius_inf_factor_iso_min_max_scalar_cell_size_gpu;
+		delete[] particles_gpu;
+		delete[] Gs_gpu; 
+		delete[] splashs_gpu; 
+		delete[] particles_gradients_gpu; 
+		delete[] hash_list_gpu;
+		delete[] index_list_gpu;
+		delete[] start_list_keys_gpu;
+		delete[] start_list_values_gpu;
+		delete[] end_list_keys_gpu;
+		delete[] end_list_values_gpu;
+		delete[] types_gpu; 
+		delete[] depths_gpu; 
+		delete[] centers_gpu; 
+		delete[] half_lengthes_gpu; 
+		delete[] tnode_num_gpu;
+		delete[] nodes_gpu; 
+    // cuda_node_calc_const_r<<<blocks, threads>>>(
+    //     particles, Gs, splashs, particles_gradients, 
+    //     hash_list, index_list, start_list_keys, start_list_values, end_list_keys, end_list_values,
+    //     types, depths, centers, half_lengthes, tnode_num,
+    //     nodes
+    // );
 }
