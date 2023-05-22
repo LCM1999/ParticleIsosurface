@@ -11,29 +11,6 @@
 #include "visitorextract.h"
 #include "traverse.h"
 
-// #include "cuda_runtime.h"
-
-// extern void cuda_node_calc_const_r(
-// 	float* particles, float* Gs, bool* splashs, float* particles_gradients, 
-//     long long* hash_list, int* index_list, long long* start_list_keys, int* start_list_values, long long* end_list_keys, int* end_list_values,
-//     char* types, char* depths, float* centers, float* half_lengthes, int* tnode_num,
-//     float* nodes
-// );
-
-// extern "C" void cuda_node_calc_const_r_kernel(
-// 	dim3 blocks, dim3 threads,
-// 	float* particles, float* Gs, bool* splashs, float* particles_gradients, 
-//     long long* hash_list, int* index_list, long long* start_list_keys, int* start_list_values, long long* end_list_keys, int* end_list_values,
-//     char* types, char* depths, float* centers, float* half_lengthes, int* tnode_num,
-//     float* nodes
-// ) {
-// 	cuda_node_calc_const_r << <blocks, threads> >>(
-// 		particles_gpu, Gs_gpu, splashs_gpu, particles_gradients_gpu, 
-// 		hash_list_gpu, index_list_gpu, start_list_keys_gpu, start_list_values_gpu, end_list_keys_gpu, end_list_values_gpu, 
-// 		types_gpu, depths_gpu, centers_gpu, half_lengthes_gpu, tnode_num_gpu, nodes_gpu
-// 	);
-// };
-
 SurfReconstructor::SurfReconstructor(std::vector<Eigen::Vector3f>& particles, 
 std::vector<float>* radiuses, Mesh* mesh, 
 float radius, float flatness, float inf_factor)

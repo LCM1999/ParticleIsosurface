@@ -16,7 +16,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
 set(EIGEN3_DIR C:/Lib/Eigen-3.4.0-MSVC/share/eigen3/cmake)
 set(HDF5_DIR C:/Lib/HDF5-1.10.7-MSVC/cmake/hdf5)
 
-
 find_package(CUDA  REQUIRED)
 if(NOT CUDA_FOUND)
     message(FATAL_ERROR "CUDA not found!")    
@@ -26,7 +25,6 @@ endif(NOT CUDA_FOUND)
 # if(NOT Thrust_FOUND)
 #     message(FATAL_ERROR "Thrust not found!")    
 # endif(NOT Thrust_FOUND)
-
 
 find_package(OpenMP REQUIRED)
 if(NOT OpenMP_FOUND)
@@ -53,7 +51,6 @@ endif()
 #if(NOT Metis_FOUND)
 #    message(FATAL_ERROR "metis not found!")
 #endif()
-
 
 ################################################################################
 # Target
