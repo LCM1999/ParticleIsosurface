@@ -10,13 +10,6 @@ HashGrid::HashGrid(std::vector<Eigen::Vector3f>& particles, float* bounding, flo
 	double length = 0.0;
 	double center = 0.0;
 
-	// bounding[0] -= radius;
-	// bounding[1] += radius;
-	// bounding[2] -= radius;
-	// bounding[3] += radius;
-	// bounding[4] -= radius;
-	// bounding[5] += radius;
-
 	for (i = 0; i < 3; i++)
 	{
 		length = ((ceil((bounding[i * 2 + 1] - bounding[i * 2]) / CellSize)) * CellSize);
@@ -126,11 +119,11 @@ void HashGrid::GetInBoxParticles(
 	CalcXYZIdx(box2, maxXyzIdx);
 
 	long long temp_hash;
-	for (int x = (minXyzIdx.x()-1); x < (maxXyzIdx.x()+1); x++)
+	for (int x = (minXyzIdx.x()-1); x <= (maxXyzIdx.x()+1); x++)
     {
-        for (int y = (minXyzIdx.y()-1); y < (maxXyzIdx.y()+1); y++)
+        for (int y = (minXyzIdx.y()-1); y <= (maxXyzIdx.y()+1); y++)
         {
-            for (int z = (minXyzIdx.z()-1); z < (maxXyzIdx.z()+1); z++)
+            for (int z = (minXyzIdx.z()-1); z <= (maxXyzIdx.z()+1); z++)
             {
                 temp_hash = CalcCellHash(Eigen::Vector3i(x, y, z));
                 if (temp_hash < 0) {continue;}

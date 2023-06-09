@@ -34,7 +34,31 @@ Evaluator::Evaluator(SurfReconstructor* surf_constructor,
 	}
 }
 
-void Evaluator::SingleEval(const Eigen::Vector3f& pos, float& scalar, Eigen::Vector3f& gradient, bool use_normalize, bool use_signed, bool grad_normalize)
+void Evaluator::SingleEval(const Eigen::Vector3f& pos, float& scalar)
+{
+	scalar = 0;
+    std::vector<int> neighbors;
+    if (IS_CONST_RADIUS)
+    {
+        constructor->getHashGrid()->GetPIdxList(pos, neighbors);
+    } else {
+        constructor->getSearcher()->GetNeighbors(pos, neighbors);
+    }
+    Eigen::Vector3f diff;
+    for (int pIdx : neighbors)
+    {
+        if (this->CheckSplash(pIdx))
+        {
+            continue;
+        }
+
+        diff = pos - GlobalxMeans[pIdx];
+        scalar += AnisotropicInterpolate(pIdx, diff);
+    }
+    scalar = constructor->getIsoValue() - ((scalar - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
+}
+
+void Evaluator::SingleEvalWithGrad(const Eigen::Vector3f& pos, float& scalar, Eigen::Vector3f& gradient, bool use_normalize, bool use_signed, bool grad_normalize)
 {
 	if (constructor->getMaxScalar() >= 0)
 	{
@@ -79,11 +103,12 @@ void Evaluator::SingleEval(const Eigen::Vector3f& pos, float& scalar, Eigen::Vec
 }
 
 void Evaluator::GridEval(
-    float* sample_points, float* field_gradients,
+    float* sample_points, float* field_gradients, float cellsize, 
     bool& signchange, int oversample, bool grad_normalize)
 {
     //assert(!sample_points.empty());
     bool origin_sign;
+    float step = cellsize / oversample;
     for (int i = 0; i < pow(oversample+1, 3); i++)
     {
         Eigen::Vector4f p(sample_points[i*4 + 0], sample_points[i*4 + 1], sample_points[i*4 + 2], sample_points[i*4 + 3]);
@@ -146,45 +171,45 @@ void Evaluator::GridEval(
                 last_idx = (z * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + (x - 1));
                 if (x == 0)
                 {
-                    gradient[0] = sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3];
+                    gradient[0] = (sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3]) / step;
                 }
                 else if (x == oversample)
                 {
-                    gradient[0] = sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3];
+                    gradient[0] = (sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3]) / step;
                 }
                 else
                 {
-                    gradient[0] = sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3];
+                    gradient[0] = (sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3]) / (step * 2);
                 }
 
                 next_idx = (z * (oversample + 1) * (oversample + 1) + (y + 1) * (oversample + 1) + x);
                 last_idx = (z * (oversample + 1) * (oversample + 1) + (y - 1) * (oversample + 1) + x);
                 if (y == 0)
                 {
-                    gradient[1] = sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3];
+                    gradient[1] = (sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3]) / step;
                 }
                 else if (y == oversample)
                 {
-                    gradient[1] = sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3];
+                    gradient[1] = (sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3]) / step;
                 }
                 else
                 {
-                    gradient[1] = sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3];
+                    gradient[1] = (sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3]) / (step * 2);
                 }
 
                 next_idx = ((z + 1) * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + x);
                 last_idx = ((z - 1) * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + x);
                 if (z == 0)
                 {
-                    gradient[2] = sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3];
+                    gradient[2] = (sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3]) / step;
                 }
                 else if (z == oversample)
                 {
-                    gradient[2] = sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3];
+                    gradient[2] = (sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3]) / step;
                 }
                 else
                 {
-                    gradient[2] = sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3];
+                    gradient[2] = (sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3]) / (step * 2);
                 }
                 if (grad_normalize)
                 {
@@ -256,23 +281,7 @@ float Evaluator::RecommendIsoValueConstR()
     const double influnce = radius * smooth_factor;
     const double influnce2 = influnce * influnce;
 
-    // Eigen::Vector3f p1(radius, 0, 0);
-    // Eigen::Vector3f p2(-radius, 0, 0);
-    // Eigen::Vector3f sample(radius, radius,0);
-    // Eigen::Vector3f xMean1;
-    // Eigen::Vector3f xMean2;
-    // Eigen::Matrix3f G1 = Eigen::Matrix3f::Zero();
-    // Eigen::Matrix3f G2 = Eigen::Matrix3f::Zero();
-    // compute_single_xMean(p1, p2, xMean1, radius);
-    // compute_single_xMean(p2, p1, xMean2, radius);
-    // compute_single_G(p1, xMean1, p2, G1, radius);
-    // compute_single_G(p2, xMean2, p1, G2, radius);
-
-    // k_value += general_kernel((G1 * (sample - xMean1)).squaredNorm(), influnce2, influnce);
-    // k_value += general_kernel((G2 * (sample - xMean2)).squaredNorm(), influnce2, influnce);
-
     k_value += general_kernel(2 * radius2, influnce2, influnce) * 2;
-    // k_value += general_kernel(5 * radius2, influnce2, influnce);
 
     return (((radius2 * radius * k_value) 
     - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
@@ -291,7 +300,6 @@ float Evaluator::RecommendIsoValueVarR()
         influnce2 = influnce * influnce;
         k_value = 0;
         k_value += general_kernel(2 * radius2, influnce2, influnce) * 2;
-        // k_value += general_kernel(5 * radius2, influnce2, influnce);
         recommend += (radius2 * r) * k_value;
     }
     return ((recommend / radiuses->size()) - constructor->getMinScalar()) / constructor->getMaxScalar() * 255;
@@ -308,7 +316,7 @@ void Evaluator::CalcParticlesNormal()
         Eigen::Vector3f tempGrad = Eigen::Vector3f::Zero();
         if (!CheckSplash(pIdx))
         {
-            SingleEval(GlobalPoses->at(pIdx), tempScalar, tempGrad);
+            SingleEvalWithGrad(GlobalPoses->at(pIdx), tempScalar, tempGrad);
             PariclesNormals[pIdx][0] = tempGrad[0];
             PariclesNormals[pIdx][1] = tempGrad[1];
             PariclesNormals[pIdx][2] = tempGrad[2];

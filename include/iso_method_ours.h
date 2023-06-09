@@ -35,6 +35,8 @@ struct TNode
 
 	TNode(SurfReconstructor* surf_constructor);
 
+	TNode::TNode(SurfReconstructor* surf_constructor, TNode* parent, Index i);
+
 	~TNode()
 	{
 		defoliate();
@@ -106,17 +108,13 @@ struct TNode
 
 	void vertAll(float& curv, bool& signchange, float& qef_error, float& sample);
 
-	void GenerateSampling(
-		float* sample_points, const int sampling_idx, const int oversample);
+	void GenerateSampling(float* sample_points);
 
 	void NodeSampling(
-		float& curv, bool& signchange, 
-		float* sample_points, float* sample_grads, 
-		const int sampling_idx, const int oversample);
+		float& curv, bool& signchange, float cellsize,
+		float* sample_points, float* sample_grads);
 
-	void NodeCalcNode(
-		float* sample_points, float* sample_grads, 
-		const int sampling_idx, const int oversample);
+	void NodeCalcNode(float* sample_points, float* sample_grads, float cellsize);
 
 	// void NodeFeatureCalc();
 

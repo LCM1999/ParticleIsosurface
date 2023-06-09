@@ -23,7 +23,7 @@ private:
     float _BORDER = (1.0 / 16.0);
     int _DEPTH_MAX = 6; // 7
     int _DEPTH_MIN = 5; // 4
-    float _NEIGHBOR_FACTOR = 0.0f;
+    float _NEIGHBOR_FACTOR = 4.0f;
     float _SMOOTH_FACTOR = 2.0f;
     float _ISO_VALUE = 0.0f;
 
@@ -82,10 +82,9 @@ protected:
     void genIsoOurs();
     void checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& curv, float& min_radius);
     void eval(TNode* tnode);
-    void beforeSampleEval(TNode* tnode, float& curv, float& min_radius, bool& empty, int& oversample);
+    void beforeSampleEval(TNode* tnode, float& curv, float& min_radius, bool& empty);
     void afterSampleEval(
-        TNode* tnode, float& curv, float& min_radius, int* oversample, const int index,
-        float* sample_points, float* sample_grads);
+        TNode* tnode, float& curv, float& min_radius, float* sample_points, float* sample_grads);
 
 public:
     SurfReconstructor() {};
