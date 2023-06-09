@@ -32,10 +32,12 @@ public:
                 std::vector<float>* radiuses,
                 float radius);
 
-	void SingleEval(const Eigen::Vector3f& pos, float& scalar, Eigen::Vector3f& gradient, bool use_normalize = true, bool use_signed = true, bool grad_normalize = true);
+    void SingleEval(const Eigen::Vector3f& pos, float& scalar);
+
+	void SingleEvalWithGrad(const Eigen::Vector3f& pos, float& scalar, Eigen::Vector3f& gradient, bool use_normalize = true, bool use_signed = true, bool grad_normalize = true);
 
     void GridEval(
-        float* sample_points, float* field_gradients,
+        float* sample_points, float* field_gradients, float cellsize, 
         bool& signchange, int oversample, bool grad_normalize = true);
 
     bool CheckSplash(const int& pIdx);

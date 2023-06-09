@@ -62,7 +62,7 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 endif()
 
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-SET(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -gencode arch=compute_${COMPUTE_CAPABILITY},code=compute_${COMPUTE_CAPABILITY};-g;-G;)
+SET(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -arch=sm_${COMPUTE_CAPABILITY}; -gencode=arch=compute_${COMPUTE_CAPABILITY},code=sm_${COMPUTE_CAPABILITY};-g;-G;-Xptxas=-v; --maxrregcount=32)
 
 cuda_add_executable(${PROJECT_NAME}
     src/cube_arrays.cpp

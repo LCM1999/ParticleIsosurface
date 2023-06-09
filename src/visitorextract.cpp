@@ -114,7 +114,6 @@ bool VisitorExtract::on_vert(TraversalData& a, TraversalData& b, TraversalData& 
 			if ((v1.node[3] > 0 ? 1 : -1) != (v2.node[3] > 0 ? 1 : -1))
 			{
 				Eigen::Vector4f tmpv1 = v1.node, tmpv2 = v2.node, tmpv = Eigen::Vector4f::Zero();
-				Eigen::Vector3f tmpg = Eigen::Vector3f::Zero();
 				float ratio;
 				while ((tmpv1 - tmpv2).head(3).norm() >
 				(IS_CONST_RADIUS ? constructor->getConstRadius(): constructor->getSearcher()->getMinRadius()) / 2)
@@ -122,7 +121,7 @@ bool VisitorExtract::on_vert(TraversalData& a, TraversalData& b, TraversalData& 
 					tmpv[0] =  (tmpv1[0] + tmpv2[0]) / 2;
 					tmpv[1] =  (tmpv1[1] + tmpv2[1]) / 2;
 					tmpv[2] =  (tmpv1[2] + tmpv2[2]) / 2;
-					constructor->getEvaluator()->SingleEval(tmpv.head(3), tmpv[3], tmpg);
+					constructor->getEvaluator()->SingleEval(tmpv.head(3), tmpv[3]);
 					if ((tmpv[3] > 0 ? 1 : -1) == (tmpv1[3] > 0 ? 1 : -1))
 					{
 						tmpv1 = tmpv;

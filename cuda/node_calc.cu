@@ -3,18 +3,18 @@
 #include "math.h"
 
 #include "node_calc.cuh"
+#include "iso_method_ours.h"
+#include "cuda_error.cuh"
+
+#include "../include/timer.h"
+
 
 #define TOLERANCE 1e-5f
 #define FLATNESS 0.99f
 #define INV_PI 0.31830988618379067153776752674503
-
-
-__constant__ float BOUNDING[6];
-__constant__ unsigned int XYZ_CELL_NUM[3];
-__constant__ size_t START_END_LIST_SIZE[2];
-__constant__ int PARTICLES_NUM_MIN_DEPTH[2];
-__constant__ float RADIUS_INF_FACTOR_ISO_MIN_MAX_SCALAR_CELL_SIZE[6];
-
+#define SAMPLE 2
+#define MIN_SCALAR 0
+#define REGS_USED_BY_KERNEL 32
 
 /*-----------------Device Math Util---------------------*/
 __device__ float squared_norm(float* v, const int m)
@@ -87,7 +87,7 @@ __device__ void qef_combine(float* qef_normal, float* eqn) {
     }
 }
 
-__device__ void mat_inverse(float* mat, float* inv, const int m) {
+__device__ void mat_inverse_gaussian(float* mat, float* inv, const int m) {
     for (size_t i = 0; i < m; i++)
     {
         inv[i * m + i] = 1.0f;
@@ -101,7 +101,6 @@ __device__ void mat_inverse(float* mat, float* inv, const int m) {
             mat[i * m + j] /= pivot;
             inv[i * m + j] /= pivot;
         }
-        
         for (size_t j = 0; j < m; j++)
         {
             if (i == j)
@@ -131,7 +130,6 @@ __device__ long long start_end_find(long long* keys, const unsigned int size, co
 }
 
 __device__ void calc_xyz_idx(
-    const float CELL_SIZE, 
     float* pos, int* xyzIdx
 ) {
     xyzIdx[0] = 0;
@@ -139,7 +137,7 @@ __device__ void calc_xyz_idx(
     xyzIdx[2] = 0;
     for (size_t i = 0; i < 3; i++)
     {
-        xyzIdx[i] = int((pos[i] - BOUNDING[i * 2]) / CELL_SIZE);
+        xyzIdx[i] = int((pos[i] - BOUNDING[i * 2]) / HASH_CELL_SIZE[0]);
     }
 }
 
@@ -154,17 +152,17 @@ __device__ long long calc_cell_hash(int* xyzIdx) {
 
 __device__ void get_in_cell_list(
     int* index_list, long long* start_list_keys, int* start_list_values, long long* end_list_keys, int* end_list_values, 
-    const long long hash, int* p_list, unsigned char& p_size
+    const long long hash, int* p_list, unsigned short& p_size
 ) {
-    size_t countIdx;
-    long long startIdx = start_end_find(start_list_keys, START_END_LIST_SIZE[0], hash), endIdx = start_end_find(end_list_keys, START_END_LIST_SIZE[1], hash);
-    if (startIdx == -1 || endIdx == -1)
+    long long start_index = start_end_find(start_list_keys, START_END_LIST_SIZE[0], hash);
+    long long end_index = start_end_find(end_list_keys, START_END_LIST_SIZE[1], hash);
+    if (start_index < 0 || end_index < 0)
     {
         return;
     }
-    for (countIdx = startIdx; countIdx < endIdx; countIdx++)
+    for (size_t countIdx = start_list_values[start_index]; countIdx < end_list_values[end_index]; countIdx++)
     {
-        p_list[p_size++] = countIdx;
+        p_list[p_size++] = index_list[countIdx];
     }
 }
 
@@ -179,54 +177,89 @@ __device__ bool check_splash(bool* splashs, const int pIdx)
 }
 
 __device__ float general_kernel(float d2, float h2, float h) {
-    float p_dist = (d2 >= h2) ? 0.0f : pow(h2 - d2, 3);
-    float sigma = (315 / (64 * pow(h, 9))) * INV_PI;
-    return p_dist * sigma;
+    return (d2 >= h2) ? 0.0f : pow(h2 - d2, 3) * (315 / (64 * pow(h, 9))) * INV_PI;
 }
 
-__device__ float anisotropic_interpolate(
-    float* G, const float radius, const float INF_FACTOR,
-    float* diff
+__device__ void anisotropic_interpolate(
+    float* G, float* diff, float& scalar
 ) {
-    float influnce = radius * INF_FACTOR;
     float gs_mult_diff[3] = {0};
     mat_mult_vec(G, diff, 3, gs_mult_diff);
-    float k_value = general_kernel(squared_norm(gs_mult_diff, 3), squared(influnce), influnce);
-    return pow(radius, 3) * determine3(G) * k_value;
+    scalar += RADIUS[2] * determine3(G) * general_kernel(squared_norm(gs_mult_diff, 3), INFLUNCE[1], INFLUNCE[0]);
+}
+
+__device__ void single_eval_const_r(
+    float* particles, float* Gs, bool* splashs, float* particles_gradients,
+    int* index_list, long long* start_list_keys, int* start_list_values, long long* end_list_keys, int* end_list_values, 
+    float* pos, float& v
+) {
+    float scalar = 0.0f;
+    int neighbors[1024] = {0};
+    unsigned short n_size = 0;
+    int xyzIdx[3] = {0};
+    int tempXyzIdx[3] = {0};
+    float diff[3] = {0};
+    long long hash = 0;
+    calc_xyz_idx(pos, xyzIdx);
+    for (int x = -1; x <= 1; x++)
+    {
+        for (int y = -1; y <= 1; y++)
+        {
+            for (int z = -1; z <= 1; z++)
+            {
+                tempXyzIdx[0] = xyzIdx[0] + x;
+                tempXyzIdx[1] = xyzIdx[1] + y;
+                tempXyzIdx[2] = xyzIdx[2] + z;
+                hash = calc_cell_hash(tempXyzIdx);
+                if (hash < 0)
+                {
+                    continue;
+                }
+                get_in_cell_list(index_list, start_list_keys, start_list_values, end_list_keys, end_list_values, hash, neighbors, n_size);
+            }
+        }
+    }
+    if (n_size > 0)
+    {
+        for (size_t n = 0; n < n_size; n++)
+        {
+            diff[0] = pos[0] - particles[neighbors[n] * 3 + 0];
+            diff[1] = pos[1] - particles[neighbors[n] * 3 + 1];
+            diff[2] = pos[2] - particles[neighbors[n] * 3 + 2];
+            anisotropic_interpolate(Gs + neighbors[n] * 9, diff, scalar);
+        }
+    }
+    v = ISO_VALUE[0] - ((scalar - MIN_SCALAR) / MAX_SCALAR[0] * 255);
 }
 
 __device__ void grid_eval_const_r(
-    float* particles, float* Gs, bool* splashs, float* particles_gradients, const int PARTICLES_NUM, const float RADIUS, const float INF_FACTOR, const float ISO_VALUE, const float MIN_SCALAR, const float MAX_SCALAR,
-    long long* hash_list, int* index_list, long long* start_list_keys, int* start_list_values, long long* end_list_keys, int* end_list_values, 
-    const float CELL_SIZE, 
+    float* particles, float* Gs, bool* splashs, float* particles_gradients, 
+    int* index_list, long long* start_list_keys, int* start_list_values, long long* end_list_keys, int* end_list_values, 
     bool& signchange, float* sample_points, float* sample_grads
 ) {
     bool origin_sign = false;
-    float p[4] = {0};
-    float scalar = 0.0f;
-    int neighbors[512] = {0};
-    unsigned char n_size = 0;
+    float p[3] = {0};
+    int neighbors[1024] = {0};
+    unsigned short n_size = 0;
     int xyzIdx[3] = {0};
     int tempXyzIdx[3] = {0};
     long long hash = 0;
     float diff[3] = {0};
-    for (size_t i = 0; i < 64; i++)
+    float scalar = 0;
+    for (size_t i = 0; i < ((SAMPLE+1)*(SAMPLE+1)*(SAMPLE+1)); i++)
     {
+        scalar = 0.0f;
         p[0] = sample_points[i * 4 + 0];
         p[1] = sample_points[i * 4 + 1];
         p[2] = sample_points[i * 4 + 2];
-        p[3] = sample_points[i * 4 + 3];
-        calc_xyz_idx(CELL_SIZE, p, xyzIdx);
+        calc_xyz_idx(p, xyzIdx);
         n_size = 0;
-        for (int x = -1; x <= 1; x++)
+        for (tempXyzIdx[0] = xyzIdx[0]-1; tempXyzIdx[0] <= xyzIdx[0]+1; tempXyzIdx[0]++)
         {
-            for (int y = -1; y <= 1; y++)
+            for (tempXyzIdx[1] = xyzIdx[1]-1; tempXyzIdx[1] <= xyzIdx[1]+1; tempXyzIdx[1]++)
             {
-                for (int z = -1; z <= 1; z++)
+                for (tempXyzIdx[2] = xyzIdx[2]-1; tempXyzIdx[2] <= xyzIdx[2]+1; tempXyzIdx[2]++)
                 {
-                    tempXyzIdx[0] = xyzIdx[0] + x;
-                    tempXyzIdx[1] = xyzIdx[1] + y;
-                    tempXyzIdx[2] = xyzIdx[2] + z;
                     hash = calc_cell_hash(tempXyzIdx);
                     if (hash < 0)
                     {
@@ -236,17 +269,18 @@ __device__ void grid_eval_const_r(
                 }
             }
         }
-        if (n_size != 0)
+        if (n_size > 0)
         {
             for (size_t n = 0; n < n_size; n++)
             {
                 diff[0] = p[0] - particles[neighbors[n] * 3 + 0];
                 diff[1] = p[1] - particles[neighbors[n] * 3 + 1];
-                diff[0] = p[0] - particles[neighbors[n] * 3 + 0];
-                scalar += anisotropic_interpolate(Gs + neighbors[n] * 9, RADIUS, INF_FACTOR, diff);
+                diff[2] = p[2] - particles[neighbors[n] * 3 + 2];
+                // scalar += 
+                anisotropic_interpolate(Gs + neighbors[n] * 9, diff, scalar);
             }
         }
-        scalar = ISO_VALUE - ((scalar - MIN_SCALAR) / MAX_SCALAR * 255);
+        scalar = ISO_VALUE[0] - ((scalar - MIN_SCALAR) / MAX_SCALAR[0] * 255);
         sample_points[i * 4 + 3] = scalar;
         origin_sign = (sample_points[3] >= 0);
         if (!signchange)
@@ -256,59 +290,59 @@ __device__ void grid_eval_const_r(
     }
     int index, last_idx, next_idx;
     float gradient[3] = {0};
-    for (int z = 0; z < 4; z++)
+    for (int z = 0; z <= SAMPLE; z++)
     {
-        for (int y = 0; y < 4; y++)
+        for (int y = 0; y <= SAMPLE; y++)
         {
-            for (int x = 0; x < 4; x++)
+            for (int x = 0; x <= SAMPLE; x++)
             {
-                index = (z * 16 + y * 4 + x);
+                index = (z * ((SAMPLE+1) * (SAMPLE+1)) + y * (SAMPLE+1) + x);
                 gradient[0] = 0;
                 gradient[1] = 0;
                 gradient[2] = 0;
-                next_idx = (z * 16 + y * 4 + (x + 1));
-                last_idx = (z * 16 + y * 4 + (x - 1));
+                next_idx = (z * ((SAMPLE+1) * (SAMPLE+1)) + y * (SAMPLE+1) + (x + 1));
+                last_idx = (z * ((SAMPLE+1) * (SAMPLE+1)) + y * (SAMPLE+1) + (x - 1));
                 if (x == 0)
                 {
-                    gradient[0] = sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3];
+                    gradient[0] = (sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3])/ HALF_CELL_BORDER_STEP_SIZE[3];
                 }
-                else if (x == 3)
+                else if (x == SAMPLE)
                 {
-                    gradient[0] = sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3];
+                    gradient[0] = (sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3]) / HALF_CELL_BORDER_STEP_SIZE[3];
                 }
                 else
                 {
-                    gradient[0] = sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3];
+                    gradient[0] = (sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3]) / (HALF_CELL_BORDER_STEP_SIZE[3] * 2);
                 }
 
-                next_idx = (z * 16 + (y + 1) * 4 + x);
-                last_idx = (z * 16 + (y - 1) * 4 + x);
+                next_idx = (z * ((SAMPLE+1) * (SAMPLE+1)) + (y + 1) * (SAMPLE+1) + x);
+                last_idx = (z * ((SAMPLE+1) * (SAMPLE+1)) + (y - 1) * (SAMPLE+1) + x);
                 if (y == 0)
                 {
-                    gradient[1] = sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3];
+                    gradient[1] = (sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3]) / HALF_CELL_BORDER_STEP_SIZE[3];
                 }
-                else if (y == 3)
+                else if (y == SAMPLE)
                 {
-                    gradient[1] = sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3];
+                    gradient[1] = (sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3]) / HALF_CELL_BORDER_STEP_SIZE[3];
                 }
                 else
                 {
-                    gradient[1] = sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3];
+                    gradient[1] = (sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3]) / (HALF_CELL_BORDER_STEP_SIZE[3] * 2);
                 }
 
-                next_idx = ((z + 1) * 16 + y * 4 + x);
-                last_idx = ((z - 1) * 16 + y * 4 + x);
+                next_idx = ((z + 1) * ((SAMPLE+1) * (SAMPLE+1)) + y * (SAMPLE+1) + x);
+                last_idx = ((z - 1) * ((SAMPLE+1) * (SAMPLE+1)) + y * (SAMPLE+1) + x);
                 if (z == 0)
                 {
-                    gradient[2] = sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3];
+                    gradient[2] = (sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3]) / HALF_CELL_BORDER_STEP_SIZE[3];
                 }
-                else if (z == 3)
+                else if (z == SAMPLE)
                 {
-                    gradient[2] = sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3];
+                    gradient[2] = (sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3]) / HALF_CELL_BORDER_STEP_SIZE[3];
                 }
                 else
                 {
-                    gradient[2] = sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3];
+                    gradient[2] = (sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3]) / (HALF_CELL_BORDER_STEP_SIZE[3] * 2);
                 }
                 sample_grads[index * 3 + 0] = gradient[0];
                 sample_grads[index * 3 + 1] = gradient[1];
@@ -320,66 +354,60 @@ __device__ void grid_eval_const_r(
 
 /*-----------------Device Top Layer Func---------------------*/
 __device__ void check_empty_and_calc_curv_const_r(
-    float* particles, bool* splashs, float* particles_gradients, const float RADIUS, const float INFLUNCE,
-    long long* hash_list, int* index_list, long long* start_list_keys, int* start_list_values, long long* end_list_keys, int* end_list_values, 
-    const float CELL_SIZE,
+    float* particles, bool* splashs, float* particles_gradients, 
+    int* index_list, long long* start_list_keys, int* start_list_values, long long* end_list_keys, int* end_list_values, 
     float* minV, float* maxV, 
     bool& empty, float& curv
 ) {
-    float norms[3] = {0.0f};
-    float area = 0.0f;
+    float norms[3] = {0};
+    int area = 0;
     int minXyzIdx[3] = {0};
     int maxXyzIdx[3] = {0};
     long long hash;
-    int p_list[512];
-    unsigned char p_size = 0;
-    int xyzIdx[3];
+    int p_list[1024];
+    unsigned short p_size = 0;
+    int xyzIdx[3] = {0};
     bool all_splash = true;
     unsigned int all_in_box = 0;
-    calc_xyz_idx(CELL_SIZE, minV, minXyzIdx);
-    calc_xyz_idx(CELL_SIZE, maxV, maxXyzIdx);
-    for (int x = (minXyzIdx[0] - 1); x < (maxXyzIdx[0] + 1); x++)
+    calc_xyz_idx(minV, minXyzIdx);
+    calc_xyz_idx(maxV, maxXyzIdx);
+    for (xyzIdx[0] = (minXyzIdx[0] - 1); xyzIdx[0] <= (maxXyzIdx[0] + 1); xyzIdx[0]++)
     {
-        for (int y = (minXyzIdx[1] - 1); y < (maxXyzIdx[1] + 1); y++)
+        for (xyzIdx[1] = (minXyzIdx[1] - 1); xyzIdx[1] <= (maxXyzIdx[1] + 1); xyzIdx[1]++)
         {
-            for (int z = (minXyzIdx[2] - 1); z < (maxXyzIdx[2] + 1); z++)
+            for (xyzIdx[2] = (minXyzIdx[2] - 1); xyzIdx[2] <= (maxXyzIdx[2] + 1); xyzIdx[2]++)
             {
-                xyzIdx[0] = x;
-                xyzIdx[1] = y;
-                xyzIdx[2] = z;
+                p_size = 0;
                 hash = calc_cell_hash(xyzIdx);
                 if (hash < 0)
                     continue;
                 get_in_cell_list(index_list, start_list_keys, start_list_values, end_list_keys, end_list_values, hash, p_list, p_size);
-                all_in_box += p_size;
                 if (p_size == 0)
                 {
                     continue;
                 }
+                all_in_box += p_size;
                 for (size_t i = 0; i < p_size; i++)
                 {
                     if (!check_splash(splashs, p_list[i]))
                     {
-                        if (particles[p_list[i] * 3 + 0] > (minV[0] - INFLUNCE) && 
-					        particles[p_list[i] * 3 + 0] < (maxV[0] + INFLUNCE) &&
-					        particles[p_list[i] * 3 + 1] > (minV[1] - INFLUNCE) && 
-					        particles[p_list[i] * 3 + 1] < (maxV[1] + INFLUNCE) &&
-					        particles[p_list[i] * 3 + 2] > (minV[2] - INFLUNCE) && 
-					        particles[p_list[i] * 3 + 2] < (maxV[2] + INFLUNCE))
+                        if (particles[p_list[i] * 3 + 0] > (minV[0] - INFLUNCE[0]) && 
+					        particles[p_list[i] * 3 + 0] < (maxV[0] + INFLUNCE[0]) &&
+					        particles[p_list[i] * 3 + 1] > (minV[1] - INFLUNCE[0]) && 
+					        particles[p_list[i] * 3 + 1] < (maxV[1] + INFLUNCE[0]) &&
+					        particles[p_list[i] * 3 + 2] > (minV[2] - INFLUNCE[0]) && 
+					        particles[p_list[i] * 3 + 2] < (maxV[2] + INFLUNCE[0]))
                         {
-                            float tempNorm[3] = {
-                                particles_gradients[p_list[i] * 3 + 0], 
-                                particles_gradients[p_list[i] * 3 + 1], 
-                                particles_gradients[p_list[i] * 3 + 2]
-                            };
-                            if (tempNorm[0] == 0 && tempNorm[1] == 0 && tempNorm[2] == 0)
+                            if (particles_gradients[p_list[i] * 3 + 0] == 0 && 
+                                particles_gradients[p_list[i] * 3 + 1] == 0 && 
+                                particles_gradients[p_list[i] * 3 + 2] == 0)
                             {
                                 continue;
                             }
-                            norms[0] += tempNorm[0];
-                            norms[1] += tempNorm[1];
-                            norms[2] += tempNorm[2];
-                            area += norm(tempNorm, 3);
+                            norms[0] += particles_gradients[p_list[i] * 3 + 0];
+                            norms[1] += particles_gradients[p_list[i] * 3 + 1];
+                            norms[2] += particles_gradients[p_list[i] * 3 + 2];
+                            area++; 
                             all_splash = false;
                         }
                     }
@@ -393,7 +421,7 @@ __device__ void check_empty_and_calc_curv_const_r(
     } else {
         empty = all_splash;
     }
-    curv = (area == 0) ? 0.0f : (norm(norms, 3) / area);
+    curv = (area == 0) ? 1.0f : (norm(norms, 3) / area);
 }
 
 __device__ void generate_sampling_points(
@@ -401,19 +429,19 @@ __device__ void generate_sampling_points(
     float* sample_points
 ) {
     int node_index;
-    for (size_t x = 0; x < 4; x++)
+    for (size_t x = 0; x <= SAMPLE; x++)
     {
-        for (size_t y = 0; y < 4; y++)
+        for (size_t y = 0; y <= SAMPLE; y++)
         {
-            for (size_t z = 0; z < 4; z++)
+            for (size_t z = 0; z <= SAMPLE; z++)
             {
-                node_index = z * 16 + y * 4 + x;
+                node_index = z * (SAMPLE+1) * (SAMPLE+1) + y * (SAMPLE+1) + x;
                 sample_points[node_index * 4 + 0] = 
-				(1 - x / 3.0f) * minV[0] + (x / 3.0f) * maxV[0];
+				(1 - (float(x) / SAMPLE)) * minV[0] + (float(x) / SAMPLE) * maxV[0];
 				sample_points[node_index * 4 + 1] = 
-				(1 - y / 3.0f) * minV[1] + (y / 3.0f) * maxV[1];
+				(1 - (float(y) / SAMPLE)) * minV[1] + (float(y) / SAMPLE) * maxV[1];
 				sample_points[node_index * 4 + 2] = 
-				(1 - z / 3.0f) * minV[2] + (z / 3.0f) * maxV[2];
+				(1 - (float(z) / SAMPLE)) * minV[2] + (float(z) / SAMPLE) * maxV[2];
 				sample_points[node_index * 4 + 3] = 0;
             }
         }
@@ -421,47 +449,37 @@ __device__ void generate_sampling_points(
 }
 
 __device__ void node_sampling_const_r(
-    float* particles, float* Gs, bool* splashs, float* particles_gradients, const int PARTICLES_NUM, const float RADIUS, const float INF_FACTOR, const float ISO_VALUE, const float MIN_SCALAR, const float MAX_SCALAR,
-    long long* hash_list, int* index_list, long long* start_list_keys, int* start_list_values, long long* end_list_keys, int* end_list_values, 
-    const float CELL_SIZE, 
+    float* particles, float* Gs, bool* splashs, float* particles_gradients, 
+    int* index_list, long long* start_list_keys, int* start_list_values, long long* end_list_keys, int* end_list_values, 
     float& curv, bool& signchange, float* sample_points, float* sample_grads
 ) {
     signchange = false;
     grid_eval_const_r(
-        particles, Gs, splashs, particles_gradients, PARTICLES_NUM, RADIUS, INF_FACTOR, ISO_VALUE, MIN_SCALAR, MAX_SCALAR,
-        hash_list, index_list, start_list_keys, start_list_values, end_list_keys, end_list_values,
-        CELL_SIZE, 
+        particles, Gs, splashs, particles_gradients, 
+        index_list, start_list_keys, start_list_values, end_list_keys, end_list_values,
         signchange, sample_points, sample_grads
     );
     float norms[3] = {0};
     float area = 0.0f;
     float tempNorm[3] = {0};
     float field_curv = 0.0f;
-    for (size_t i = 0; i < 64; i++)
+    for (size_t i = 0; i < ((SAMPLE+1)*(SAMPLE+1)*(SAMPLE+1)); i++)
     {
         tempNorm[0] = sample_grads[i * 3 + 0];
         tempNorm[1] = sample_grads[i * 3 + 1];
         tempNorm[2] = sample_grads[i * 3 + 2];
-        // normlize(tempNorm, 3);
         norms[0] += tempNorm[0];
         norms[1] += tempNorm[1];
         norms[2] += tempNorm[2];
         area += norm(tempNorm, 3);
     }
-    field_curv = (area == 0) ? 0.0 : (norm(norms, 3) / area);
-    if (field_curv == 0.0f)
-	{
-		return;
-	} else if (curv == 0.0f) {
-		curv = field_curv;
-	} else {
-        curv = (field_curv > curv) ? curv : field_curv;
-    }
+    field_curv = (area == 0) ? 1.0f : (norm(norms, 3) / area);
+    curv = (field_curv > curv) ? curv : field_curv;
 }
 
-__device__ float calc_error(float* p, float* points, float* grads)
+__device__ void calc_error(float* p, float* points, float* grads, float& err)
 {
-    float err = 0;
+    err = 0;
     float tempv[3] = {0};
 	for (size_t i = 0; i < 64; i++)
 	{
@@ -470,28 +488,34 @@ __device__ float calc_error(float* p, float* points, float* grads)
         tempv[2] = p[2] - points[i * 4 + 2];
 		err += squared(p[3] - dot(grads + i * 3, tempv, 3)) / (1 + squared_norm(grads + i * 3, 3));
 	}
-	return err;
 }
 
 __device__ void feature_calc(
-    float* minV, float* maxV, const float cell_size, const float half_length, float* center,
+    float* particles, float* Gs, bool* splashs, float* particles_gradients, 
+    int* index_list, long long* start_list_keys, int* start_list_values, long long* end_list_keys, int* end_list_values, 
+    float* minV, float* maxV, float* center,
     float* sample_points, float* sample_grads, 
     float* node)
 {
-    const float border = cell_size / 16.0;
-    float borderMinV[3] = {center[0] - half_length + border, center[1] - half_length + border, center[2] - half_length + border};
-    float borderMaxV[3] = {center[0] + half_length - border, center[1] + half_length - border, center[2] + half_length - border};
+    float borderMinV[3] = {
+        center[0] - HALF_CELL_BORDER_STEP_SIZE[0] + HALF_CELL_BORDER_STEP_SIZE[2], 
+        center[1] - HALF_CELL_BORDER_STEP_SIZE[0] + HALF_CELL_BORDER_STEP_SIZE[2], 
+        center[2] - HALF_CELL_BORDER_STEP_SIZE[0] + HALF_CELL_BORDER_STEP_SIZE[2]};
+    float borderMaxV[3] = {
+        center[0] + HALF_CELL_BORDER_STEP_SIZE[0] - HALF_CELL_BORDER_STEP_SIZE[2], 
+        center[1] + HALF_CELL_BORDER_STEP_SIZE[0] - HALF_CELL_BORDER_STEP_SIZE[2], 
+        center[2] + HALF_CELL_BORDER_STEP_SIZE[0] - HALF_CELL_BORDER_STEP_SIZE[2]};
     float qef_normal[15] = {0};
     float p[3] = {0};
     float pl[5] = {0};
-    int node_index;
-    for (size_t x = 0; x < 4; x++)
+    int node_index, index;
+    for (size_t x = 0; x <= SAMPLE; x++)
     {
-        for (size_t y = 0; y < 4; y++)
+        for (size_t y = 0; y <= SAMPLE; y++)
         {
-            for (size_t z = 0; z < 4; z++)
+            for (size_t z = 0; z <= SAMPLE; z++)
             {
-                node_index = z * 16 + y * 4 + x;
+                node_index = z * ((SAMPLE+1) * (SAMPLE+1)) + y * (SAMPLE+1) + x;
                 p[0] = sample_points[node_index * 4 + 0];
                 p[1] = sample_points[node_index * 4 + 1];
                 p[2] = sample_points[node_index * 4 + 2];
@@ -506,10 +530,15 @@ __device__ void feature_calc(
     }
     float A[16] = {0};
     float B[4] = {0};
-    for (size_t i = 0; i < 4; i++)
+    float* corners[2] = {borderMinV, borderMaxV};
+    float AC[49] = {0};
+    float BC[7] = {0};
+    size_t i, j;
+    int dir, side, dp, dpp;
+    for (i = 0; i < 4; i++)
     {
-        int index = ((11 - i) * i) / 2;
-        for (size_t j = i; j < 4; j++)
+        index = ((11 - i) * i) / 2;
+        for (j = i; j < 4; j++)
         {
             A[i * 4 + j] = qef_normal[index + j - i];
             A[j * 4 + i] = A[i * 4 + j];
@@ -517,20 +546,20 @@ __device__ void feature_calc(
         B[i] = -qef_normal[index + 4 - i];
     }
     bool is_out = true;
-    float err = 1e30f;
+    float err = 1e30f, e;
     float pc[4] = {0};
     // float pcg[3] = {0};
+    float rvalue[7] = {0};
+    float inv[49] = {0};
     for (int cell_dim = 3; cell_dim >= 0 && is_out; cell_dim--)
     {
         if (cell_dim == 3)
         {
-            float rvalue[4] = {0};
-            float inv[16] = {0};
-            mat_inverse(A, inv, 4);
-            for (size_t i = 0; i < 4; i++)
+            mat_inverse_gaussian(A, inv, 4);
+            for (i = 0; i < 4; i++)
             {
                 rvalue[i] = 0;
-                for (size_t j = 0; j < 4; j++)
+                for (j = 0; j < 4; j++)
                 {
                     rvalue[i] += inv[j * 4 + i] * B[j];
                 }
@@ -544,7 +573,7 @@ __device__ void feature_calc(
 				pc[2] >= borderMinV[2] && pc[2] <= borderMaxV[2])
             {
                 is_out = false;
-				err = calc_error(pc, sample_points, sample_grads);
+				calc_error(pc, sample_points, sample_grads, err);
 				node[0] = pc[0];
 				node[1] = pc[1];
 				node[2] = pc[2];
@@ -553,14 +582,11 @@ __device__ void feature_calc(
         } else if (cell_dim == 2) {
 			for (int face = 0; face < 6; face++)
             {
-                int dir = face / 2;
-				int side = face % 2;
-                float* corners[2] = {borderMinV, borderMaxV};
-                float AC[25] = {0};
-                float BC[5] = {0};
-                for (size_t i = 0; i < 5; i++)
+                dir = face / 2;
+				side = face % 2;
+                for (i = 0; i < 5; i++)
                 {
-                    for (size_t j = 0; j < 5; j++)
+                    for (j = 0; j < 5; j++)
                     {
                         AC[i * 5 + j] = (i < 4 && j < 4) ? A[i * 5 + j] : 0;
                     }
@@ -569,13 +595,11 @@ __device__ void feature_calc(
                 AC[20 + dir] = AC[dir * 5 + 4] = 1;
                 BC[4] = corners[side][dir];
                 
-                float rvalue[5] = {0};
-                float inv[25] = {0};
-                mat_inverse(AC, inv, 5);
-                for (size_t i = 0; i < 5; i++)
+                mat_inverse_gaussian(AC, inv, 5);
+                for (i = 0; i < 5; i++)
                 {
                     rvalue[i] = 0;
-                    for (size_t j = 0; j < 5; j++)
+                    for (j = 0; j < 5; j++)
                     {
                         rvalue[i] += inv[j * 5 + i] * BC[j];
                     }
@@ -585,13 +609,13 @@ __device__ void feature_calc(
                 pc[2] = rvalue[2];
                 pc[3] = rvalue[3];
 
-                int dp = (dir + 1) % 3;
-                int dpp = (dir + 2) % 3;
+                dp = (dir + 1) % 3;
+                dpp = (dir + 2) % 3;
                 if (pc[dp] >= borderMinV[dp] && pc[dp] <= borderMaxV[dp] &&
 					pc[dpp] >= borderMinV[dpp] && pc[dpp] <= borderMaxV[dpp])
                 {
                     is_out = false;
-					float e = calc_error(pc, sample_points, sample_grads);
+					calc_error(pc, sample_points, sample_grads, e);
 					if (e < err)
 					{
 						err = e;
@@ -604,33 +628,28 @@ __device__ void feature_calc(
             }
         } else if (cell_dim == 1) {
             for (int edge = 0; edge < 12; edge++) {
-                int dir = edge / 4;
-				int side = edge % 4;
-                float* corners[2] = {borderMinV, borderMaxV};
-                float AC[36] = {0};
-                float BC[6] = {0};
-                for (int i = 0; i < 6; i++)
+                dir = edge / 4;
+				side = edge % 4;
+                for (i = 0; i < 6; i++)
 				{
-					for (int j = 0; j < 6; j++)
+					for (j = 0; j < 6; j++)
 					{
 						AC[i * 6 + j] = (i < 4 && j < 4 ? A[i * 4 + j] : 0);
 					}
 					BC[i] = (i < 4 ? B[i] : 0);
 				}
-                int dp = (dir + 1) % 3;
-				int dpp = (dir + 2) % 3;
+                dp = (dir + 1) % 3;
+				dpp = (dir + 2) % 3;
                 AC[24 + dp] = AC[dp * 6 + 4] = 1;
 				AC[30 + dpp] = AC[dpp * 6 + 5] = 1;
 				BC[4] = corners[side & 1][dp];
 				BC[5] = corners[side >> 1][dpp];
 
-                float rvalue[6] = {0};
-                float inv[36] = {0};
-                mat_inverse(AC, inv, 6);
-                for (size_t i = 0; i < 6; i++)
+                mat_inverse_gaussian(AC, inv, 6);
+                for (i = 0; i < 6; i++)
                 {
                     rvalue[i] = 0;
-                    for (size_t j = 0; j < 6; j++)
+                    for (j = 0; j < 6; j++)
                     {
                         rvalue[i] += inv[j * 6 + i] * BC[j];
                     }
@@ -641,7 +660,7 @@ __device__ void feature_calc(
                 pc[3] = rvalue[3];
 				if (pc[dir] >= borderMinV[dir] && pc[dir] <= borderMaxV[dir]) {
                     is_out = false;
-					float e = calc_error(pc, sample_points, sample_grads);
+					calc_error(pc, sample_points, sample_grads, e);
                     if (e < err)
 					{
 						err = e;
@@ -655,41 +674,50 @@ __device__ void feature_calc(
         } else if (cell_dim == 0) {
 			for (int vertex = 0; vertex < 8; vertex++)
             {
-                float* corners[2] = {borderMinV, borderMaxV};
-                float AC[49] = {0};
-                float BC[7] = {0};
-                for (int i = 0; i < 7; i++)
+                for (i = 0; i < 7; i++)
 				{
-					for (int j = 0; j < 7; j++)
+					for (j = 0; j < 7; j++)
 					{
 						AC[i * 7 + j] = (i < 4 && j < 4 ? A[i * 4 + j] : 0);
 					}
 					BC[i] = (i < 4 ? B[i] : 0);
 				}
-                for (int i = 0; i < 3; i++)
+                for (i = 0; i < 3; i++)
                 {
                     AC[(4 + i) * 4 + i] = AC[i * 4 + 4 + i] = 1;
                     BC[4 + i] = corners[(vertex >> i) & 1][i];
                 }
 
-                float rvalue[7] = {0};
-                float inv[49] = {0};
-                mat_inverse(AC, inv, 7);
-                for (size_t i = 0; i < 7; i++)
+                mat_inverse_gaussian(AC, inv, 7);
+                for (i = 0; i < 7; i++)
                 {
                     rvalue[i] = 0;
-                    for (size_t j = 0; j < 7; j++)
+                    for (j = 0; j < 7; j++)
                     {
                         rvalue[i] += inv[j * 7 + i] * BC[j];
                     }
                 }
-                node[0] = pc[0];
-                node[1] = pc[1];
-                node[2] = pc[2];
-                node[3] = pc[3];
+                pc[0] = rvalue[0];
+                pc[1] = rvalue[1];
+                pc[2] = rvalue[2];
+                pc[3] = rvalue[3];
+                calc_error(pc, sample_points, sample_grads, e);
+                if (e < err)
+				{
+					err = e;
+					node[0] = pc[0];
+                    node[1] = pc[1];
+                    node[2] = pc[2];
+                    node[3] = pc[3];
+				}
             }
         }
     }
+    single_eval_const_r(
+        particles, Gs, splashs, particles_gradients,
+        index_list, start_list_keys, start_list_values, end_list_keys, end_list_values, 
+        node, node[3]
+    );
 }
 
 /*
@@ -711,259 +739,238 @@ CUDA_NODE_CALC_CONST_R:
         types
         nodes: tnodes' feature point
 */
-__global__ void cuda_node_calc_const_r(
+__global__ void 
+cuda_node_calc_const_r(
     float* particles, float* Gs, bool* splashs, float* particles_gradients, 
-    long long* hash_list, int* index_list, long long* start_list_keys, int* start_list_values, long long* end_list_keys, int* end_list_values,
-    char* types, char* depths, float* centers, float* half_lengthes, int* tnode_num,
-    float* nodes
+    int* index_list, long long* start_list_keys, int* start_list_values, long long* end_list_keys, int* end_list_values,
+    char* types, float* centers, float* nodes
 ) {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    const int PARTICLES_NUM = PARTICLES_NUM_MIN_DEPTH[0];
-    const float RADIUS = RADIUS_INF_FACTOR_ISO_MIN_MAX_SCALAR_CELL_SIZE[0];
-    const float INF_FACTOR = RADIUS_INF_FACTOR_ISO_MIN_MAX_SCALAR_CELL_SIZE[1];
-    const float INFLUNCE = RADIUS * INF_FACTOR;
-    const float ISO_VALUE = RADIUS_INF_FACTOR_ISO_MIN_MAX_SCALAR_CELL_SIZE[2];
-    const float MIN_SCALAR = RADIUS_INF_FACTOR_ISO_MIN_MAX_SCALAR_CELL_SIZE[3];
-    const float MAX_SCALAR = RADIUS_INF_FACTOR_ISO_MIN_MAX_SCALAR_CELL_SIZE[4];
-    const int DEPTH_MIN = PARTICLES_NUM_MIN_DEPTH[1];
-    const float CELL_SIZE = RADIUS_INF_FACTOR_ISO_MIN_MAX_SCALAR_CELL_SIZE[5];
-    const int TNODES_NUM = tnode_num[0];
-    if (index < TNODES_NUM)
+    int blockId = (blockIdx.x + blockIdx.y * gridDim.x + blockIdx.z * gridDim.x * gridDim.y);
+    int index = blockId * (blockDim.x * blockDim.y * blockDim.z) + (threadIdx.z * (blockDim.x * blockDim.y)) + (threadIdx.y * blockDim.x) + threadIdx.x;
+    if (index < TNODE_NUM[0])
     {
         bool empty = false;
         bool signchange = false;
-        float sample_points[256] = {0};
-        float sample_grads[192] = {0};
+        float sample_points[(SAMPLE+1) * (SAMPLE+1) * (SAMPLE+1) * 4] = {0};
+        float sample_grads[(SAMPLE+1) * (SAMPLE+1) * (SAMPLE+1) * 3] = {0};
         float curv = 0.0f;
-        float cell_size = half_lengthes[index] * 2;
-        float minV[3] = {centers[index * 3 + 0] - half_lengthes[index], centers[index * 3 + 1] - half_lengthes[index], centers[index * 3 + 2] - half_lengthes[index]};
-        float maxV[3] = {centers[index * 3 + 0] + half_lengthes[index], centers[index * 3 + 1] + half_lengthes[index], centers[index * 3 + 2] + half_lengthes[index]};
+        float minV[3] = {centers[index * 3 + 0] - HALF_CELL_BORDER_STEP_SIZE[0], centers[index * 3 + 1] - HALF_CELL_BORDER_STEP_SIZE[0], centers[index * 3 + 2] - HALF_CELL_BORDER_STEP_SIZE[0]};
+        float maxV[3] = {centers[index * 3 + 0] + HALF_CELL_BORDER_STEP_SIZE[0], centers[index * 3 + 1] + HALF_CELL_BORDER_STEP_SIZE[0], centers[index * 3 + 2] + HALF_CELL_BORDER_STEP_SIZE[0]};
         check_empty_and_calc_curv_const_r(
-            particles, splashs, particles_gradients, RADIUS, INFLUNCE,
-            hash_list, index_list, start_list_keys, start_list_values, end_list_keys, end_list_values, 
-            CELL_SIZE, 
+            particles, splashs, particles_gradients, 
+            index_list, start_list_keys, start_list_values, end_list_keys, end_list_values, 
             minV, maxV, 
             empty, curv
         );
         if (empty)
         {
             types[index] = 0;
-            nodes[index * 4 + 0] = centers[index * 3 + 0];
-            nodes[index * 4 + 0] = centers[index * 3 + 0];
-            nodes[index * 4 + 0] = centers[index * 3 + 0];
-            return;
-        }
-        if (depths[index] < DEPTH_MIN)
-        {
-            types[index] = 1;
+            single_eval_const_r(
+                particles, Gs, splashs, particles_gradients, 
+                index_list, start_list_keys, start_list_values, end_list_keys, end_list_values, 
+                centers + index * 3, nodes[index * 4 + 3]
+            );
             return;
         }
         generate_sampling_points(minV, maxV, sample_points);
         node_sampling_const_r(
-            particles, Gs, splashs, particles_gradients, PARTICLES_NUM, RADIUS, INF_FACTOR, ISO_VALUE, MIN_SCALAR, MAX_SCALAR,
-            hash_list, index_list, start_list_keys, start_list_values, end_list_keys, end_list_values, 
-            CELL_SIZE, 
+            particles, Gs, splashs, particles_gradients, 
+            index_list, start_list_keys, start_list_values, end_list_keys, end_list_values, 
             curv, signchange, sample_points, sample_grads
         );
-        if ((CELL_SIZE - RADIUS) < TOLERANCE)
+        if ((HALF_CELL_BORDER_STEP_SIZE[1] - RADIUS[0]) < TOLERANCE)
         {
             types[index] = 2;
-            feature_calc(minV, maxV, cell_size, half_lengthes[index], centers + index * 3, sample_points, sample_grads, nodes + index * 3);
+            // feature_calc(
+            //     particles, Gs, splashs, particles_gradients, 
+            //     index_list, start_list_keys, start_list_values, end_list_keys, end_list_values, 
+            //     minV, maxV, centers + index * 3, 
+            //     sample_points, sample_grads, 
+            //     nodes + index * 4);
+            single_eval_const_r(
+                particles, Gs, splashs, particles_gradients,
+                index_list, start_list_keys, start_list_values, end_list_keys, end_list_values, 
+                centers + index * 3, nodes[index * 4 + 3]
+            );
+            return;
         }
         if (signchange && (curv < FLATNESS))
         {
+            types[index] = 1;
+            return;
+        } else {
             types[index] = 2;
+            // feature_calc(
+            //     particles, Gs, splashs, particles_gradients,
+            //     index_list, start_list_keys, start_list_values, end_list_keys, end_list_values, 
+            //     minV, maxV, centers + index * 3, 
+            //     sample_points, sample_grads, 
+            //     nodes + index * 4);
+            single_eval_const_r(
+                particles, Gs, splashs, particles_gradients,
+                index_list, start_list_keys, start_list_values, end_list_keys, end_list_values, 
+                centers + index * 3, nodes[index * 4 + 3]
+            );
+            return;
         }
     }
 }
 
+void cuda_node_calc_initialize_const_r(
+    int GlobalParticlesNum, int DepthMin, float R, float InfFactor, float IsoValue, float MaxScalar,
+    Evaluator* evaluator, HashGrid* hashgrid
+) {
+    cudaSetDevice(0);
+    size_t start_end_list_size[2] = {hashgrid->StartList.size(), hashgrid->EndList.size()};
+    float hash_cell_size[1] = {hashgrid->CellSize};
+    // int particles_num[1] = {GlobalParticlesNum};
+    int min_depth[1] = {DepthMin};
+    float radius[3] = {R, R*R, R*R*R};
+    // int neighbor_factor[1] = {NeighborFactor};
+    float influnce[3] = {R * InfFactor, pow(R*InfFactor, 2), pow(R*InfFactor,3)};
+    float iso_value[1] = {IsoValue};
+    float max_scalar[1] = {MaxScalar};
+    float* xmeans_cpu = new float[GlobalParticlesNum * 3];
+	float* Gs_cpu = new float[GlobalParticlesNum * 9];
+	float* particles_grads_cpu = new float[GlobalParticlesNum * 3];
+	for (size_t i = 0; i < GlobalParticlesNum; i++)
+	{
+		xmeans_cpu[i * 3 + 0] = evaluator->GlobalxMeans[i][0];
+		xmeans_cpu[i * 3 + 1] = evaluator->GlobalxMeans[i][1];
+		xmeans_cpu[i * 3 + 2] = evaluator->GlobalxMeans[i][2];
+		Gs_cpu[i * 9 + 0] = evaluator->GlobalGs[i].data()[0];
+		Gs_cpu[i * 9 + 1] = evaluator->GlobalGs[i].data()[1];
+		Gs_cpu[i * 9 + 2] = evaluator->GlobalGs[i].data()[2];
+		Gs_cpu[i * 9 + 3] = evaluator->GlobalGs[i].data()[3];
+		Gs_cpu[i * 9 + 4] = evaluator->GlobalGs[i].data()[4];
+		Gs_cpu[i * 9 + 5] = evaluator->GlobalGs[i].data()[5];
+		Gs_cpu[i * 9 + 6] = evaluator->GlobalGs[i].data()[6];
+		Gs_cpu[i * 9 + 7] = evaluator->GlobalGs[i].data()[7];
+		Gs_cpu[i * 9 + 8] = evaluator->GlobalGs[i].data()[8];
+		particles_grads_cpu[i * 3 + 0] = evaluator->PariclesNormals[i][0];
+		particles_grads_cpu[i * 3 + 1] = evaluator->PariclesNormals[i][1];
+		particles_grads_cpu[i * 3 + 2] = evaluator->PariclesNormals[i][2];
+	}
+    long long* start_list_keys_cpu = new long long[hashgrid->StartList.size()];
+	int* start_list_values_cpu = new int[hashgrid->StartList.size()];
+	long long* end_list_keys_cpu = new long long[hashgrid->EndList.size()];
+	int* end_list_values_cpu = new int[hashgrid->EndList.size()];
+    int i = 0;
+    for (auto it: hashgrid->StartList) {
+        start_list_keys_cpu[i] = it.first;
+        start_list_values_cpu[i] = it.second;
+        i++;
+    }
+    i = 0;
+    for (auto it: hashgrid->EndList) {
+        end_list_keys_cpu[i] = it.first;
+        end_list_values_cpu[i] = it.second;
+        i++;
+    }
+
+    cudaMemcpyToSymbol(BOUNDING, hashgrid->Bounding, 6 * sizeof(float));
+	cudaMemcpyToSymbol(XYZ_CELL_NUM, hashgrid->XYZCellNum, 3 * sizeof(unsigned int));
+	cudaMemcpyToSymbol(START_END_LIST_SIZE, start_end_list_size, 2 * sizeof(size_t));
+	// cudaMemcpyToSymbol(PARTICLES_NUM, particles_num, 1 * sizeof(int));
+	cudaMemcpyToSymbol(MIN_DEPTH, min_depth, 1 * sizeof(int));
+
+	cudaMemcpyToSymbol(RADIUS, radius, 3 * sizeof(float));
+	// cudaMemcpyToSymbol(NEIGHBOR_FACTOR, neighbor_factor, 1 * sizeof(float));
+	cudaMemcpyToSymbol(INFLUNCE, influnce, 3 * sizeof(float));
+	cudaMemcpyToSymbol(ISO_VALUE, iso_value, 1 * sizeof(float));
+	cudaMemcpyToSymbol(MAX_SCALAR, max_scalar, 1 * sizeof(float));
+	cudaMemcpyToSymbol(HASH_CELL_SIZE, hash_cell_size, 1 * sizeof(float));
+
+    cudaMalloc((void**)& particles_gpu, GlobalParticlesNum * 3 * sizeof(float));
+	cudaMalloc((void**)& Gs_gpu, GlobalParticlesNum * 9 * sizeof(float));
+	cudaMalloc((void**)& splashs_gpu, GlobalParticlesNum * sizeof(bool));
+	cudaMalloc((void**)& particles_gradients_gpu, GlobalParticlesNum * 3 * sizeof(float));
+	cudaMalloc((void**)& index_list_gpu, hashgrid->IndexList.size() * sizeof(int));
+	cudaMalloc((void**)& start_list_keys_gpu, hashgrid->StartList.size() * sizeof(long long));
+	cudaMalloc((void**)& start_list_values_gpu, hashgrid->StartList.size() * sizeof(int));
+	cudaMalloc((void**)& end_list_keys_gpu, hashgrid->StartList.size() * sizeof(long long));
+	cudaMalloc((void**)& end_list_values_gpu, hashgrid->StartList.size() * sizeof(int));
+
+	cudaMemcpy(particles_gpu, xmeans_cpu, GlobalParticlesNum * 3 * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(Gs_gpu, Gs_cpu, GlobalParticlesNum * 9 * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(splashs_gpu, evaluator->GlobalSplash.data(), GlobalParticlesNum * sizeof(bool), cudaMemcpyHostToDevice);
+	cudaMemcpy(particles_gradients_gpu, particles_grads_cpu, GlobalParticlesNum * 3 * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(index_list_gpu, hashgrid->IndexList.data(), hashgrid->IndexList.size() * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(start_list_keys_gpu, start_list_keys_cpu, hashgrid->StartList.size() * sizeof(long long), cudaMemcpyHostToDevice);
+	cudaMemcpy(start_list_values_gpu, start_list_values_cpu, hashgrid->StartList.size() * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(end_list_keys_gpu, end_list_keys_cpu, hashgrid->EndList.size() * sizeof(long long), cudaMemcpyHostToDevice);
+	cudaMemcpy(end_list_values_gpu, end_list_values_cpu, hashgrid->EndList.size() * sizeof(int), cudaMemcpyHostToDevice);
+
+    delete[] xmeans_cpu;
+	delete[] Gs_cpu;
+	delete[] particles_grads_cpu;
+	delete[] start_list_keys_cpu;
+	delete[] start_list_values_cpu;
+	delete[] end_list_keys_cpu;
+	delete[] end_list_values_cpu;
+}
+
+extern "C" void cuda_node_calc_release_const_r() {
+    cudaFree(particles_gpu);
+	cudaFree(Gs_gpu);
+	cudaFree(splashs_gpu);
+	cudaFree(particles_gradients_gpu);
+	cudaFree(index_list_gpu);
+	cudaFree(start_list_keys_gpu);
+	cudaFree(start_list_values_gpu);
+	cudaFree(end_list_keys_gpu);
+	cudaFree(end_list_values_gpu);
+}
+
 void cuda_node_calc_const_r_kernel(
-    int GlobalParticlesNum, int DepthMin, int QueueFlag,
-    float R, float NeighborFactor, float IsoValue, float MinScalar, float MaxScalar,  
-    Evaluator* evaluator, HashGrid* hashgrid) {
-    	int threadsPerBlock = 512, blocksPerGrid;
-		blocksPerGrid = int(QueueFlag + (threadsPerBlock - 1) / threadsPerBlock);
-		// memory on host
-		float* xmeans_cpu = new float[GlobalParticlesNum * 3];
-		float* Gs_cpu = new float[GlobalParticlesNum * 9];
-		float* particles_grads_cpu = new float[GlobalParticlesNum * 3];
-		for (size_t i = 0; i < GlobalParticlesNum; i++)
-		{
-			xmeans_cpu[i * 3 + 0] = evaluator->GlobalxMeans[i][0];
-			xmeans_cpu[i * 3 + 1] = evaluator->GlobalxMeans[i][1];
-			xmeans_cpu[i * 3 + 2] = evaluator->GlobalxMeans[i][2];
-			Gs_cpu[i * 9 + 0] = evaluator->GlobalGs[i].data()[0];
-			Gs_cpu[i * 9 + 1] = evaluator->GlobalGs[i].data()[1];
-			Gs_cpu[i * 9 + 2] = evaluator->GlobalGs[i].data()[2];
-			Gs_cpu[i * 9 + 3] = evaluator->GlobalGs[i].data()[3];
-			Gs_cpu[i * 9 + 4] = evaluator->GlobalGs[i].data()[4];
-			Gs_cpu[i * 9 + 5] = evaluator->GlobalGs[i].data()[5];
-			Gs_cpu[i * 9 + 6] = evaluator->GlobalGs[i].data()[6];
-			Gs_cpu[i * 9 + 7] = evaluator->GlobalGs[i].data()[7];
-			Gs_cpu[i * 9 + 8] = evaluator->GlobalGs[i].data()[8];
-			particles_grads_cpu[i * 3 + 0] = evaluator->PariclesNormals[i][0];
-			particles_grads_cpu[i * 3 + 1] = evaluator->PariclesNormals[i][1];
-			particles_grads_cpu[i * 3 + 2] = evaluator->PariclesNormals[i][2];
-		}
-		long long* start_list_keys_cpu = new long long[_hashgrid->StartList.size()];
-		int* start_list_values_cpu = new int[_hashgrid->StartList.size()];
-		long long* end_list_keys_cpu = new long long[_hashgrid->EndList.size()];
-		int* end_list_values_cpu = new int[_hashgrid->EndList.size()];
-		std::transform(_hashgrid->StartList.begin(), _hashgrid->EndList.end(), start_list_keys_cpu, [](const std::pair<long long, int>& p) {return p.first;});
-		std::transform(_hashgrid->StartList.begin(), _hashgrid->EndList.end(), start_list_values_cpu, [](const std::pair<long long, int>& p) {return p.second;});
-		std::transform(_hashgrid->StartList.begin(), _hashgrid->EndList.end(), end_list_keys_cpu, [](const std::pair<long long, int>& p) {return p.first;});
-		std::transform(_hashgrid->StartList.begin(), _hashgrid->EndList.end(), end_list_values_cpu, [](const std::pair<long long, int>& p) {return p.second;});
-		char* types_cpu;
-		char* depths_cpu;
-		float* centers_cpu;
-		float* half_lengthes_cpu;
-		int tnode_num_cpu[1];
-		float* nodes_cpu;
-		size_t start_end_list_size[2] = {_hashgrid->StartList.size(), _hashgrid->EndList.size()};
-		int particels_num_min_depth[2] = {GlobalParticlesNum, DepthMin};
-		float radius_inf_factor_iso_min_max_scalar_cell_size[6] = {R, NeighborFactor, IsoValue, MinScalar, MaxScalar, _hashgrid->CellSize};
-        types_cpu = new char[QueueFlag];
-		depths_cpu = new char[QueueFlag];
-		centers_cpu = new float[QueueFlag * 3];
-		half_lengthes_cpu = new float[QueueFlag];
-		tnode_num_cpu[0] = QueueFlag;
-		nodes_cpu = new float[QueueFlag * 4];
-		for (size_t i = 0; i < QueueFlag; i++)
-		{
-			types_cpu[i] = ProcessArray[i]->type;
-			depths_cpu[i] = ProcessArray[i]->depth;
-			centers_cpu[i * 3 + 0] = ProcessArray[i]->center[0];
-			centers_cpu[i * 3 + 1] = ProcessArray[i]->center[1];
-			centers_cpu[i * 3 + 2] = ProcessArray[i]->center[2];
-			half_lengthes_cpu[i] = ProcessArray[i]->half_length;
-			nodes_cpu[i * 4 + 0] = ProcessArray[i]->center[0];
-			nodes_cpu[i * 4 + 1] = ProcessArray[i]->center[1];
-			nodes_cpu[i * 4 + 2] = ProcessArray[i]->center[2];
-			nodes_cpu[i * 4 + 3] = ProcessArray[i]->center[3];
-		}
-		// memory on device
-		float* bounding_gpu;
-		unsigned int* xyz_cell_num_gpu;
-		size_t* start_end_list_size_gpu;
-		int* particels_num_min_depth_gpu;
-		float* radius_inf_factor_iso_min_max_scalar_cell_size_gpu;
-		cudaMalloc(&bounding_gpu, 6 * sizeof(float));
-		cudaMalloc(&xyz_cell_num_gpu, 3 * sizeof(unsigned int));
-		cudaMalloc(&start_end_list_size_gpu, 2 * sizeof(size_t));
-		cudaMalloc(&particels_num_min_depth_gpu, 2 * sizeof(int));
-		cudaMalloc(&radius_inf_factor_iso_min_max_scalar_cell_size_gpu, 6 * sizeof(float));
-		cudaMemcpyToSymbol(bounding_gpu, _hashgrid->Bounding, 6 * sizeof(float));
-		cudaMemcpyToSymbol(xyz_cell_num_gpu, _hashgrid->XYZCellNum, 3 * sizeof(unsigned int));
-		cudaMemcpyToSymbol(start_end_list_size_gpu, start_end_list_size, 2 * sizeof(size_t));
-		cudaMemcpyToSymbol(particels_num_min_depth_gpu, particels_num_min_depth, 2 * sizeof(int));
-		cudaMemcpyToSymbol(radius_inf_factor_iso_min_max_scalar_cell_size_gpu, radius_inf_factor_iso_min_max_scalar_cell_size, 6 * sizeof(float));
-        float* particles_gpu;
-		float* Gs_gpu; 
-		bool* splashs_gpu; 
-		float* particles_gradients_gpu; 
-		long long* hash_list_gpu;
-		int* index_list_gpu;
-		long long* start_list_keys_gpu;
-		int* start_list_values_gpu;
-		long long* end_list_keys_gpu;
-		int* end_list_values_gpu;
-		char* types_gpu; 
-		char* depths_gpu; 
-		float* centers_gpu; 
-		float* half_lengthes_gpu; 
-		int* tnode_num_gpu;
-		float* nodes_gpu; 
-        cudaMalloc((void**)& tnode_num_gpu, sizeof(int));
-		cudaMemcpy(tnode_num_gpu, tnode_num_cpu, sizeof(int), cudaMemcpyHostToDevice);
-        
-		cudaMalloc((void**)& particles_gpu, GlobalParticlesNum * 3 * sizeof(float));
-		cudaMalloc((void**)& Gs_gpu, GlobalParticlesNum * 9 * sizeof(float));
-		cudaMalloc((void**)& splashs_gpu, GlobalParticlesNum * sizeof(bool));
-		cudaMalloc((void**)& particles_gradients_gpu, GlobalParticlesNum * 3 * sizeof(float));
-		cudaMalloc((void**)& hash_list_gpu, _hashgrid->HashList.size() * sizeof(long long));
-		cudaMalloc((void**)& index_list_gpu, _hashgrid->IndexList.size() * sizeof(int));
-		cudaMalloc((void**)& start_list_keys_gpu, _hashgrid->StartList.size() * sizeof(long long));
-		cudaMalloc((void**)& start_list_values_gpu, _hashgrid->StartList.size() * sizeof(int));
-		cudaMalloc((void**)& end_list_keys_gpu, _hashgrid->StartList.size() * sizeof(long long));
-		cudaMalloc((void**)& end_list_values_gpu, _hashgrid->StartList.size() * sizeof(int));
-		cudaMalloc((void**)& types_gpu, QueueFlag * sizeof(char));
-		cudaMalloc((void**)& depths_gpu, QueueFlag * sizeof(char));
-		cudaMalloc((void**)& centers_gpu, QueueFlag * 3 * sizeof(float));
-		cudaMalloc((void**)& half_lengthes_gpu, QueueFlag * sizeof(float));
-		cudaMalloc((void**)& nodes_gpu, QueueFlag * 4 * sizeof(float));
-		cudaMemcpy(particles_gpu, xmeans_cpu, GlobalParticlesNum * 3 * sizeof(float), cudaMemcpyHostToDevice);
-		cudaMemcpy(Gs_gpu, Gs_cpu, GlobalParticlesNum * 9 * sizeof(float), cudaMemcpyHostToDevice);
-		cudaMemcpy(splashs_gpu, _evaluator->GlobalSplash.data(), GlobalParticlesNum * sizeof(bool), cudaMemcpyHostToDevice);
-		cudaMemcpy(particles_gradients_gpu, particles_grads_cpu, GlobalParticlesNum * 3 * sizeof(float), cudaMemcpyHostToDevice);
-		cudaMemcpy(hash_list_gpu, _hashgrid->HashList.data(), _hashgrid->HashList.size() * sizeof(long long), cudaMemcpyHostToDevice);
-		cudaMemcpy(index_list_gpu, _hashgrid->IndexList.data(), _hashgrid->IndexList.size() * sizeof(int), cudaMemcpyHostToDevice);
-		cudaMemcpy(start_list_keys_gpu, start_list_keys_cpu, _hashgrid->StartList.size() * sizeof(long long), cudaMemcpyHostToDevice);
-		cudaMemcpy(start_list_values_gpu, start_list_values_cpu, _hashgrid->StartList.size() * sizeof(int), cudaMemcpyHostToDevice);
-		cudaMemcpy(end_list_keys_gpu, end_list_keys_cpu, _hashgrid->EndList.size() * sizeof(long long), cudaMemcpyHostToDevice);
-		cudaMemcpy(end_list_values_gpu, end_list_values_cpu, _hashgrid->EndList.size() * sizeof(int), cudaMemcpyHostToDevice);
-		cudaMemcpy(types_gpu, types_cpu, QueueFlag * sizeof(char), cudaMemcpyHostToDevice);
-		cudaMemcpy(depths_gpu, depths_cpu, QueueFlag * sizeof(char), cudaMemcpyHostToDevice);
-		cudaMemcpy(centers_gpu, centers_cpu, QueueFlag * 3 * sizeof(float), cudaMemcpyHostToDevice);
-		cudaMemcpy(half_lengthes_gpu, half_lengthes_cpu, QueueFlag * sizeof(float), cudaMemcpyHostToDevice);
-		cudaMemcpy(nodes_gpu, nodes_cpu, QueueFlag * 4 * sizeof(float), cudaMemcpyHostToDevice);
-        
-        cuda_node_calc_const_r();
-        
-        cudaMemcpy(types_cpu, types_gpu, QueueFlag * sizeof(char), cudaMemcpyDeviceToHost);
-		cudaMemcpy(nodes_cpu, nodes_gpu, QueueFlag * 4 * sizeof(float), cudaMemcpyDeviceToHost);
-		cudaFree(particles_gpu);
-		cudaFree(Gs_gpu);
-		cudaFree(splashs_gpu);
-		cudaFree(particles_gradients_gpu);
-		cudaFree(hash_list_gpu);
-		cudaFree(index_list_gpu);
-		cudaFree(start_list_keys_gpu);
-		cudaFree(start_list_values_gpu);
-		cudaFree(end_list_keys_gpu);
-		cudaFree(end_list_values_gpu);
-		cudaFree(types_gpu);
-		cudaFree(depths_gpu);
-		cudaFree(centers_gpu);
-		cudaFree(half_lengthes_gpu);
-		cudaFree(nodes_gpu);
-		cudaFree(tnode_num_gpu);
-		delete[] xmeans_cpu;
-		delete[] Gs_cpu;
-		delete[] particles_grads_cpu;
-		delete[] start_list_keys_cpu;
-		delete[] start_list_values_cpu;
-		delete[] end_list_keys_cpu;
-		delete[] end_list_values_cpu;
-		delete[] types_cpu;
-		delete[] depths_cpu;
-		delete[] centers_cpu;
-		delete[] half_lengthes_cpu;
-		delete[] nodes_cpu;
-		delete[] bounding_gpu;
-		delete[] xyz_cell_num_gpu;
-		delete[] start_end_list_size_gpu;
-		delete[] particels_num_min_depth_gpu;
-		delete[] radius_inf_factor_iso_min_max_scalar_cell_size_gpu;
-		delete[] particles_gpu;
-		delete[] Gs_gpu; 
-		delete[] splashs_gpu; 
-		delete[] particles_gradients_gpu; 
-		delete[] hash_list_gpu;
-		delete[] index_list_gpu;
-		delete[] start_list_keys_gpu;
-		delete[] start_list_values_gpu;
-		delete[] end_list_keys_gpu;
-		delete[] end_list_values_gpu;
-		delete[] types_gpu; 
-		delete[] depths_gpu; 
-		delete[] centers_gpu; 
-		delete[] half_lengthes_gpu; 
-		delete[] tnode_num_gpu;
-		delete[] nodes_gpu; 
-    // cuda_node_calc_const_r<<<blocks, threads>>>(
-    //     particles, Gs, splashs, particles_gradients, 
-    //     hash_list, index_list, start_list_keys, start_list_values, end_list_keys, end_list_values,
-    //     types, depths, centers, half_lengthes, tnode_num,
-    //     nodes
-    // );
+    int QueueFlag, float half_length, char* types_cpu, float* centers_cpu, float* nodes_cpu
+) {
+    double in_cuda_time, phase1, phase2;
+    // int threadsPerBlock = 1024, blocksPerGrid;
+    int threadsPerBlock_x = 1, threadsPerBlock_y = 1, threadsPerBlock_z = 1, blocksPerGrid = 65536 / REGS_USED_BY_KERNEL;
+    if (QueueFlag <= 1024 * blocksPerGrid) {
+        threadsPerBlock_x = 1024;
+    } else if (QueueFlag <= 1024 * 64 * blocksPerGrid) {
+        threadsPerBlock_x = 1024;
+        threadsPerBlock_z = 64;
+    } else if (QueueFlag <= 1024 * 1024 * blocksPerGrid) {
+        threadsPerBlock_x = 1024;
+        threadsPerBlock_y = 1024;
+    } else {
+        threadsPerBlock_x = 1024;
+        threadsPerBlock_y = 1024;
+        threadsPerBlock_z = 64;
+    }
+    blocksPerGrid = (QueueFlag + (threadsPerBlock_x * threadsPerBlock_y * threadsPerBlock_z - 1)) / (threadsPerBlock_x * threadsPerBlock_y * threadsPerBlock_z);
+    // blocksPerGrid = (QueueFlag + threadsPerBlock_x - 1) / threadsPerBlock_x;
+	// memory on host
+    int tnode_num_cpu[1] = {QueueFlag};
+    float half_cell_border_step[4] = {half_length, half_length * 2, half_length / 8, half_length * 2 / SAMPLE};
+    // memory on device
+    in_cuda_time = get_time();
+	cudaMemcpyToSymbol(TNODE_NUM, tnode_num_cpu, sizeof(int));
+	cudaMemcpyToSymbol(HALF_CELL_BORDER_STEP_SIZE, half_cell_border_step, 4 * sizeof(float));
+
+	cudaMalloc((void**)& types_gpu, QueueFlag * sizeof(char));
+	cudaMalloc((void**)& centers_gpu, QueueFlag * 3 * sizeof(float));
+	cudaMalloc((void**)& nodes_gpu, QueueFlag * 4 * sizeof(float));
+
+	cudaMemcpy(types_gpu, types_cpu, QueueFlag * sizeof(char), cudaMemcpyHostToDevice);
+	cudaMemcpy(centers_gpu, centers_cpu, QueueFlag * 3 * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(nodes_gpu, nodes_cpu, QueueFlag * 4 * sizeof(float), cudaMemcpyHostToDevice);
+    phase1 = get_time();
+    cuda_node_calc_const_r<<<dim3(threadsPerBlock_x, threadsPerBlock_y, threadsPerBlock_z), blocksPerGrid>>>(
+        particles_gpu, Gs_gpu, splashs_gpu, particles_gradients_gpu, 
+        index_list_gpu, start_list_keys_gpu, start_list_values_gpu, end_list_keys_gpu, end_list_values_gpu,
+        types_gpu, centers_gpu, nodes_gpu
+    );
+    cudaMemcpy(types_cpu, types_gpu, QueueFlag * sizeof(char), cudaMemcpyDeviceToHost);
+	cudaMemcpy(nodes_cpu, nodes_gpu, QueueFlag * 4 * sizeof(float), cudaMemcpyDeviceToHost);
+    // CHECK(cudaGetLastError());
+    // CHECK(cudaDeviceSynchronize());
+    phase2 = get_time();
+    cudaFree(types_gpu);
+    cudaFree(centers_gpu);
+    cudaFree(nodes_gpu);
+    printf("In Cuda Phase 1 time = %f, Phase 2 time = %f, Phase 3 time = %f;\n", phase1 - in_cuda_time, phase2 - phase1, get_time() - phase2);
 }

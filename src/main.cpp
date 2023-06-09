@@ -4,7 +4,7 @@
 #include <regex>
 
 #include "global.h"
-#include "hdf5Utils.hpp"
+// #include "hdf5Utils.hpp"
 #include "iso_common.h"
 #include "iso_method_ours.h"
 #include "json.hpp"
@@ -289,7 +289,7 @@ void run(std::string &dataDirPath)
             loadParticlesFromCSV(dataPath, particles, radiuses);
             break;
         case 1:
-            readShonDyParticleData(dataPath, particles, radiuses, DEFAULT_SCALE);
+            // readShonDyParticleData(dataPath, particles, radiuses, DEFAULT_SCALE);
             break;
         default:
             printf("ERROR: Unknown DATA TYPE;");
@@ -363,11 +363,11 @@ int main(int argc, char **argv)
     else
     {
         std::string dataDirPath =
-            // "C:/Users/11379/Desktop/protein";
-            "E:/data/multiR/mr_csv";
+            // "E:/data/water_csv";
+            // "E:/data/multiR/mr_csv";
             // "E:/BaiduNetdiskDownload/MultiResolutionResults/damcsv";
             // "E:/BaiduNetdiskDownload/MultiResolutionResults/watercsv";
-            // "E:/data/vtk/csv";
+            "E:/data/vtk/csv";
         run(dataDirPath);
     }
 
