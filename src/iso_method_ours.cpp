@@ -419,168 +419,25 @@ void TNode::NodeCalcNode(float* sample_points, float* sample_grads)
 	bool is_out = true;
 	float err = 1e30;
 	Eigen::Vector4f pc = Eigen::Vector4f::Zero();
-	// Eigen::Vector3f pcg = Eigen::Vector3f::Zero();
-	for (int cell_dim = 3; cell_dim >= 0 && is_out; cell_dim--)
+	// find minimal point
+	Eigen::Vector4f rvalue = Eigen::Vector4f::Zero();
+	Eigen::Matrix4f inv = node_A.inverse();
+	for (int i = 0; i < node_n; i++)
 	{
-		if (cell_dim == 3)
-		{
-			// find minimal point
-			Eigen::Vector4f rvalue = Eigen::Vector4f::Zero();
-			Eigen::Matrix4f inv = node_A.inverse();
-			for (int i = 0; i < node_n; i++)
-			{
-				rvalue[i] = 0;
-				for (int j = 0; j < node_n; j++)
-					rvalue[i] += inv(j, i) * node_B[j];
-			}
-			pc << rvalue[0], rvalue[1], rvalue[2], rvalue[3];
-			// constructor->getEvaluator()->SingleEvalWithGrad(pc.head(3), pc[3], pcg);
-			// check bounds
-			if (pc[0] >= minV[0] && pc[0] <= maxV[0] &&
-				pc[1] >= minV[1] && pc[1] <= maxV[1] &&
-				pc[2] >= minV[2] && pc[2] <= maxV[2])
-			{
-				is_out = false;
-				err = calcErrorDMC(pc, sample_points, sample_grads, constructor->getOverSampleQEF());
-				node << pc;
-			}
-		}
-		else if (cell_dim == 2)
-		{
-			for (int face = 0; face < 6; face++)
-			{
-				int dir = face / 2;
-				int side = face % 2;
-				Eigen::Vector3f corners[2] = { minV, maxV };
-				// build constrained system
-				Matrix5f AC = Matrix5f::Zero();
-				float BC[node_n + 1];
-				for (int i = 0; i < node_n + 1; i++)
-				{
-					for (int j = 0; j < node_n + 1; j++)
-					{
-						AC(i, j) = (i < node_n&& j < node_n ? node_A(i, j) : 0);
-					}
-					BC[i] = (i < node_n ? node_B[i] : 0);
-				}
-				AC(node_n, dir) = AC(dir, node_n) = 1;
-				BC[node_n] = corners[side][dir];
-				// find minimal point
-				float rvalue[node_n + 1];
-				Matrix5f inv = AC.inverse();
-				for (int i = 0; i < node_n + 1; i++)
-				{
-					rvalue[i] = 0;
-					for (int j = 0; j < node_n + 1; j++)
-						rvalue[i] += inv(j, i) * BC[j];
-				}
-				pc << rvalue[0], rvalue[1], rvalue[2], rvalue[3];
-				// constructor->getEvaluator()->SingleEvalWithGrad(pc.head(3), pc[3], pcg);
-				// check bounds
-				int dp = (dir + 1) % 3;
-				int dpp = (dir + 2) % 3;
-				if (pc[dp] >= minV[dp] && pc[dp] <= maxV[dp] &&
-					pc[dpp] >= minV[dpp] && pc[dpp] <= maxV[dpp])
-				{
-					is_out = false;
-					float e = calcErrorDMC(pc, sample_points, sample_grads, constructor->getOverSampleQEF());
-					if (e < err)
-					{
-						err = e;
-						node << pc;
-					}
-				}
-			}
-		}
-		else if (cell_dim == 1)
-		{
-			for (int edge = 0; edge < 12; edge++)
-			{
-				int dir = edge / 4;
-				int side = edge % 4;
-				Eigen::Vector3f corners[2] = { minV, maxV };
-				// build constrained system
-				Matrix6f AC = Matrix6f::Zero();
-				float BC[node_n + 2];
-				for (int i = 0; i < node_n + 2; i++)
-				{
-					for (int j = 0; j < node_n + 2; j++)
-					{
-						AC(i, j) = (i < node_n&& j < node_n ? node_A(i, j) : 0);
-					}
-					BC[i] = (i < node_n ? node_B[i] : 0);
-				}
-				int dp = (dir + 1) % 3;
-				int dpp = (dir + 2) % 3;
-				AC(node_n, dp) = AC(dp, node_n) = 1;
-				AC(node_n + 1, dpp) = AC(dpp, node_n + 1) = 1;
-				BC[node_n] = corners[side & 1][dp];
-				BC[node_n + 1] = corners[side >> 1][dpp];
-				// find minimal point
-				float rvalue[node_n + 2];
-				Matrix6f inv = AC.inverse();
-				for (int i = 0; i < node_n + 2; i++)
-				{
-					rvalue[i] = 0;
-					for (int j = 0; j < node_n + 2; j++)
-						rvalue[i] += inv(j, i) * BC[j];
-				}
-				pc << rvalue[0], rvalue[1], rvalue[2], rvalue[3];
-				// constructor->getEvaluator()->SingleEvalWithGrad(pc.head(3), pc[3], pcg);
-				// check bounds
-				if (pc[dir] >= minV[dir] && pc[dir] <= maxV[dir])
-				{
-					is_out = false;
-					float e = calcErrorDMC(pc, sample_points, sample_grads, constructor->getOverSampleQEF());
-					if (e < err)
-					{
-						err = e;
-						node << pc;
-					}
-				}
-			}
-		}
-		else if (cell_dim == 0)
-		{
-			for (int vertex = 0; vertex < 8; vertex++)
-			{
-				Eigen::Vector3f corners[2] = { minV, maxV };
-				// build constrained system
-				Matrix7f AC = Matrix7f::Zero();
-				float BC[node_n + 3];
-				for (int i = 0; i < node_n + 3; i++)
-				{
-					for (int j = 0; j < node_n + 3; j++)
-					{
-						AC(i, j) = (i < node_n&& j < node_n ? node_A(i, j) : 0);
-					}
-					BC[i] = (i < node_n ? node_B[i] : 0);
-				}
-				for (int i = 0; i < 3; i++)
-				{
-					AC(node_n + i, i) = AC(i, node_n + i) = 1;
-					BC[node_n + i] = corners[(vertex >> i) & 1][i];
-				}
-				// find minimal point
-				float rvalue[node_n + 3];
-				Matrix7f inv = AC.inverse();
-				for (int i = 0; i < node_n + 3; i++)
-				{
-					rvalue[i] = 0;
-					for (int j = 0; j < node_n + 3; j++)
-						rvalue[i] += inv(j, i) * BC[j];
-				}
-				pc << rvalue[0], rvalue[1], rvalue[2], rvalue[3];
-				// constructor->getEvaluator()->SingleEvalWithGrad(pc.head(3), pc[3], pcg);
-				// check bounds
-				float e = calcErrorDMC(pc, sample_points, sample_grads, constructor->getOverSampleQEF());
-				if (e < err)
-				{
-					err = e;
-					node << pc;
-				}
-			}
-		}
+		rvalue[i] = 0;
+		for (int j = 0; j < node_n; j++)
+			rvalue[i] += inv(j, i) * node_B[j];
+	}
+	pc << rvalue[0], rvalue[1], rvalue[2], rvalue[3];
+	// constructor->getEvaluator()->SingleEvalWithGrad(pc.head(3), pc[3], pcg);
+	// check bounds
+	if (pc[0] >= minV[0] && pc[0] <= maxV[0] &&
+		pc[1] >= minV[1] && pc[1] <= maxV[1] &&
+		pc[2] >= minV[2] && pc[2] <= maxV[2])
+	{
+		is_out = false;
+		err = calcErrorDMC(pc, sample_points, sample_grads, constructor->getOverSampleQEF());
+		node << pc;
 	}
 	constructor->getEvaluator()->SingleEval(node.head(3), node[3]);
 }

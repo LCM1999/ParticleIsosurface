@@ -259,8 +259,8 @@ void SurfReconstructor::afterSampleEval(
 	{
 		// it's a leaf
 		tnode->type = LEAF;
-		// tnode->NodeCalcNode(sample_points, sample_grads);
-		_evaluator->SingleEval(tnode->node.head(3), tnode->node[3]);
+		tnode->NodeCalcNode(sample_points, sample_grads);
+		// _evaluator->SingleEval(tnode->node.head(3), tnode->node[3]);
 		return;
 	}
 	// check curvature
@@ -271,8 +271,8 @@ void SurfReconstructor::afterSampleEval(
 	else
 	{
 		tnode->type = LEAF;
-		// tnode->NodeCalcNode(sample_points, sample_grads);
-		_evaluator->SingleEval(tnode->node.head(3), tnode->node[3]);
+		tnode->NodeCalcNode(sample_points, sample_grads);
+		// _evaluator->SingleEval(tnode->node.head(3), tnode->node[3]);
 	}
 }
 
@@ -298,11 +298,6 @@ void SurfReconstructor::genIsoOurs()
 		root->half_length = _RootHalfLength;
 		_OurRoot = root;
 	}
-	// else if (_STATE == 1)
-	// {
-	// 	printf("-= Our Method =-\n");
-	// 	root = _OurRoot;
-	// }
 	else if (_STATE == 1)
 	{
 		printf("-= Generate Surface =-\n");
@@ -442,166 +437,6 @@ void SurfReconstructor::genIsoOurs()
 		depth++;
 		half/=2;
 	}
-	// delete[] sample_points;
-	// delete[] sample_grads;
-	// delete[] cuvrs;
-	// delete[] min_raiduses;
-	// delete[] emptys;
-	// delete[] oversamples;
-	// delete[] types_cpu;
-	// delete[] centers_cpu;
-	// delete[] nodes_cpu;
-	/*
-	if (!USE_CUDA)
-	{
-		float* sample_points;
-		float* sample_grads;
-		float* cuvrs;
-		float* min_raiduses;
-		bool* emptys;
-		int* oversamples;
-		int all_sampling = 0;
-		WaitingStack.push_back(root);
-		while (!WaitingStack.empty())
-		{
-			all_sampling = 0;
-			printf("%d \n", WaitingStack.size());
-			for (queue_flag = 0; queue_flag < inProcessSize && !WaitingStack.empty(); queue_flag++)
-			{
-				ProcessArray[queue_flag] = WaitingStack.back();
-				WaitingStack.pop_back();
-			}
-			layer_time = get_time();
-			cuvrs = new float[queue_flag];
-			min_raiduses = new float[queue_flag];
-			emptys = new bool[queue_flag];
-			oversamples = new int[queue_flag]();
-			phase1 = get_time();
-			#pragma omp parallel //for schedule(dynamic, OMP_THREADS_NUM) 
-			{
-				#pragma omp single
-				{
-					for (size_t i = 0; i < queue_flag; i++)
-					{
-						#pragma omp task
-							beforeSampleEval(ProcessArray[i], cuvrs[i], min_raiduses[i], emptys[i], oversamples[i]);
-					}
-				}
-			}
-			// printf("\n");
-			for (size_t i = 0; i < queue_flag; i++)
-			{
-				all_sampling += pow(oversamples[i]+1, 3);
-			}
-			sample_points = new float[all_sampling * 4];
-			sample_grads = new float[all_sampling * 3];
-			//TODO: Sampling
-			#pragma omp parallel //for schedule(dynamic, OMP_THREADS_NUM)
-			{
-				#pragma omp single
-				{
-					for (size_t i = 0; i < queue_flag; i++)
-					{
-						if (!emptys[i])
-						{
-							#pragma omp task
-								afterSampleEval(ProcessArray[i], cuvrs[i], min_raiduses[i], oversamples, i, sample_points, sample_grads);
-						}
-					}
-				}
-			}
-			phase2 = get_time();
-			for (size_t i = 0; i < queue_flag; i++)
-			{
-				if (ProcessArray[i]->type == INTERNAL) {
-					for (Index t = 0; t.v < 8; t++)
-					{
-						ProcessArray[i]->children[t.v] = new TNode(this, ProcessArray[i], t);
-						WaitingStack.push_back(ProcessArray[i]->children[t.v]);
-					}
-				}
-			}
-			printf("Layer time = %f; Phase 1 time = %f; Phase 2 time = %f; Phase 3 time = %f;\n", get_time() - layer_time, phase1 - layer_time, phase2 - phase1, get_time() - phase2);
-		}
-		delete[] sample_points;
-		delete[] sample_grads;
-		delete[] cuvrs;
-		delete[] min_raiduses;
-		delete[] emptys;
-		delete[] oversamples;
-	} else {
-		if (IS_CONST_RADIUS)
-		{
-			char* types_cpu;
-			char* depths_cpu;
-			float* centers_cpu;
-			float* half_lengthes_cpu;
-			float* nodes_cpu;
-			WaitingStack.push_back(root);
-			while (!WaitingStack.empty())
-			{
-				printf("%d \n", WaitingStack.size());
-				for (queue_flag = 0; !WaitingStack.empty(); queue_flag++)
-				{
-					ProcessArray[queue_flag] = WaitingStack.back();
-					WaitingStack.pop_back();
-				}
-				layer_time = get_time();
-				types_cpu = new char[queue_flag];
-				depths_cpu = new char[queue_flag];
-				centers_cpu = new float[queue_flag * 3];
-				half_lengthes_cpu = new float[queue_flag];
-				nodes_cpu = new float[queue_flag * 4];
-				for (size_t i = 0; i < queue_flag; i++)
-				{
-					types_cpu[i] = ProcessArray[i]->type;
-					depths_cpu[i] = ProcessArray[i]->depth;
-					centers_cpu[i * 3 + 0] = ProcessArray[i]->center[0];
-					centers_cpu[i * 3 + 1] = ProcessArray[i]->center[1];
-					centers_cpu[i * 3 + 2] = ProcessArray[i]->center[2];
-					half_lengthes_cpu[i] = ProcessArray[i]->half_length;
-					nodes_cpu[i * 4 + 0] = ProcessArray[i]->center[0];
-					nodes_cpu[i * 4 + 1] = ProcessArray[i]->center[1];
-					nodes_cpu[i * 4 + 2] = ProcessArray[i]->center[2];
-					nodes_cpu[i * 4 + 3] = ProcessArray[i]->center[3];
-				}
-				phase1 = get_time();
-				cuda_node_calc_const_r_kernel (
-					queue_flag, types_cpu, depths_cpu, centers_cpu, half_lengthes_cpu, nodes_cpu);
-				phase2 = get_time();
-				for (size_t i = 0; i < queue_flag; i++)
-				{
-					ProcessArray[i]->type = types_cpu[i];
-					if (ProcessArray[i]->type == EMPTY || ProcessArray[i]->type == LEAF)
-					{
-						ProcessArray[i]->node[0] = nodes_cpu[i * 4 + 0];
-						ProcessArray[i]->node[1] = nodes_cpu[i * 4 + 1];
-						ProcessArray[i]->node[2] = nodes_cpu[i * 4 + 2];
-						ProcessArray[i]->node[3] = nodes_cpu[i * 4 + 3];
-					} else if (ProcessArray[i]->type == INTERNAL) {
-						for (Index t = 0; t.v < 8; t++)
-						{
-							ProcessArray[i]->children[t.v] = new TNode(this, ProcessArray[i], t);
-							WaitingStack.push_back(ProcessArray[i]->children[t.v]);
-						}
-					} else {
-						printf("Unexcepted node type.");
-						exit(1);
-					}
-				}
-				// printf("Layer time = %f; Phase 1 time = %f; Phase 2 time = %f; Phase 3 time = %f;\n", get_time() - layer_time, phase1 - layer_time, phase2 - phase1, get_time() - phase2);
-			}
-			delete[] types_cpu;
-			delete[] depths_cpu;
-			delete[] centers_cpu;
-			delete[] half_lengthes_cpu;
-			delete[] nodes_cpu;
-		} else {
-			printf("GPU acceleration for multi resolution particle data is not yet supported.");
-			exit(0);
-		}
-	}
-	*/
 	double t_finish = get_time();
 	printf("Time generating tree = %f;\n", t_finish - t_start);	
 	_STATE++;

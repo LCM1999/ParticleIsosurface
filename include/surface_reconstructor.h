@@ -20,7 +20,7 @@ class SurfReconstructor
 private:
     // Global Parameters
     int _OVERSAMPLE_QEF = 2;
-    float _BORDER = (1.0 / 16.0);
+    float _BORDER = (1.0 / 64.0);
     int _DEPTH_MAX = 6; // 7
     int _DEPTH_MIN = 5; // 4
     float _NEIGHBOR_FACTOR = 4.0f;
