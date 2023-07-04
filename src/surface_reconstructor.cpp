@@ -137,7 +137,7 @@ void SurfReconstructor::resizeRootBoxConstR()
 		_RootCenter[i] = center;
 	}
 	
-	_DEPTH_MIN = (_DEPTH_MAX - 2);	//int(_DEPTH_MAX / 3));
+	_DEPTH_MIN = (_DEPTH_MAX - 2);	
 }
 
 void SurfReconstructor::resizeRootBoxVarR()
@@ -155,7 +155,6 @@ void SurfReconstructor::resizeRootBoxVarR()
 		_DEPTH_MAX++;
 		resizeLen = pow(2, _DEPTH_MAX) * avgR;
 	}
-	// resizeLen *= 1.005;
 	_RootHalfLength = resizeLen / 2;
 	for (size_t i = 0; i < 3; i++)
 	{
@@ -174,8 +173,6 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 	Eigen::Vector3f norms(0, 0, 0);
 	int area = 0;
 	std::vector<int> insides;
-	// double node_vol = std::max(pow(tnode->half_length * 2, 3), pow(_hashgrid->CellSize, 3));
-	// double p_vol = 0.0f;
 	min_radius = IS_CONST_RADIUS ? _RADIUS : FLT_MAX;
 	const Eigen::Vector3f 
 	box1 = tnode->center - Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length),
@@ -239,11 +236,6 @@ void SurfReconstructor::beforeSampleEval(TNode* tnode, float& curv, float& min_r
 			tnode->type = EMPTY;
 			return;
 		}
-		// else if (tnode->depth <= _DEPTH_MIN)
-		// {
-		// 	Eigen::Vector3f tempG;
-		// 	_evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3], tempG);
-		// }
 	}
 	break;
 	default:
@@ -286,62 +278,7 @@ void SurfReconstructor::afterSampleEval(
 		tnode->NodeCalcNode(sample_points, sample_grads, cellsize);
 	}
 }
-/*
-void get_division_depth(TNode* root, char& cdepth, std::vector<TNode*>& layer_nodes)
-{
-	std::queue<TNode*> layer_list;
-	int layer_num = 0, layer_search_num = 0;
-	int layer_depth = 0;
-	TNode* temp;
-	layer_list.push(root);
 
-	auto queue2vect = [&](std::queue<TNode*>& q, std::vector<TNode*>& v)
-	{
-		while (!q.empty())
-		{
-			v.push_back(q.front());
-			q.pop();
-		}
-	};
-
-	if (OMP_THREADS_NUM <= 1)
-	{
-		cdepth = layer_depth;
-		queue2vect(layer_list, layer_nodes);
-		return;
-	}
-
-	do 
-	{
-		layer_depth++;
-		layer_search_num = layer_list.size();
-		for (size_t i = 0; i < layer_search_num; i++)
-		{
-			temp = layer_list.front();
-			layer_list.pop();
-			switch (temp->type)
-			{
-			case EMPTY:
-			case LEAF:
-				layer_list.push(temp);
-				break;
-			case INTERNAL:
-				for (TNode* child: temp->children)
-				{
-					layer_list.push(child);
-				}
-				break;
-			default:
-				printf("Error: Get Uncertain Node During Octree division;");
-				exit(1);
-			}
-		}
-	} while (layer_list.size() < OMP_THREADS_NUM);	
-	cdepth = layer_depth;
-	queue2vect(layer_list, layer_nodes);
-	return;
-}
-*/
 void SurfReconstructor::genIsoOurs()
 {
     double t_start = get_time();

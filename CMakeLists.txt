@@ -67,10 +67,8 @@ endif()
 # SET(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -gencode arch=compute_${COMPUTE_CAPABILITY},code=compute_${COMPUTE_CAPABILITY};-g;-G;)
 
 add_executable(${PROJECT_NAME}
-    src/cube_arrays.cpp
     src/iso_method_ours.cpp
     src/main.cpp
-    src/tet_arrays.cpp
     src/timer.cpp
     src/utils.cpp
     src/visitorextract.cpp

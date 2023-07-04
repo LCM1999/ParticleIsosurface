@@ -1,5 +1,4 @@
 #pragma once
-#include "cube_arrays.h"
 
 enum TraversalType
 {
