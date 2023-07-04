@@ -6,5 +6,4 @@ extern int OMP_THREADS_NUM;
 extern bool IS_CONST_RADIUS;
 extern bool USE_CUDA;
 
-extern char SCALE;
 

@@ -165,7 +165,7 @@ void SurfReconstructor::resizeRootBoxVarR()
 		_RootCenter[i] = center;
 	}
 
-	_DEPTH_MIN = int(ceil(log2(ceil(maxLen / maxR)))) - 2; //, _DEPTH_MAX - int(_DEPTH_MAX / 3));
+	_DEPTH_MIN = int(ceil(log2(ceil(maxLen / maxR)))) - 1; //, _DEPTH_MAX - int(_DEPTH_MAX / 3));
 }
 
 
