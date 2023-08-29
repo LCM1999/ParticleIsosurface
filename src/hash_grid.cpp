@@ -50,6 +50,11 @@ inline void HashGrid::CalcHashList()
 	Eigen::Vector3i xyzIdx;
 	for (size_t index = 0; index < ParticlesNum; index++)
 	{
+		if (index == 95096)
+		{
+			printf("");
+		}
+		
 		CalcXYZIdx((Particles->at(index)), xyzIdx);
 		HashList[index] = CalcCellHash(xyzIdx);
 		IndexList[index] = index;
@@ -86,9 +91,9 @@ void HashGrid::CalcXYZIdx(const Eigen::Vector3f& pos, Eigen::Vector3i& xyzIdx)
 
 long long HashGrid::CalcCellHash(const Eigen::Vector3i& xyzIdx)
 {
-	if (xyzIdx[0] < 0 || xyzIdx[0] >= XYZCellNum[0] ||
-		xyzIdx[1] < 0 || xyzIdx[1] >= XYZCellNum[1] ||
-		xyzIdx[2] < 0 || xyzIdx[2] >= XYZCellNum[2])
+	if (xyzIdx[0] < 0 || xyzIdx[0] > XYZCellNum[0] ||
+		xyzIdx[1] < 0 || xyzIdx[1] > XYZCellNum[1] ||
+		xyzIdx[2] < 0 || xyzIdx[2] > XYZCellNum[2])
 		return -1;
 	return (long long)xyzIdx[2] * (long long)XYZCellNum[0] * (long long)XYZCellNum[1] + 
 		(long long)xyzIdx[1] * (long long)XYZCellNum[0] + (long long)xyzIdx[0];

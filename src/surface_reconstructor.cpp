@@ -53,18 +53,29 @@ float radius, float flatness, float inf_factor)
 
 inline void SurfReconstructor::loadRootBox()
 {
-	_BoundingBox[0] = (*std::min_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	[&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.x() < b.x(); })).x();
-	_BoundingBox[1] = (*std::max_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	[&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.x() < b.x(); })).x();
-	_BoundingBox[2] = (*std::min_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	[&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.y() < b.y(); })).y();
-	_BoundingBox[3] = (*std::max_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	[&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.y() < b.y(); })).y();
-	_BoundingBox[4] = (*std::min_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	[&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.z() < b.z(); })).z();
-	_BoundingBox[5] = (*std::max_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	[&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.z() < b.z(); })).z();
+	_BoundingBox[0] = _BoundingBox[2] = _BoundingBox[4] = FLT_MAX;
+	_BoundingBox[1] = _BoundingBox[3] = _BoundingBox[5] = -FLT_MAX;
+	for (const Eigen::Vector3f& p: _GlobalParticles)
+	{
+		if (p.x() < _BoundingBox[0]) _BoundingBox[0] = p.x();
+		if (p.x() > _BoundingBox[1]) _BoundingBox[1] = p.x();
+		if (p.y() < _BoundingBox[2]) _BoundingBox[2] = p.y();
+		if (p.y() > _BoundingBox[3]) _BoundingBox[3] = p.y();
+		if (p.z() < _BoundingBox[4]) _BoundingBox[4] = p.z();
+		if (p.z() > _BoundingBox[5]) _BoundingBox[5] = p.z();
+	}
+	// _BoundingBox[0] = (*std::min_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
+	// [&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.x() < b.x(); })).x();
+	// _BoundingBox[1] = (*std::max_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
+	// [&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.x() < b.x(); })).x();
+	// _BoundingBox[2] = (*std::min_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
+	// [&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.y() < b.y(); })).y();
+	// _BoundingBox[3] = (*std::max_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
+	// [&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.y() < b.y(); })).y();
+	// _BoundingBox[4] = (*std::min_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
+	// [&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.z() < b.z(); })).z();
+	// _BoundingBox[5] = (*std::max_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
+	// [&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.z() < b.z(); })).z();
 }
 
 void SurfReconstructor::shrinkBox()

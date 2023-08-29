@@ -7,6 +7,10 @@
 #include "global.h"
 #include "pugixml.hpp"
 
+bool readShonDyParticleXDMF(const std::string dir_path,
+                            const std::string xdmf_file,
+                            std::vector<std::string> &files);
+
 bool readShonDyParticleData(const std::string &fileName,
                             std::vector<Eigen::Vector3f> &positions,
                             std::vector<float>* radiuses, const float scale);
