@@ -25,7 +25,7 @@ void parseStringToElements(std::vector<T>* elements, std::string& input, std::st
 		{
 			elements->push_back(stoi(input.substr(0, pos)));
 		}
-		else if (typeid(T) == typeid(float))
+		else if (typeid(T) == typeid(double))
 		{
 			elements->push_back(stof(input.substr(0, pos)));
 		}
@@ -43,7 +43,7 @@ void parseStringToElements(std::vector<T>* elements, std::string& input, std::st
 		{
 			elements->push_back(stoi(input));
 		}
-		else if (typeid(T) == typeid(float))
+		else if (typeid(T) == typeid(double))
 		{
 			elements->push_back(stof(input));
 		}

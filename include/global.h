@@ -44,7 +44,7 @@ struct vect3
 	}
 };
 
-typedef vect3<float> Vertex;
+typedef vect3<double> Vertex;
 
 struct Triangle
 {
@@ -76,8 +76,8 @@ class Mesh
 public:
 	Mesh(int mesh_precision = 1e4);
     int MESH_PRECISION;
-	std::vector<Eigen::Vector3f> IcosaTable;
-	std::map<vect3<int>, int> vertices_map;
+	std::vector<Eigen::Vector3d> IcosaTable;
+	std::map<vect3<long long>, int> vertices_map;
 	std::vector<Vertex> vertices;
 	std::map<Triangle, int> tris_map;
 	std::vector<Triangle> tris;
@@ -86,19 +86,19 @@ public:
 	const int theta = 5;
 	const int phi = 5;
 
-	int insert_vert(const Eigen::Vector3f& p);
+	int insert_vert(const Eigen::Vector3d& p);
 	double precise(double x);
-	vect3<int> vect3f2vect3i(vect3<float>& a);
-	vect3<float> vect3i2vect3f(vect3<int>& a);
-	bool similiar_point(Eigen::Vector3f& v1, Eigen::Vector3f& v2);
+	vect3<long long> vect3f2vect3i(vect3<double>& a);
+	vect3<double> vect3i2vect3f(vect3<int>& a);
+	bool similiar_point(Eigen::Vector3d& v1, Eigen::Vector3d& v2);
 	void insert_tri(int t0, int t1, int t2);
 	void reset();
 
 	const int triangle_edge2vert[3][2] = { {1, 2}, {2, 0}, {0, 1} };
 
-	//std::vector<Eigen::Vector3f> norms;
+	//std::vector<Eigen::Vector3d> norms;
 
 	void BuildIcosaTable();
-	void AppendSplash_ConstR(std::vector<Eigen::Vector3f>& splash_particles, const float radius);
-	void AppendSplash_VarR(std::vector<Eigen::Vector3f>& splash_particles, std::vector<float>& splash_radius);
+	void AppendSplash_ConstR(std::vector<Eigen::Vector3d>& splash_particles, const double radius);
+	void AppendSplash_VarR(std::vector<Eigen::Vector3d>& splash_particles, std::vector<double>& splash_radius);
 };

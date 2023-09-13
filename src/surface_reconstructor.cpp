@@ -14,18 +14,18 @@
 // #include "cuda_runtime.h"
 
 // extern void cuda_node_calc_const_r(
-// 	float* particles, float* Gs, bool* splashs, float* particles_gradients, 
+// 	double* particles, double* Gs, bool* splashs, double* particles_gradients, 
 //     long long* hash_list, int* index_list, long long* start_list_keys, int* start_list_values, long long* end_list_keys, int* end_list_values,
-//     char* types, char* depths, float* centers, float* half_lengthes, int* tnode_num,
-//     float* nodes
+//     char* types, char* depths, double* centers, double* half_lengthes, int* tnode_num,
+//     double* nodes
 // );
 
 // extern "C" void cuda_node_calc_const_r_kernel(
 // 	dim3 blocks, dim3 threads,
-// 	float* particles, float* Gs, bool* splashs, float* particles_gradients, 
+// 	double* particles, double* Gs, bool* splashs, double* particles_gradients, 
 //     long long* hash_list, int* index_list, long long* start_list_keys, int* start_list_values, long long* end_list_keys, int* end_list_values,
-//     char* types, char* depths, float* centers, float* half_lengthes, int* tnode_num,
-//     float* nodes
+//     char* types, char* depths, double* centers, double* half_lengthes, int* tnode_num,
+//     double* nodes
 // ) {
 // 	cuda_node_calc_const_r << <blocks, threads> >>(
 // 		particles_gpu, Gs_gpu, splashs_gpu, particles_gradients_gpu, 
@@ -34,9 +34,9 @@
 // 	);
 // };
 
-SurfReconstructor::SurfReconstructor(std::vector<Eigen::Vector3f>& particles, 
-std::vector<float>* radiuses, Mesh* mesh, 
-float radius, float flatness, float inf_factor)
+SurfReconstructor::SurfReconstructor(std::vector<Eigen::Vector3d>& particles, 
+std::vector<double>* radiuses, Mesh* mesh, 
+double radius, double flatness, double inf_factor)
 {
 	_GlobalParticles = particles;
 	_GlobalParticlesNum = _GlobalParticles.size();
@@ -53,18 +53,29 @@ float radius, float flatness, float inf_factor)
 
 inline void SurfReconstructor::loadRootBox()
 {
-	_BoundingBox[0] = (*std::min_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	[&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.x() < b.x(); })).x();
-	_BoundingBox[1] = (*std::max_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	[&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.x() < b.x(); })).x();
-	_BoundingBox[2] = (*std::min_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	[&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.y() < b.y(); })).y();
-	_BoundingBox[3] = (*std::max_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	[&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.y() < b.y(); })).y();
-	_BoundingBox[4] = (*std::min_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	[&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.z() < b.z(); })).z();
-	_BoundingBox[5] = (*std::max_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	[&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.z() < b.z(); })).z();
+	_BoundingBox[0] = _BoundingBox[2] = _BoundingBox[4] = FLT_MAX;
+	_BoundingBox[1] = _BoundingBox[3] = _BoundingBox[5] = -FLT_MAX;
+	for (const Eigen::Vector3d& p: _GlobalParticles)
+	{
+		if (p.x() < _BoundingBox[0]) _BoundingBox[0] = p.x();
+		if (p.x() > _BoundingBox[1]) _BoundingBox[1] = p.x();
+		if (p.y() < _BoundingBox[2]) _BoundingBox[2] = p.y();
+		if (p.y() > _BoundingBox[3]) _BoundingBox[3] = p.y();
+		if (p.z() < _BoundingBox[4]) _BoundingBox[4] = p.z();
+		if (p.z() > _BoundingBox[5]) _BoundingBox[5] = p.z();
+	}
+	// _BoundingBox[0] = (*std::min_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
+	// [&] (Eigen::Vector3d& a, Eigen::Vector3d& b) { return a.x() < b.x(); })).x();
+	// _BoundingBox[1] = (*std::max_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
+	// [&] (Eigen::Vector3d& a, Eigen::Vector3d& b) { return a.x() < b.x(); })).x();
+	// _BoundingBox[2] = (*std::min_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
+	// [&] (Eigen::Vector3d& a, Eigen::Vector3d& b) { return a.y() < b.y(); })).y();
+	// _BoundingBox[3] = (*std::max_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
+	// [&] (Eigen::Vector3d& a, Eigen::Vector3d& b) { return a.y() < b.y(); })).y();
+	// _BoundingBox[4] = (*std::min_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
+	// [&] (Eigen::Vector3d& a, Eigen::Vector3d& b) { return a.z() < b.z(); })).z();
+	// _BoundingBox[5] = (*std::max_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
+	// [&] (Eigen::Vector3d& a, Eigen::Vector3d& b) { return a.z() < b.z(); })).z();
 }
 
 void SurfReconstructor::shrinkBox()
@@ -115,8 +126,8 @@ void SurfReconstructor::shrinkBox()
 
 void SurfReconstructor::resizeRootBoxConstR()
 {
-    float maxLen, resizeLen;
-	float r = _RADIUS;
+    double maxLen, resizeLen;
+	double r = _RADIUS;
 	maxLen = (std::max)({ 
 		(_BoundingBox[1] - _BoundingBox[0]) , 
 		(_BoundingBox[3] - _BoundingBox[2]) , 
@@ -143,7 +154,7 @@ void SurfReconstructor::resizeRootBoxConstR()
 void SurfReconstructor::resizeRootBoxVarR()
 {
 	double maxLen, resizeLen;
-	float minR = _searcher->getMinRadius(), maxR = _searcher->getMaxRadius(), avgR = _searcher->getAvgRadius();
+	double minR = _searcher->getMinRadius(), maxR = _searcher->getMaxRadius(), avgR = _searcher->getAvgRadius();
 	maxLen = (std::max)({ 
 		(_BoundingBox[1] - _BoundingBox[0]) , 
 		(_BoundingBox[3] - _BoundingBox[2]) , 
@@ -168,15 +179,15 @@ void SurfReconstructor::resizeRootBoxVarR()
 }
 
 
-void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& curv, float& min_radius)
+void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, double& curv, double& min_radius)
 {
-	Eigen::Vector3f norms(0, 0, 0);
+	Eigen::Vector3d norms(0, 0, 0);
 	int area = 0;
 	std::vector<int> insides;
 	min_radius = IS_CONST_RADIUS ? _RADIUS : FLT_MAX;
-	const Eigen::Vector3f 
-	box1 = tnode->center - Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length),
-	box2 = tnode->center + Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length);
+	const Eigen::Vector3d 
+	box1 = tnode->center - Eigen::Vector3d(tnode->half_length, tnode->half_length, tnode->half_length),
+	box2 = tnode->center + Eigen::Vector3d(tnode->half_length, tnode->half_length, tnode->half_length);
 	if (IS_CONST_RADIUS)
 	{
 		_hashgrid->GetInBoxParticles(box1, box2, insides);
@@ -198,8 +209,8 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 					_GlobalParticles[in].z() > (box1.z() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _SMOOTH_FACTOR)) && 
 					_GlobalParticles[in].z() < (box2.z() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _SMOOTH_FACTOR)))
 				{
-					Eigen::Vector3f tempNorm = _evaluator->PariclesNormals[in];
-					if (tempNorm == Eigen::Vector3f(0, 0, 0))	{continue;}
+					Eigen::Vector3d tempNorm = _evaluator->PariclesNormals[in];
+					if (tempNorm == Eigen::Vector3d(0, 0, 0))	{continue;}
 					norms += tempNorm;
 					area++;
 					if (!IS_CONST_RADIUS)
@@ -218,7 +229,7 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, float& 
 	curv = (area == 0) ? 1.0 : (norms.norm() / area);
 }
 
-void SurfReconstructor::beforeSampleEval(TNode* tnode, float& curv, float& min_radius, bool& empty)
+void SurfReconstructor::beforeSampleEval(TNode* tnode, double& curv, double& min_radius, bool& empty)
 {
 	switch (tnode->type)
 	{
@@ -232,7 +243,7 @@ void SurfReconstructor::beforeSampleEval(TNode* tnode, float& curv, float& min_r
 		checkEmptyAndCalcCurv(tnode, empty, curv, min_radius);
 		if (empty)
 		{
-			_evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3]);
+			_evaluator->SingleEval((Eigen::Vector3d&)tnode->node, tnode->node[3]);
 			tnode->type = EMPTY;
 			return;
 		}
@@ -244,12 +255,12 @@ void SurfReconstructor::beforeSampleEval(TNode* tnode, float& curv, float& min_r
 }
 
 void SurfReconstructor::afterSampleEval(
-	TNode* tnode, float& curv, float& min_radius, 
-	float* sample_points, float* sample_grads)
+	TNode* tnode, double& curv, double& min_radius, 
+	double* sample_points, double* sample_grads)
 {
 	bool isbig = (tnode->depth < _DEPTH_MIN);
 	bool signchange = false;
-	float cellsize = 2 * tnode->half_length;
+	double cellsize = 2 * tnode->half_length;
 
 	if (!isbig)
 	{
@@ -307,8 +318,8 @@ void SurfReconstructor::genIsoOurs()
 		VisitorExtract v(this, m);
 		TraversalData td(_OurRoot);
 		traverse_node<trav_vert>(v, td);
-		std::vector<Eigen::Vector3f> splash_pos;
-		std::vector<float> splash_radiuses;
+		std::vector<Eigen::Vector3d> splash_pos;
+		std::vector<double> splash_radiuses;
 		for (int pIdx = 0; pIdx < getGlobalParticlesNum(); pIdx++)
 		{
 			if (_evaluator->CheckSplash(pIdx))
@@ -333,11 +344,11 @@ void SurfReconstructor::genIsoOurs()
 		return;
 	}
 	int depth = 0;
-	float half = root->half_length;
-	float* sample_points;
-	float* sample_grads;
-	float* cuvrs;
-	float* min_raiduses;
+	double half = root->half_length;
+	double* sample_points;
+	double* sample_grads;
+	double* cuvrs;
+	double* min_raiduses;
 	bool* emptys;
 	WaitingStack.push_back(root);
 	while (!WaitingStack.empty())
@@ -348,8 +359,8 @@ void SurfReconstructor::genIsoOurs()
 			ProcessArray[queue_flag] = WaitingStack.back();
 			WaitingStack.pop_back();
 		}
-		cuvrs = new float[queue_flag];
-		min_raiduses = new float[queue_flag];
+		cuvrs = new double[queue_flag];
+		min_raiduses = new double[queue_flag];
 		emptys = new bool[queue_flag];
 		#pragma omp parallel //for schedule(dynamic, OMP_THREADS_NUM) 
 		{
@@ -362,8 +373,8 @@ void SurfReconstructor::genIsoOurs()
 				}
 			}
 		}
-		sample_points = new float[pow(getOverSampleQEF()+1, 3) * 4 * queue_flag];
-		sample_grads = new float[pow(getOverSampleQEF()+1, 3) * 3 * queue_flag];
+		sample_points = new double[pow(getOverSampleQEF()+1, 3) * 4 * queue_flag];
+		sample_grads = new double[pow(getOverSampleQEF()+1, 3) * 3 * queue_flag];
 		//TODO: Sampling
 		#pragma omp parallel //for schedule(dynamic, OMP_THREADS_NUM)
 		{

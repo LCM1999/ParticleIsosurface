@@ -3,9 +3,39 @@
 
 #include "hdf5Utils.hpp"
 
+
+bool readShonDyParticleXDMF(const std::string dir_path,
+                            const std::string xdmf_file,
+                            std::vector<std::string> &files)
+{
+    std::string xdmf_path = dir_path + "\\" + xdmf_file;
+    if (!std::filesystem::exists(xdmf_path))
+    {
+        std::cout << "Error: cannot find xdmf file: " << xdmf_path << std::endl;
+        return false;
+    }
+
+    pugi::xml_document doc;
+    pugi::xml_parse_result result = doc.load_file(xdmf_path);
+    if (!result)
+    {
+        std::cout << "Load result: " << result.description() << std::endl;
+        return false;
+    }
+
+    // prefix = doc.child("Xdmf").child("Domain").attribute("Name").as_string();
+
+    for (pugi::xml_node frame: doc.child("Xdmf").child("Domain").child("Grid").children("Grid"))
+    {
+        // std::cout << frame.child("Time").attribute("Value").as_string() << std::endl;
+        files.push_back(std::string(frame.child("Time").attribute("Value").as_string()) + ".h5");
+    }
+    return true;
+}
+
 bool readShonDyParticleData(const std::string &fileName,
-                            std::vector<Eigen::Vector3f> &positions,
-                            std::vector<float>* radiuses, const float scale)
+                            std::vector<Eigen::Vector3d> &positions,
+                            std::vector<double>* radiuses, const double scale)
 {
     if (!std::filesystem::exists(fileName))
     {
@@ -32,15 +62,15 @@ bool readShonDyParticleData(const std::string &fileName,
     // read particle densities
     if (radiuses != nullptr)
     {
-        readDouble(hdf5FileID, "radius", radiusesDouble);
+        readDouble(hdf5FileID, "particleRadius", radiusesDouble);
         radiuses->resize(numberOfNodes);
     }
     
-    // convert double data to float
+    // convert double data to double
     for (int i = 0; i < numberOfNodes; i++)
     {
         positions[i] =
-            Eigen::Vector3f(nodes[3 * i], nodes[3 * i + 1], nodes[3 * i + 2]);
+            Eigen::Vector3d(nodes[3 * i], nodes[3 * i + 1], nodes[3 * i + 2]);
         if (radiuses != nullptr)
         {
             (*radiuses)[i] = radiusesDouble[i] * scale;

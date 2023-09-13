@@ -14,7 +14,7 @@ set(PROJECT_NAME Isosurface_smiplify)
 ################################################################################
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
 set(EIGEN3_DIR C:/Lib/Eigen-3.4.0-MSVC/share/eigen3/cmake)
-set(HDF5_DIR C:/Lib/HDF5-1.10.7-MSVC/cmake/hdf5)
+set(HDF5_DIR F:/hdf5-1.12.1/cmake/hdf5)
 
 
 # find_package(CUDA  REQUIRED)
@@ -79,6 +79,7 @@ add_executable(${PROJECT_NAME}
     src/recorder.cpp
     src/pugixml.cpp
     src/hdf5Utils.cpp
+    src/pvdReader.cpp
     src/multi_level_reseacher.cpp
     # src/node_calc.cu
     src/rply.c

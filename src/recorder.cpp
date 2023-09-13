@@ -64,11 +64,14 @@ void Recorder::RecordProgress()
 void Recorder::RecordParticles()
 {
 	Evaluator* evaluator = constructor->getEvaluator();
+	HashGrid* hashgrid = constructor->getHashGrid();
+	Eigen::Vector3i xyz;
 	FILE* f = fopen((_Output_Dir + "/rp_" + _Frame_Name + ".txt").c_str(), "w");
-	fprintf(f, "\"x\",\"y\",\"z\",\"type\"\n");
+	fprintf(f, "\"x\",\"y\",\"z\",\"type\",\"hash\"\n");
 	for (int pIdx = 0; pIdx < constructor->getGlobalParticlesNum(); pIdx++)
 	{
-		fprintf(f, "%f,%f,%f,%d\n", evaluator->GlobalxMeans[pIdx][0], evaluator->GlobalxMeans[pIdx][1], evaluator->GlobalxMeans[pIdx][2], evaluator->CheckSplash(pIdx)?1:0);
+		hashgrid->CalcXYZIdx(evaluator->GlobalxMeans[pIdx], xyz);
+		fprintf(f, "%f,%f,%f,%d,%d\n", evaluator->GlobalxMeans[pIdx][0], evaluator->GlobalxMeans[pIdx][1], evaluator->GlobalxMeans[pIdx][2], evaluator->CheckSplash(pIdx)?1:0, hashgrid->CalcCellHash(xyz));
 	}
 	fclose(f);
 }

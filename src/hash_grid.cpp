@@ -1,6 +1,6 @@
 #include "hash_grid.h"
 
-HashGrid::HashGrid(std::vector<Eigen::Vector3f>& particles, float* bounding, float radius, float inf_factor)
+HashGrid::HashGrid(std::vector<Eigen::Vector3d>& particles, double* bounding, double radius, double inf_factor)
 {
 	Particles = &particles;
 	ParticlesNum = Particles->size();
@@ -50,6 +50,11 @@ inline void HashGrid::CalcHashList()
 	Eigen::Vector3i xyzIdx;
 	for (size_t index = 0; index < ParticlesNum; index++)
 	{
+		if (index == 95096)
+		{
+			printf("");
+		}
+		
 		CalcXYZIdx((Particles->at(index)), xyzIdx);
 		HashList[index] = CalcCellHash(xyzIdx);
 		IndexList[index] = index;
@@ -77,7 +82,7 @@ inline void HashGrid::FindStartEnd()
 	}
 }
 
-void HashGrid::CalcXYZIdx(const Eigen::Vector3f& pos, Eigen::Vector3i& xyzIdx)
+void HashGrid::CalcXYZIdx(const Eigen::Vector3d& pos, Eigen::Vector3i& xyzIdx)
 {
 	xyzIdx.setZero();
 	for (int i = 0; i < 3; i++)
@@ -86,9 +91,9 @@ void HashGrid::CalcXYZIdx(const Eigen::Vector3f& pos, Eigen::Vector3i& xyzIdx)
 
 long long HashGrid::CalcCellHash(const Eigen::Vector3i& xyzIdx)
 {
-	if (xyzIdx[0] < 0 || xyzIdx[0] >= XYZCellNum[0] ||
-		xyzIdx[1] < 0 || xyzIdx[1] >= XYZCellNum[1] ||
-		xyzIdx[2] < 0 || xyzIdx[2] >= XYZCellNum[2])
+	if (xyzIdx[0] < 0 || xyzIdx[0] > XYZCellNum[0] ||
+		xyzIdx[1] < 0 || xyzIdx[1] > XYZCellNum[1] ||
+		xyzIdx[2] < 0 || xyzIdx[2] > XYZCellNum[2])
 		return -1;
 	return (long long)xyzIdx[2] * (long long)XYZCellNum[0] * (long long)XYZCellNum[1] + 
 		(long long)xyzIdx[1] * (long long)XYZCellNum[0] + (long long)xyzIdx[0];
@@ -111,7 +116,7 @@ void HashGrid::GetInCellList(const long long hash, std::vector<int>& pIdxList)
 }
 
 void HashGrid::GetInBoxParticles(
-	const Eigen::Vector3f& box1, const Eigen::Vector3f& box2, 
+	const Eigen::Vector3d& box1, const Eigen::Vector3d& box2, 
 	std::vector<int>& insides)
 {
 	Eigen::Vector3i minXyzIdx, maxXyzIdx;
@@ -133,7 +138,7 @@ void HashGrid::GetInBoxParticles(
     }
 }
 
-void HashGrid::GetPIdxList(const Eigen::Vector3f& pos, std::vector<int>& pIdxList)
+void HashGrid::GetPIdxList(const Eigen::Vector3d& pos, std::vector<int>& pIdxList)
 {
 	pIdxList.clear();
 	Eigen::Vector3i xyzIdx;
