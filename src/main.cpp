@@ -40,7 +40,7 @@ std::vector<std::string> DATA_PATHES;
 std::string OUTPUT_TYPE = "ply";
 std::string OUTPUT_DIR = "out";
 std::string output_dir_path = "";
-float RADIUS = 0;
+double RADIUS = 0;
 bool USE_CUDA = false;
 
 void writeObjFile(Mesh &m, std::string fn)
@@ -61,15 +61,15 @@ int writePlyFile(Mesh& m, std::string fn)
 {
     int num_vertices = int(m.verticesNum);
     int num_faces = int(m.trianglesNum);
-    float version;
+    double version;
     p_ply ply = ply_create(fn.c_str(), PLY_DEFAULT, NULL, 0, NULL);
     if (!ply) 
         return 0;   
 
     ply_add_element(ply, "vertex", num_vertices);
-    ply_add_scalar_property(ply, "x", PLY_FLOAT32);
-    ply_add_scalar_property(ply, "y", PLY_FLOAT32);
-    ply_add_scalar_property(ply, "z", PLY_FLOAT32);
+    ply_add_scalar_property(ply, "x", PLY_double32);
+    ply_add_scalar_property(ply, "y", PLY_double32);
+    ply_add_scalar_property(ply, "z", PLY_double32);
     
     ply_add_element(ply, "face", num_faces);
     ply_add_list_property(ply, "vertex_indices", PLY_UCHAR, PLY_INT);
@@ -151,6 +151,7 @@ void loadConfigJson(std::string path)
         {
             std::filesystem::create_directory(output_dir_path);
         }
+        std::cout << "Output path: " << output_dir_path << ";" << std::endl;
 
         if (DATA_TYPE == 2)
         {
@@ -207,8 +208,8 @@ void loadConfigJson(std::string path)
 }
 
 void loadParticlesFromCSV(std::string &csvPath,
-                          std::vector<Eigen::Vector3f> &particles,
-                          std::vector<float>* radiuses)
+                          std::vector<Eigen::Vector3d> &particles,
+                          std::vector<double>* radiuses)
 {
     std::ifstream ifn;
     ifn.open(csvPath.c_str());
@@ -219,7 +220,7 @@ void loadParticlesFromCSV(std::string &csvPath,
 
     std::string line;
     std::vector<std::string> titles;
-    std::vector<float> elements;
+    std::vector<double> elements;
     std::getline(ifn, line);
     replaceAll(line, "\"", "");
     parseString(&titles, line, ",");
@@ -263,7 +264,7 @@ void loadParticlesFromCSV(std::string &csvPath,
     {
         elements.clear();
         parseStringToElements(&elements, line, ",");
-        particles.push_back(Eigen::Vector3f(elements[xIdx], elements[yIdx], elements[zIdx]));
+        particles.push_back(Eigen::Vector3d(elements[xIdx], elements[yIdx], elements[zIdx]));
         if (!IS_CONST_RADIUS)
         {
             radiuses->push_back(elements[radiusIdx] * DEFAULT_SCALE);
@@ -277,8 +278,8 @@ void run(std::string &dataDirPath)
     loadConfigJson(dataDirPath);
     double frameStart = 0;
     int index = 0;
-    std::vector<Eigen::Vector3f> particles;
-    std::vector<float>* radiuses = (IS_CONST_RADIUS ? nullptr : new std::vector<float>());
+    std::vector<Eigen::Vector3d> particles;
+    std::vector<double>* radiuses = (IS_CONST_RADIUS ? nullptr : new std::vector<double>());
     for (const std::string frame : DATA_PATHES)
     {
         Mesh* mesh = new Mesh(int(pow(10, 4)));
@@ -313,30 +314,41 @@ void run(std::string &dataDirPath)
         {
             // recorder.RecordProgress();
             recorder->RecordParticles();
-            // recorder->RecordFeatures();
+            recorder->RecordFeatures();
         }
 
         std::string output_name = frame.substr(0, frame.find_last_of('_') + 1);
         std::string timestamp = frame.substr(frame.find_last_of('_') + 1, frame.size() - frame.find_last_of('_') - 5);
         std::string int_part = timestamp.substr(0, std::distance(timestamp.begin(), std::find(timestamp.begin(), timestamp.end(), '.')));
-        std::string float_part = "";
+        std::string double_part = "";
         if (timestamp.find('.') != timestamp.npos)
         {
-            float_part = timestamp.substr(std::distance(timestamp.begin(), std::find(timestamp.begin(), timestamp.end(), '.')) + 1, timestamp.size());
+            double_part = timestamp.substr(std::distance(timestamp.begin(), std::find(timestamp.begin(), timestamp.end(), '.')) + 1, timestamp.size());
         }
-        output_name += std::string(6 - int_part.size(), '0') + int_part + float_part + std::string(6 - float_part.size(), '0');
-        if ("ply" == OUTPUT_TYPE || "PLY" == OUTPUT_TYPE)
+        output_name += std::string(6 - int_part.size(), '0') + int_part + double_part + std::string(6 - double_part.size(), '0');
+        try
         {
-            writePlyFile(*mesh,
-                  output_dir_path + "/" + output_name + ".ply");
-        } else if ("obj" == OUTPUT_TYPE || "OBJ" == OUTPUT_TYPE) 
+            if ("ply" == OUTPUT_TYPE || "PLY" == OUTPUT_TYPE)
+            {
+                writePlyFile(*mesh,
+                    output_dir_path + "/" + output_name + ".ply");
+            } else if ("obj" == OUTPUT_TYPE || "OBJ" == OUTPUT_TYPE) 
+            {
+                writeObjFile(*mesh,
+                    output_dir_path + "/" + output_name + ".obj");    
+            } else {
+                writePlyFile(*mesh,
+                    output_dir_path + "/" + output_name + ".ply");
+            }  
+        }
+        catch(const std::exception& e)
         {
-            writeObjFile(*mesh,
-                  output_dir_path + "/" + output_name + ".obj");    
-        } else {
-            writePlyFile(*mesh,
-                  output_dir_path + "/" + output_name + ".ply");
-        }        
+            std::cerr << e.what() << '\n';
+            std::cout << "Error happened during writing result." << std::endl;
+            std::cout << "Result output path: " << output_dir_path + "/" + output_name + "." + OUTPUT_TYPE + ";" << std::endl;
+            std::cout << "In Memory Mesh : Vertices=" << mesh->verticesNum << ", Cells=" << mesh->trianglesNum << ";" << std::endl;
+            exit(1);
+        }
         index++;
         delete(mesh);
         delete(constructor);
@@ -371,7 +383,7 @@ int main(int argc, char **argv)
     else
     {
         std::string dataDirPath =
-            "F:\\data\\vtk\\21a99fdd-2c66-4f3d-8aa2-4fb076bc380a";
+            "F:\\data\\test";
         run(dataDirPath);
     }
 

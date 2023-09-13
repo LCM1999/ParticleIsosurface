@@ -8,17 +8,17 @@
 
 class SurfReconstructor;
 
-typedef Eigen::Vector<float, 5> Vector5f;
 typedef Eigen::Vector<double, 5> Vector5d;
-typedef Eigen::Vector<float, 6> Vector6f;
+typedef Eigen::Vector<double, 5> Vector5d;
 typedef Eigen::Vector<double, 6> Vector6d;
-typedef Eigen::Vector<float, 7> Vector7f;
+typedef Eigen::Vector<double, 6> Vector6d;
 typedef Eigen::Vector<double, 7> Vector7d;
-typedef Eigen::Matrix<float, 5, 5> Matrix5f;
+typedef Eigen::Vector<double, 7> Vector7d;
 typedef Eigen::Matrix<double, 5, 5> Matrix5d;
-typedef Eigen::Matrix<float, 6, 6> Matrix6f;
+typedef Eigen::Matrix<double, 5, 5> Matrix5d;
 typedef Eigen::Matrix<double, 6, 6> Matrix6d;
-typedef Eigen::Matrix<float, 7, 7> Matrix7f;
+typedef Eigen::Matrix<double, 6, 6> Matrix6d;
+typedef Eigen::Matrix<double, 7, 7> Matrix7d;
 typedef Eigen::Matrix<double, 7, 7> Matrix7d;
 
 extern int tree_cells;
@@ -43,16 +43,16 @@ struct TNode
 
 	SurfReconstructor* constructor;
 
-	Eigen::Vector3f center;
-	float half_length;
-	Eigen::Vector4f node = Eigen::Vector4f::Zero();
+	Eigen::Vector3d center;
+	double half_length;
+	Eigen::Vector4d node = Eigen::Vector4d::Zero();
 
 	char depth = 0;
 	char type;
 
 	TNode *children[8];
 
-	bool changeSignDMC(Eigen::Vector4f* verts);
+	bool changeSignDMC(Eigen::Vector4d* verts);
 
 	int getWeight()
 	{
@@ -84,7 +84,7 @@ struct TNode
 		return type == LEAF || type == EMPTY;
 	}
 
-	bool contain(const Eigen::Vector3f& pos)
+	bool contain(const Eigen::Vector3d& pos)
 	{
 		if (std::abs(pos[0] - center[0]) <= half_length &&
 			std::abs(pos[1] - center[1]) <= half_length &&
@@ -102,18 +102,18 @@ struct TNode
 		return t * t;
 	}
 
-	float calcErrorDMC(
-		Eigen::Vector4f p, float* verts, float* verts_grad, const int oversample);
+	double calcErrorDMC(
+		Eigen::Vector4d p, double* verts, double* verts_grad, const int oversample);
 
-	void vertAll(float& curv, bool& signchange, float& qef_error, float& sample);
+	void vertAll(double& curv, bool& signchange, double& qef_error, double& sample);
 
-	void GenerateSampling(float* sample_points);
+	void GenerateSampling(double* sample_points);
 
 	void NodeSampling(
-		float& curv, bool& signchange, float cellsize,
-		float* sample_points, float* sample_grads);
+		double& curv, bool& signchange, double cellsize,
+		double* sample_points, double* sample_grads);
 
-	void NodeCalcNode(float* sample_points, float* sample_grads, float cellsize);
+	void NodeCalcNode(double* sample_points, double* sample_grads, double cellsize);
 
 	// void NodeFeatureCalc();
 

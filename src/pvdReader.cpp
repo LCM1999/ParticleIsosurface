@@ -7,7 +7,7 @@ bool readShonDyParticlesPVD(
     const std::string dir_path,
     const std::string pvd_file,
     bool &is_const_radius,
-    float &radius,
+    double &radius,
     std::vector<std::string> &files
 ) {
     std::string pvd_path = dir_path + "\\" + pvd_file;

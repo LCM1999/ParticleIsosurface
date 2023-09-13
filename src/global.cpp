@@ -10,11 +10,11 @@ Mesh::Mesh(const int mesh_precision)
 	BuildIcosaTable();
 }
 
-int Mesh::insert_vert(const Eigen::Vector3f& p)
+int Mesh::insert_vert(const Eigen::Vector3d& p)
 {
-	vect3<float> tp(p);
-	vect3<int> tmp = vect3f2vect3i(tp);
-	// vect3<float> tmp(float(precise(p[0])), float(precise(p[1])), float(precise(p[2])));
+	vect3<double> tp(p);
+	vect3<long long> tmp = vect3f2vect3i(tp);
+	// vect3<double> tmp(double(precise(p[0])), double(precise(p[1])), double(precise(p[2])));
 	if (vertices_map.find(tmp) == vertices_map.end())
 	{
 		verticesNum++;
@@ -35,27 +35,27 @@ double Mesh::precise(double x)
     return res;
 }
 
-vect3<int> Mesh::vect3f2vect3i(vect3<float>& a)
+vect3<long long> Mesh::vect3f2vect3i(vect3<double>& a)
 {
-	vect3<int> r;
+	vect3<long long> r;
 	for (size_t i = 0; i < 3; i++)
 	{
-		r[i] = int(round(a[i] * MESH_PRECISION));
+		r[i] = long long(round(a[i] * MESH_PRECISION));
 	}
 	return r;
 }
 
-vect3<float> Mesh::vect3i2vect3f(vect3<int>& a)
+vect3<double> Mesh::vect3i2vect3f(vect3<int>& a)
 {
-	vect3<float> r;
+	vect3<double> r;
 	for (size_t i = 0; i < 3; i++)
 	{
-		r[i] = a[i] / float(MESH_PRECISION);
+		r[i] = a[i] / double(MESH_PRECISION);
 	}
 	return r;
 }
 
-bool Mesh::similiar_point(Eigen::Vector3f& v1, Eigen::Vector3f& v2)
+bool Mesh::similiar_point(Eigen::Vector3d& v1, Eigen::Vector3d& v2)
 {
 	for (size_t i = 0; i < 3; i++)
 	{
@@ -78,9 +78,9 @@ void Mesh::insert_tri(int t0, int t1, int t2)
 	// vect3i t1_i = vect3f2vect3i(vertices[(t1 - 1)]);
 	// vect3i t2_i = vect3f2vect3i(vertices[(t2 - 1)]);
 	// Triangle<vect3i> ti(t0_i, t1_i, t2_i);
-	// //float length[3];
+	// //double length[3];
 	// //int top, bottom1, bottom2;
-	// //float height, half;
+	// //double height, half;
 	// //double area;
 	// //half = 0;
 	// //for (size_t i = 0; i < 3; i++)
@@ -135,14 +135,14 @@ void Mesh::reset()
 
 void Mesh::BuildIcosaTable()
 {
-	const float PI = 3.1415926f;
-	const float H_ANGLE = PI / 180 * 72;    // 72 degree = 360 / 5
-	const float V_ANGLE = atanf(1.0f / 2); 
-	float z, xy;                            // coords
-	float hAngle1 = -PI / 2 - H_ANGLE / 2;  // start from -126 deg at 1st row
-	float hAngle2 = -PI / 2;				// start from -90 deg at 2nd row
+	const double PI = 3.1415926f;
+	const double H_ANGLE = PI / 180 * 72;    // 72 degree = 360 / 5
+	const double V_ANGLE = atanf(1.0f / 2); 
+	double z, xy;                            // coords
+	double hAngle1 = -PI / 2 - H_ANGLE / 2;  // start from -126 deg at 1st row
+	double hAngle2 = -PI / 2;				// start from -90 deg at 2nd row
 
-	IcosaTable[0] = Eigen::Vector3f(0, 0, 1);
+	IcosaTable[0] = Eigen::Vector3d(0, 0, 1);
 	int i1, i2;
 
 	for (size_t i = 1; i <= 5; i++)
@@ -152,20 +152,20 @@ void Mesh::BuildIcosaTable()
 		z = std::sin(V_ANGLE);
 		xy = std::cos(V_ANGLE);
 
-		IcosaTable[i1] = Eigen::Vector3f(xy * cos(hAngle1), xy * sin(hAngle1), z);
-		IcosaTable[i2] = Eigen::Vector3f(xy * cos(hAngle2), xy * sin(hAngle2), -z);
+		IcosaTable[i1] = Eigen::Vector3d(xy * cos(hAngle1), xy * sin(hAngle1), z);
+		IcosaTable[i2] = Eigen::Vector3d(xy * cos(hAngle2), xy * sin(hAngle2), -z);
 
 		hAngle1 += H_ANGLE;
 		hAngle2 += H_ANGLE;
 	}
 
-	IcosaTable[11] = Eigen::Vector3f(0, 0, -1);	
+	IcosaTable[11] = Eigen::Vector3d(0, 0, -1);	
 }
 
-void Mesh::AppendSplash_ConstR(std::vector<Eigen::Vector3f>& splash_particles, const float radius)
+void Mesh::AppendSplash_ConstR(std::vector<Eigen::Vector3d>& splash_particles, const double radius)
 {
 	std::vector<int> tmp_vec_indices;
-	for (const Eigen::Vector3f& pos : splash_particles)
+	for (const Eigen::Vector3d& pos : splash_particles)
 	{
 		tmp_vec_indices.clear();
 		tmp_vec_indices.resize(12);
@@ -183,7 +183,7 @@ void Mesh::AppendSplash_ConstR(std::vector<Eigen::Vector3f>& splash_particles, c
 	}
 }
 
-void Mesh::AppendSplash_VarR(std::vector<Eigen::Vector3f>& splash_particles, std::vector<float>& splash_radius)
+void Mesh::AppendSplash_VarR(std::vector<Eigen::Vector3d>& splash_particles, std::vector<double>& splash_radius)
 {
 	std::vector<int> tmp_vec_indices;
 	for (int spi = 0; spi < splash_particles.size(); spi++)

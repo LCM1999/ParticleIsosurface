@@ -34,8 +34,8 @@ bool readShonDyParticleXDMF(const std::string dir_path,
 }
 
 bool readShonDyParticleData(const std::string &fileName,
-                            std::vector<Eigen::Vector3f> &positions,
-                            std::vector<float>* radiuses, const float scale)
+                            std::vector<Eigen::Vector3d> &positions,
+                            std::vector<double>* radiuses, const double scale)
 {
     if (!std::filesystem::exists(fileName))
     {
@@ -66,11 +66,11 @@ bool readShonDyParticleData(const std::string &fileName,
         radiuses->resize(numberOfNodes);
     }
     
-    // convert double data to float
+    // convert double data to double
     for (int i = 0; i < numberOfNodes; i++)
     {
         positions[i] =
-            Eigen::Vector3f(nodes[3 * i], nodes[3 * i + 1], nodes[3 * i + 2]);
+            Eigen::Vector3d(nodes[3 * i], nodes[3 * i + 1], nodes[3 * i + 2]);
         if (radiuses != nullptr)
         {
             (*radiuses)[i] = radiusesDouble[i] * scale;

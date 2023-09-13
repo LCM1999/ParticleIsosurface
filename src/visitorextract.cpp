@@ -69,7 +69,7 @@ bool VisitorExtract::on_vert(TraversalData& a, TraversalData& b, TraversalData& 
 		{
 			trans_vertices[i] = n[proc.trans[i]];
 		}
-		std::array<Eigen::Vector3f, 12> points;
+		std::array<Eigen::Vector3d, 12> points;
 		
 		auto calculate_point = [&](int e_index, int v_index1, int v_index2) {
 			auto& v1 = *trans_vertices[v_index1];
@@ -77,8 +77,8 @@ bool VisitorExtract::on_vert(TraversalData& a, TraversalData& b, TraversalData& 
 			
 			if ((v1.node[3] > 0 ? 1 : -1) != (v2.node[3] > 0 ? 1 : -1))
 			{
-				Eigen::Vector4f tmpv1 = v1.node, tmpv2 = v2.node, tmpv = Eigen::Vector4f::Zero();
-				float ratio;
+				Eigen::Vector4d tmpv1 = v1.node, tmpv2 = v2.node, tmpv = Eigen::Vector4d::Zero();
+				double ratio;
 				while ((tmpv1 - tmpv2).head(3).norm() >
 				(IS_CONST_RADIUS ? constructor->getConstRadius(): constructor->getSearcher()->getMinRadius()) / 2)
 				{
@@ -99,7 +99,7 @@ bool VisitorExtract::on_vert(TraversalData& a, TraversalData& b, TraversalData& 
 						break;
 					}
 				}
-				ratio = invlerp(tmpv1[3], tmpv2[3], 0.0f);
+				ratio = invlerp(tmpv1[3], tmpv2[3], 0.0);
 				if (ratio < constructor->getRatioTolerance())
 					tmpv = tmpv1;
 				else if (ratio > (1 - constructor->getRatioTolerance()))

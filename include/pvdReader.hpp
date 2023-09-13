@@ -10,12 +10,12 @@ bool readShonDyParticlesPVD(
     const std::string dir_path,
     const std::string pvd_file,
     bool &is_const_radius,
-    float &radius,
+    double &radius,
     std::vector<std::string> &files
 );
 
 bool readVTU(
     const std::string &vtuFile,
-    std::vector<Eigen::Vector3f> &positions,
-    std::vector<float> *radiuses
+    std::vector<Eigen::Vector3d> &positions,
+    std::vector<double> *radiuses
 );
