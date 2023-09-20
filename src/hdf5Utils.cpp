@@ -6,7 +6,8 @@
 
 bool readShonDyParticleXDMF(const std::string dir_path,
                             const std::string xdmf_file,
-                            std::vector<std::string> &files)
+                            std::vector<std::string> &files,
+                            const int target_frame)
 {
     std::string xdmf_path = dir_path + "\\" + xdmf_file;
     if (!std::filesystem::exists(xdmf_path))
@@ -24,11 +25,21 @@ bool readShonDyParticleXDMF(const std::string dir_path,
     }
 
     // prefix = doc.child("Xdmf").child("Domain").attribute("Name").as_string();
-
+    int files_num = std::distance(doc.child("Xdmf").child("Domain").child("Grid").children("Grid").begin(), doc.child("Xdmf").child("Domain").child("Grid").children("Grid").end());
+    int file_index = 0;
     for (pugi::xml_node frame: doc.child("Xdmf").child("Domain").child("Grid").children("Grid"))
     {
+        file_index++;
         // std::cout << frame.child("Time").attribute("Value").as_string() << std::endl;
-        files.push_back(std::string(frame.child("Time").attribute("Value").as_string()) + ".h5");
+        if (target_frame > 0 && target_frame <= files_num)
+        {
+            if (target_frame == file_index)
+            {
+                files.push_back(std::string(frame.child("Time").attribute("Value").as_string()) + ".h5");
+            }
+        } else {
+            files.push_back(std::string(frame.child("Time").attribute("Value").as_string()) + ".h5");
+        }
     }
     return true;
 }

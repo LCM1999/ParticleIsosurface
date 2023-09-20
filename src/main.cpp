@@ -34,6 +34,7 @@ bool IS_CONST_RADIUS = false;
 // variants for test
 short DATA_TYPE = 0;    // CSV:0, H5: 1
 bool NEED_RECORD = false;
+int TARGET_FRAME = 0;
 std::string PREFIX = "";
 bool WITH_NORMAL;
 std::vector<std::string> DATA_PATHES;
@@ -97,6 +98,7 @@ int writePlyFile(Mesh& m, std::string fn)
             ply_write(ply, m.tris[i].v[j] - 1);
         }
     }
+    std::cout << "Output Done" << std::endl;
     if (!ply_close(ply))
     {
         return 0;
@@ -109,10 +111,6 @@ void loadConfigJson(std::string path)
 {
     nlohmann::json readInJSON;
 
-    if (! std::filesystem::is_directory(path))
-    {
-        path = std::filesystem::path(path).parent_path().string();
-    } 
     if (! std::filesystem::exists(path + "/controlData.json"))
     {
         std::cout << "Error: cannot find ConfigJson file: " << path + "/controlData.json" << std::endl;
@@ -158,11 +156,13 @@ void loadConfigJson(std::string path)
             readShonDyParticlesPVD(path, filePath, IS_CONST_RADIUS, RADIUS, DATA_PATHES);
             exit(0);
         } else if (DATA_TYPE == 1) {
-            if (! readShonDyParticleXDMF(path, filePath, DATA_PATHES)) {
+            if (readInJSON.contains("TARGET_FRAME"))
+            {
+                TARGET_FRAME = readInJSON.at("TARGET_FRAME");
+            }
+            if (! readShonDyParticleXDMF(path, filePath, DATA_PATHES, TARGET_FRAME)) {
                 exit(1);
             }
-            // IS_CONST_RADIUS = true;
-            // RADIUS = 0.009;
         } else {
             if (readInJSON.contains("PREFIX"))
             {
@@ -277,13 +277,13 @@ void run(std::string &dataDirPath)
 {
     loadConfigJson(dataDirPath);
     double frameStart = 0;
-    int index = 0;
+    int index = 1;
     std::vector<Eigen::Vector3d> particles;
     std::vector<double>* radiuses = (IS_CONST_RADIUS ? nullptr : new std::vector<double>());
     for (const std::string frame : DATA_PATHES)
     {
         Mesh* mesh = new Mesh(int(pow(10, 4)));
-        std::cout << "-=   Frame " << index << " " << frame << "   =-"
+        std::cout << "-=   Frame " << (TARGET_FRAME == 0 ? index : TARGET_FRAME) << " " << frame << "   =-"
                   << std::endl;
         std::string dataPath = dataDirPath + "/" + frame;
         frameStart = get_time();
@@ -309,23 +309,22 @@ void run(std::string &dataDirPath)
         SurfReconstructor* constructor = new SurfReconstructor(particles, radiuses, mesh, RADIUS, DEFAULT_FLATNESS, DEFAULT_INF_FACTOR);
         Recorder* recorder = new Recorder(dataDirPath, frame.substr(0, frame.size() - 4), constructor);
         constructor->Run();
-
         if (NEED_RECORD)
         {
             // recorder.RecordProgress();
             recorder->RecordParticles();
             recorder->RecordFeatures();
         }
-
-        std::string output_name = frame.substr(0, frame.find_last_of('_') + 1);
-        std::string timestamp = frame.substr(frame.find_last_of('_') + 1, frame.size() - frame.find_last_of('_') - 5);
-        std::string int_part = timestamp.substr(0, std::distance(timestamp.begin(), std::find(timestamp.begin(), timestamp.end(), '.')));
-        std::string double_part = "";
-        if (timestamp.find('.') != timestamp.npos)
-        {
-            double_part = timestamp.substr(std::distance(timestamp.begin(), std::find(timestamp.begin(), timestamp.end(), '.')) + 1, timestamp.size());
-        }
-        output_name += std::string(6 - int_part.size(), '0') + int_part + double_part + std::string(6 - double_part.size(), '0');
+        std::string output_name = frame.substr(0, frame.find_last_of('.'));
+        // std::string timestamp = frame.substr(frame.find_last_of('_') + 1, frame.size() - frame.find_last_of('.') + frame.find_last_of('_'));
+        // std::string int_part = timestamp.substr(0, std::distance(timestamp.begin(), std::find(timestamp.begin(), timestamp.end(), '.')));
+        // std::string double_part = "";
+        // if (timestamp.find('.') != timestamp.npos)
+        // {
+        //     double_part = timestamp.substr(std::distance(timestamp.begin(), std::find(timestamp.begin(), timestamp.end(), '.')) + 1, timestamp.size());
+        // }
+        // output_name += std::string(6 - int_part.size(), '0') + int_part + double_part + std::string(6 - double_part.size(), '0');
+        std::cout << output_name << std::endl;
         try
         {
             if ("ply" == OUTPUT_TYPE || "PLY" == OUTPUT_TYPE)
@@ -383,7 +382,7 @@ int main(int argc, char **argv)
     else
     {
         std::string dataDirPath =
-            "F:\\data\\test";
+            "E:\\BaiduNetdiskDownload\\MultiResolutionResults\\waterEntryCylinder";
         run(dataDirPath);
     }
 

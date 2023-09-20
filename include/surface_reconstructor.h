@@ -23,8 +23,8 @@ private:
     double _BORDER = (1.0 / 16.0);
     int _DEPTH_MAX = 6; // 7
     int _DEPTH_MIN = 5; // 4
-    double _NEIGHBOR_FACTOR = 8.0f;
-    double _SMOOTH_FACTOR = 4.0f;
+    double _NEIGHBOR_FACTOR = 4.0f;
+    double _SMOOTH_FACTOR = 2.0f;
     double _ISO_VALUE = 0.0f;
 
     double _MAX_SCALAR = -1.0f;
