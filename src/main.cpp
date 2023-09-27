@@ -382,7 +382,7 @@ int main(int argc, char **argv)
     else
     {
         std::string dataDirPath =
-            "E:\\BaiduNetdiskDownload\\MultiResolutionResults\\waterEntryCylinder";
+            "E:/data/vtk_11/vtk/e3ad64c6-7d73-4712-8b40-1b26ee28e5e5";
         run(dataDirPath);
     }
 

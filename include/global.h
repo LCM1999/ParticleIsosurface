@@ -70,6 +70,18 @@ struct Triangle
 	}
 };
 
+template<class T>
+std::string generate_string(std::vector<T> ids)
+{
+	std::sort(ids.begin(), ids.end());
+	std::string key = "";
+	for (auto id: ids)
+	{
+		key += std::to_string(id);
+		key += ",";
+	}
+	return key;
+}
 
 class Mesh
 {
@@ -77,16 +89,16 @@ public:
 	Mesh(int mesh_precision = 1e4);
     int MESH_PRECISION;
 	std::vector<Eigen::Vector3d> IcosaTable;
-	std::map<vect3<long long>, int> vertices_map;
+	std::map<std::string, int> vertices_map;
 	std::vector<Vertex> vertices;
-	std::map<Triangle, int> tris_map;
+	std::map<std::string, int> tris_map;
 	std::vector<Triangle> tris;
 	unsigned int verticesNum = 0;
 	unsigned int trianglesNum = 0;
 	const int theta = 5;
 	const int phi = 5;
 
-	int insert_vert(const Eigen::Vector3d& p);
+	int insert_vert(unsigned long long id1, unsigned long long id2, const Eigen::Vector3d& p);
 	double precise(double x);
 	vect3<long long> vect3f2vect3i(vect3<double>& a);
 	vect3<double> vect3i2vect3f(vect3<int>& a);

@@ -1,6 +1,7 @@
 #pragma once 
 #include <iterator>
 #include <vector>
+#include <array>
 #include <algorithm>
 #include <Eigen/Dense>
 #include "iso_common.h"
@@ -288,12 +289,35 @@ static procedure table[256] =
 	/* 11111111 */ {{0, 1, 2, 3, 4, 5, 6, 7}, false, 0b11111111},
 };
 
+struct dual_grid
+{
+	procedure proc;
+	std::array<TNode*, 8> grid;
+};
+
+struct dual_cell
+{
+	std::array<Eigen::Vector3f, 12> vertices;
+	std::vector<std::array<char, 3>> faces;
+};
+
 struct VisitorExtract
 {
 	VisitorExtract(SurfReconstructor* surf_constructor, Mesh* m_);
 	SurfReconstructor* constructor;
 	Mesh* m;
-	std::vector<TNode*>* part = nullptr;
+	std::vector<dual_grid> dual_grids;
+	std::vector<dual_cell> dual_cells;
+
+	const int dual_edge2vert = 
+	{
+		{0, 1}, {2, 3}, {4, 5}, {6, 7},
+		{0, 2}, {1, 3},	{4, 6},	{5, 7},
+		{0, 4},	{1, 5},	{2, 6},	{3, 7}
+	};
+	
+	void calc_vertices();
+	void generate_mesh();
 
 	bool on_vert(TraversalData& a, TraversalData& b, TraversalData& c, TraversalData& d,
 		TraversalData& aa, TraversalData& ba, TraversalData& ca, TraversalData& da);

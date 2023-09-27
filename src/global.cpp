@@ -10,19 +10,26 @@ Mesh::Mesh(const int mesh_precision)
 	BuildIcosaTable();
 }
 
-int Mesh::insert_vert(const Eigen::Vector3d& p)
+int Mesh::insert_vert(unsigned long long id1, unsigned long long id2, const Eigen::Vector3d& p)
 {
-	vect3<double> tp(p);
-	vect3<long long> tmp = vect3f2vect3i(tp);
-	// vect3<double> tmp(double(precise(p[0])), double(precise(p[1])), double(precise(p[2])));
-	if (vertices_map.find(tmp) == vertices_map.end())
-	{
+	// vect3<double> tp(p);
+	// vect3<long long> tmp = vect3f2vect3i(tp);
+	// // vect3<double> tmp(double(precise(p[0])), double(precise(p[1])), double(precise(p[2])));
+	// if (vertices_map.find(tmp) == vertices_map.end())
+	// {
+	// 	verticesNum++;
+	// 	vertices_map[tmp] = verticesNum;
+	// 	// vertices.push_back(vect3i2vect3f(tmp));
+	// 	vertices.push_back(p);
+	// }
+	auto [iterator, inserted] = 
+		vertices_map.try_emplace(generate_string(std::vector<unsigned long long>({id1, id2})), verticesNum);
+	if (inserted) {
 		verticesNum++;
-		vertices_map[tmp] = verticesNum;
-		// vertices.push_back(vect3i2vect3f(tmp));
-		vertices.push_back(p);
+		return verticesNum-1;
+	} else {
+		return verticesNum;
 	}
-	return vertices_map[tmp];
 }
 
 double Mesh::precise(double x)
@@ -69,58 +76,23 @@ bool Mesh::similiar_point(Eigen::Vector3d& v1, Eigen::Vector3d& v2)
 
 void Mesh::insert_tri(int t0, int t1, int t2)
 {
-	if ((t0 == t1 || t1 == t2 || t0 == t2))
-	{
-		return;
-	}
-	
-	// vect3i t0_i = vect3f2vect3i(vertices[(t0 - 1)]);
-	// vect3i t1_i = vect3f2vect3i(vertices[(t1 - 1)]);
-	// vect3i t2_i = vect3f2vect3i(vertices[(t2 - 1)]);
-	// Triangle<vect3i> ti(t0_i, t1_i, t2_i);
-	// //double length[3];
-	// //int top, bottom1, bottom2;
-	// //double height, half;
-	// //double area;
-	// //half = 0;
-	// //for (size_t i = 0; i < 3; i++)
-	// //{
-	// //	length[i] = (vertices[t.v[triangle_edge2vert[i][1]] - 1] - vertices[t.v[triangle_edge2vert[i][0]] - 1]).length();
-	// //	half += length[i];
-	// //}
-	// //half /= 2;
-	// //for (size_t i = 0; i < 3; i++)
-	// //{
-	// //	if (length[i] >= length[triangle_edge2vert[i][0]] && length[i] >= length[triangle_edge2vert[i][1]])
-	// //	{
-	// //		top = i; bottom1 = triangle_edge2vert[i][0]; bottom2 = triangle_edge2vert[i][1];
-	// //		break;
-	// //	}
-	// //}
-	// //area = sqrt(half * (half - length[0]) * (half - length[1]) * (half - length[2]));
-	// //height = area * 2 / length[top];
-	// //if ((height / length[top]) < LOW_MESH_QUALITY)
-	// //{
-	// //	vertices[t.v[top] - 1] =
-	// //		(vertices[t.v[bottom1] - 1] * (length[bottom1] / (length[bottom1] + length[bottom2])) +
-	// //			vertices[t.v[bottom2] - 1] * (length[bottom2] / (length[bottom1] + length[bottom2])));
-	// //	//printf("Elimit: %d, %d;  ", t.v[top], t.v[top]);
-	// //}
-	// //else
-	// //{
-	// //}
-	// if (tris_map.find(ti) == tris_map.end())
+	// if ((t0 == t1 || t1 == t2 || t0 == t2))
+	// {
+	// 	return;
+	// }
+	// Triangle tv(t0, t1, t2);
+	// if (tris_map.find(tv) == tris_map.end())
 	// {
 	// 	trianglesNum++;
-	// 	tris_map[ti] = trianglesNum;
+	// 	tris_map[tv] = trianglesNum;
+	// 	tris.push_back(tv);
 	// }
-	Triangle tv(t0, t1, t2);
-	if (tris_map.find(tv) == tris_map.end())
-	{
+	auto [iterator, inserted] = 
+		tris_map.try_emplace(generate_string(std::vector<unsigned long long>({t0, t1, t2})), trianglesNum);
+	if (inserted) {
 		trianglesNum++;
-		tris_map[tv] = trianglesNum;
-		tris.push_back(tv);
 	}
+
 }
 
 void Mesh::reset()
