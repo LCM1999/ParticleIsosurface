@@ -331,12 +331,12 @@ void SurfReconstructor::genIsoOurs()
 				}
 			}
 		}
-		if (IS_CONST_RADIUS)
-		{
-			m->AppendSplash_ConstR(splash_pos, _RADIUS);
-		} else {
-			m->AppendSplash_VarR(splash_pos, splash_radiuses);
-		}
+		// if (IS_CONST_RADIUS)
+		// {
+		// 	m->AppendSplash_ConstR(splash_pos, _RADIUS);
+		// } else {
+		// 	m->AppendSplash_VarR(splash_pos, splash_radiuses);
+		// }
 		
 		//}
 		double t_alldone = get_time();
