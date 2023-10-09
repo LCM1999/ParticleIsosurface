@@ -56,6 +56,7 @@ void writeObjFile(Mesh &m, std::string fn)
         fprintf(f, "f %d %d %d\n", t.v[0], t.v[1], t.v[2]);
     }
     fclose(f);
+    std::cout << "Output Done" << std::endl;
 }
 
 int writePlyFile(Mesh& m, std::string fn)
@@ -98,12 +99,11 @@ int writePlyFile(Mesh& m, std::string fn)
             ply_write(ply, m.tris[i].v[j] - 1);
         }
     }
-    std::cout << "Output Done" << std::endl;
     if (!ply_close(ply))
     {
         return 0;
     }
-    
+    std::cout << "Output Done" << std::endl;
     return 1;
 }
 
@@ -382,7 +382,8 @@ int main(int argc, char **argv)
     else
     {
         std::string dataDirPath =
-            "E:/data/vtk_11/vtk/e3ad64c6-7d73-4712-8b40-1b26ee28e5e5";
+            // "E:\\data\\multiR\\mr_csv";
+            "E:\\data\\geo";
         run(dataDirPath);
     }
 

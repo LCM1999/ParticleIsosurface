@@ -26,20 +26,9 @@ int Mesh::insert_vert(unsigned long long id1, unsigned long long id2, const Eige
 		vertices_map.try_emplace(generate_string(std::vector<unsigned long long>({id1, id2})), verticesNum);
 	if (inserted) {
 		verticesNum++;
-		return verticesNum-1;
-	} else {
-		return verticesNum;
+		vertices.push_back(p);
 	}
-}
-
-double Mesh::precise(double x)
-{
-	std::stringstream is;
-    double res;
-    is.precision(MESH_PRECISION);
-    is << x;
-    is >> res;
-    return res;
+	return iterator->second + 1;
 }
 
 vect3<long long> Mesh::vect3f2vect3i(vect3<double>& a)
@@ -62,18 +51,6 @@ vect3<double> Mesh::vect3i2vect3f(vect3<int>& a)
 	return r;
 }
 
-bool Mesh::similiar_point(Eigen::Vector3d& v1, Eigen::Vector3d& v2)
-{
-	for (size_t i = 0; i < 3; i++)
-	{
-		if (abs(v1[i] - v2[i]) >= MESH_PRECISION)
-		{
-			return false;
-		}
-	}
-	return true;
-}
-
 void Mesh::insert_tri(int t0, int t1, int t2)
 {
 	// if ((t0 == t1 || t1 == t2 || t0 == t2))
@@ -88,9 +65,10 @@ void Mesh::insert_tri(int t0, int t1, int t2)
 	// 	tris.push_back(tv);
 	// }
 	auto [iterator, inserted] = 
-		tris_map.try_emplace(generate_string(std::vector<unsigned long long>({t0, t1, t2})), trianglesNum);
+		tris_map.try_emplace(generate_string(std::vector<int>({t0, t1, t2})), trianglesNum);
 	if (inserted) {
 		trianglesNum++;
+		tris.push_back(Triangle(t0, t1, t2));
 	}
 
 }
@@ -143,7 +121,9 @@ void Mesh::AppendSplash_ConstR(std::vector<Eigen::Vector3d>& splash_particles, c
 		tmp_vec_indices.resize(12);
 		for (size_t i = 0; i < 12; i++)
 		{
-			tmp_vec_indices[i] = insert_vert(pos + IcosaTable[i] * radius);
+			verticesNum++;
+			vertices.push_back(Vertex(pos + IcosaTable[i] * radius));
+			tmp_vec_indices[i] = verticesNum;
 		}
 		for (size_t i = 0; i < 5; i++)
 		{
@@ -164,7 +144,9 @@ void Mesh::AppendSplash_VarR(std::vector<Eigen::Vector3d>& splash_particles, std
 		tmp_vec_indices.resize(12);
 		for (size_t i = 0; i < 12; i++)
 		{
-			tmp_vec_indices[i] = insert_vert(splash_particles[spi] + IcosaTable[i] * splash_radius[spi]);
+			verticesNum++;
+			vertices.push_back(Vertex(splash_particles[spi] + IcosaTable[i] * splash_radius[spi]));
+			tmp_vec_indices[i] = verticesNum;
 		}
 		for (size_t i = 0; i < 5; i++)
 		{

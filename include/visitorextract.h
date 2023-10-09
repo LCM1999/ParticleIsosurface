@@ -297,8 +297,15 @@ struct dual_grid
 
 struct dual_cell
 {
-	std::array<Eigen::Vector3f, 12> vertices;
-	std::vector<std::array<char, 3>> faces;
+	std::array<Eigen::Vector3d, 12> vertices;
+	std::vector<std::array<int, 3>> faces;
+};
+
+static int dual_edge2vert[12][2] = 
+{
+	{0, 1}, {2, 3}, {4, 5}, {6, 7},
+	{0, 2}, {1, 3},	{4, 6},	{5, 7},
+	{0, 4},	{1, 5},	{2, 6},	{3, 7}
 };
 
 struct VisitorExtract
@@ -308,13 +315,6 @@ struct VisitorExtract
 	Mesh* m;
 	std::vector<dual_grid> dual_grids;
 	std::vector<dual_cell> dual_cells;
-
-	const int dual_edge2vert = 
-	{
-		{0, 1}, {2, 3}, {4, 5}, {6, 7},
-		{0, 2}, {1, 3},	{4, 6},	{5, 7},
-		{0, 4},	{1, 5},	{2, 6},	{3, 7}
-	};
 	
 	void calc_vertices();
 	void generate_mesh();

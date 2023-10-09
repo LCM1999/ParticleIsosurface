@@ -99,10 +99,8 @@ public:
 	const int phi = 5;
 
 	int insert_vert(unsigned long long id1, unsigned long long id2, const Eigen::Vector3d& p);
-	double precise(double x);
 	vect3<long long> vect3f2vect3i(vect3<double>& a);
 	vect3<double> vect3i2vect3f(vect3<int>& a);
-	bool similiar_point(Eigen::Vector3d& v1, Eigen::Vector3d& v2);
 	void insert_tri(int t0, int t1, int t2);
 	void reset();
 

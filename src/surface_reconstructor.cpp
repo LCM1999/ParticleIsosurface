@@ -306,7 +306,7 @@ void SurfReconstructor::genIsoOurs()
 	if (_STATE == 0)
 	{
 		printf("-= Calculating Tree Structure =-\n");
-		root = new TNode(this);
+		root = new TNode(this, 0);
 		root->center << _RootCenter[0], _RootCenter[1], _RootCenter[2];
 		root->node << _RootCenter[0], _RootCenter[1], _RootCenter[2], 0.0;
 		root->half_length = _RootHalfLength;
@@ -318,6 +318,8 @@ void SurfReconstructor::genIsoOurs()
 		VisitorExtract v(this, m);
 		TraversalData td(_OurRoot);
 		traverse_node<trav_vert>(v, td);
+		v.calc_vertices();
+		v.generate_mesh();
 		std::vector<Eigen::Vector3d> splash_pos;
 		std::vector<double> splash_radiuses;
 		for (int pIdx = 0; pIdx < getGlobalParticlesNum(); pIdx++)
@@ -337,8 +339,6 @@ void SurfReconstructor::genIsoOurs()
 		} else {
 			m->AppendSplash_VarR(splash_pos, splash_radiuses);
 		}
-		
-		//}
 		double t_alldone = get_time();
 		printf("Time generating polygons = %f\n", t_alldone - t_gen_mesh);
 		return;
