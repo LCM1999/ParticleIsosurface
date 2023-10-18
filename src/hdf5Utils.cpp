@@ -27,18 +27,21 @@ bool readShonDyParticleXDMF(const std::string dir_path,
     // prefix = doc.child("Xdmf").child("Domain").attribute("Name").as_string();
     int files_num = std::distance(doc.child("Xdmf").child("Domain").child("Grid").children("Grid").begin(), doc.child("Xdmf").child("Domain").child("Grid").children("Grid").end());
     int file_index = 0;
+    std::string frame_path;
     for (pugi::xml_node frame: doc.child("Xdmf").child("Domain").child("Grid").children("Grid"))
     {
         file_index++;
-        // std::cout << frame.child("Time").attribute("Value").as_string() << std::endl;
+        frame_path = std::string(frame.child("Geometry").child("DataItem").child_value());
+        frame_path = frame_path.substr(0, frame_path.find_first_of(":"));
+        std::cout << frame_path << std::endl;
         if (target_frame > 0 && target_frame <= files_num)
         {
             if (target_frame == file_index)
             {
-                files.push_back(std::string(frame.child("Time").attribute("Value").as_string()) + ".h5");
+                files.push_back(frame_path);
             }
         } else {
-            files.push_back(std::string(frame.child("Time").attribute("Value").as_string()) + ".h5");
+            files.push_back(frame_path);
         }
     }
     return true;
