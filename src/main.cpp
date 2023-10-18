@@ -39,8 +39,6 @@ std::string PREFIX = "";
 bool WITH_NORMAL;
 std::vector<std::string> DATA_PATHES;
 std::string OUTPUT_TYPE = "ply";
-std::string OUTPUT_DIR = "out";
-std::string output_dir_path = "";
 double RADIUS = 0;
 bool USE_CUDA = false;
 
@@ -56,6 +54,7 @@ void writeObjFile(Mesh &m, std::string fn)
         fprintf(f, "f %d %d %d\n", t.v[0], t.v[1], t.v[2]);
     }
     fclose(f);
+    std::cout << "Output Done" << std::endl;
 }
 
 int writePlyFile(Mesh& m, std::string fn)
@@ -98,26 +97,25 @@ int writePlyFile(Mesh& m, std::string fn)
             ply_write(ply, m.tris[i].v[j] - 1);
         }
     }
-    std::cout << "Output Done" << std::endl;
     if (!ply_close(ply))
     {
         return 0;
     }
-    
+    std::cout << "Output Done" << std::endl;
     return 1;
 }
 
-void loadConfigJson(std::string path)
+void loadConfigJson(std::string dataPath)
 {
     nlohmann::json readInJSON;
 
-    if (! std::filesystem::exists(path + "/controlData.json"))
+    if (! std::filesystem::exists(dataPath + "/controlData.json"))
     {
-        std::cout << "Error: cannot find ConfigJson file: " << path + "/controlData.json" << std::endl;
+        std::cout << "Error: cannot find ConfigJson file: " << dataPath + "/controlData.json" << std::endl;
         exit(1);
     }
     
-    std::ifstream inJSONFile(path + "/controlData.json", std::fstream::in);
+    std::ifstream inJSONFile(dataPath + "/controlData.json", std::fstream::in);
 
     if (inJSONFile.good())
     {
@@ -138,29 +136,19 @@ void loadConfigJson(std::string path)
         {
             OUTPUT_TYPE = readInJSON.at("OUTPUT_TYPE");
         }
-        if (readInJSON.contains("OUTPUT_DIR"))
-        {
-            OUTPUT_DIR = readInJSON.at("OUTPUT_DIR");
-        }
 
         const std::string filePath = readInJSON.at("DATA_FILE");
-        output_dir_path = path + "/" + OUTPUT_DIR;
-        if (! std::filesystem::exists(output_dir_path))
-        {
-            std::filesystem::create_directory(output_dir_path);
-        }
-        std::cout << "Output path: " << output_dir_path << ";" << std::endl;
 
         if (DATA_TYPE == 2)
         {
-            readShonDyParticlesPVD(path, filePath, IS_CONST_RADIUS, RADIUS, DATA_PATHES);
+            readShonDyParticlesPVD(dataPath, filePath, IS_CONST_RADIUS, RADIUS, DATA_PATHES);
             exit(0);
         } else if (DATA_TYPE == 1) {
             if (readInJSON.contains("TARGET_FRAME"))
             {
                 TARGET_FRAME = readInJSON.at("TARGET_FRAME");
             }
-            if (! readShonDyParticleXDMF(path, filePath, DATA_PATHES, TARGET_FRAME)) {
+            if (! readShonDyParticleXDMF(dataPath, filePath, DATA_PATHES, TARGET_FRAME)) {
                 exit(1);
             }
         } else {
@@ -178,7 +166,7 @@ void loadConfigJson(std::string path)
                 intptr_t hFile;
                 struct _finddata_t fileInfo;
                 std::string p;
-                if ((hFile = _findfirst(p.assign(path).append("\\").append(PREFIX).append("*.csv").c_str(), &fileInfo)) != -1)
+                if ((hFile = _findfirst(p.assign(dataPath).append("\\").append(PREFIX).append("*.csv").c_str(), &fileInfo)) != -1)
                 {
                     do
                     {
@@ -273,7 +261,7 @@ void loadParticlesFromCSV(std::string &csvPath,
     }
 }
 
-void run(std::string &dataDirPath)
+void run(std::string dataDirPath, std::string outPath)
 {
     loadConfigJson(dataDirPath);
     double frameStart = 0;
@@ -316,6 +304,12 @@ void run(std::string &dataDirPath)
             recorder->RecordFeatures();
         }
         std::string output_name = frame.substr(0, frame.find_last_of('.'));
+        if (! std::filesystem::exists(outPath))
+        {
+            // std::filesystem::create_directory(outPath);
+            std::filesystem::create_directories(outPath);
+        }
+        std::cout << "Output path: " << outPath + "/" + output_name + ".ply"<< std::endl;
         // std::string timestamp = frame.substr(frame.find_last_of('_') + 1, frame.size() - frame.find_last_of('.') + frame.find_last_of('_'));
         // std::string int_part = timestamp.substr(0, std::distance(timestamp.begin(), std::find(timestamp.begin(), timestamp.end(), '.')));
         // std::string double_part = "";
@@ -324,27 +318,26 @@ void run(std::string &dataDirPath)
         //     double_part = timestamp.substr(std::distance(timestamp.begin(), std::find(timestamp.begin(), timestamp.end(), '.')) + 1, timestamp.size());
         // }
         // output_name += std::string(6 - int_part.size(), '0') + int_part + double_part + std::string(6 - double_part.size(), '0');
-        std::cout << output_name << std::endl;
         try
         {
             if ("ply" == OUTPUT_TYPE || "PLY" == OUTPUT_TYPE)
             {
                 writePlyFile(*mesh,
-                    output_dir_path + "/" + output_name + ".ply");
+                    outPath + "/" + output_name + ".ply");
             } else if ("obj" == OUTPUT_TYPE || "OBJ" == OUTPUT_TYPE) 
             {
                 writeObjFile(*mesh,
-                    output_dir_path + "/" + output_name + ".obj");    
+                    outPath + "/" + output_name + ".obj");    
             } else {
                 writePlyFile(*mesh,
-                    output_dir_path + "/" + output_name + ".ply");
+                    outPath + "/" + output_name + ".ply");
             }  
         }
         catch(const std::exception& e)
         {
             std::cerr << e.what() << '\n';
             std::cout << "Error happened during writing result." << std::endl;
-            std::cout << "Result output path: " << output_dir_path + "/" + output_name + "." + OUTPUT_TYPE + ";" << std::endl;
+            std::cout << "Result output path: " << outPath + "/" + output_name + "." + OUTPUT_TYPE + ";" << std::endl;
             std::cout << "In Memory Mesh : Vertices=" << mesh->verticesNum << ", Cells=" << mesh->trianglesNum << ";" << std::endl;
             exit(1);
         }
@@ -371,19 +364,33 @@ int main(int argc, char **argv)
     omp_set_dynamic(OMP_USE_DYNAMIC_THREADS);
     omp_set_num_threads(OMP_THREADS_NUM);
 
-    // std::cout << std::to_string(argc) << std::endl;
+    std::string h5DirPath;
+    std::string outPath;
 
-    if (argc == 2)
+    switch (argc)
     {
-        std::string h5DirPath = std::string(argv[1]);
-        std::cout << h5DirPath << std::endl;
-        run(h5DirPath);
-    }
-    else
-    {
-        std::string dataDirPath =
-            "E:/data/vtk_11/vtk/e3ad64c6-7d73-4712-8b40-1b26ee28e5e5";
-        run(dataDirPath);
+    case 3:
+        h5DirPath = std::string(argv[1]);
+        outPath = std::string(argv[2]);
+        std::cout << "H5 dir: " << h5DirPath << std::endl;
+        std::cout << "Out dir: " << outPath << std::endl;
+        run(h5DirPath, outPath);
+        break;
+    case 2:
+        h5DirPath = std::string(argv[1]);
+        outPath = h5DirPath + "\\out";
+        std::cout << "H5 dir: " << h5DirPath << std::endl;
+        run(h5DirPath, outPath);
+        break;
+    case 1:
+        h5DirPath =
+        // "E:\\data\\multiR\\mr_csv";
+        "E:\\data\\vtk_11\\vtk\\e3ad64c6-7d73-4712-8b40-1b26ee28e5e5";
+        outPath = h5DirPath + "\\out";
+        run(h5DirPath, outPath);
+        break;
+    default:
+        break;
     }
 
     return 0;
