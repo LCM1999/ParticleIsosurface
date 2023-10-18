@@ -281,7 +281,7 @@ double Evaluator::RecommendIsoValueConstR()
     const double influnce = radius * smooth_factor;
     const double influnce2 = influnce * influnce;
 
-    k_value += general_kernel(2 * radius2, influnce2, influnce) * 2;
+    k_value += general_kernel(1.9 * radius2, influnce2, influnce);
 
     return (((radius2 * radius * k_value) 
     - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
@@ -299,7 +299,7 @@ double Evaluator::RecommendIsoValueVarR()
         influnce = r * smooth_factor;
         influnce2 = influnce * influnce;
         k_value = 0;
-        k_value += general_kernel(2 * radius2, influnce2, influnce) * 2;
+        k_value += general_kernel(1.9 * radius2, influnce2, influnce);
         recommend += (radius2 * r) * k_value;
     }
     return ((recommend / radiuses->size()) - constructor->getMinScalar()) / constructor->getMaxScalar() * 255;
@@ -388,7 +388,7 @@ inline void Evaluator::compute_xMeans(int pIdx, std::vector<int> temp_neighbors,
         if (nIdx == pIdx)
             continue;
         nR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(nIdx);
-        nD = smooth_factor * nR * 1.5;
+        nD = smooth_factor * nR * 1.3;
         nD2 = nD * nD;
         nI = nR * neighbor_factor;
         nI2 = nI * nI;
