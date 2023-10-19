@@ -33,7 +33,7 @@ bool readShonDyParticleXDMF(const std::string dir_path,
         file_index++;
         frame_path = std::string(frame.child("Geometry").child("DataItem").child_value());
         frame_path = frame_path.substr(0, frame_path.find_first_of(":"));
-        std::cout << frame_path << std::endl;
+        // std::cout << frame_path << std::endl;
         if (target_frame > 0 && target_frame <= files_num)
         {
             if (target_frame == file_index)

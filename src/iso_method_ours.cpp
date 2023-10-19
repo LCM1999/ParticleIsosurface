@@ -169,10 +169,10 @@ void TNode::NodeCalcNode(double* sample_points, double* sample_grads, double cel
 		node << pc;
 	}
 	constructor->getEvaluator()->SingleEval(node.head(3), node[3]);
-	if (err/cellsize < 0.001)
-	{
-		node[3] = 0;
-	}
+	// if (err/cellsize < 0.00001)
+	// {
+	// 	node[3] = 0;
+	// }
 }
 
 bool TNode::changeSignDMC(Eigen::Vector4d* verts)
