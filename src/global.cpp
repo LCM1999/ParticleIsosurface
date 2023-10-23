@@ -31,26 +31,6 @@ int Mesh::insert_vert(unsigned long long id1, unsigned long long id2, const Eige
 	return iterator->second + 1;
 }
 
-vect3<long long> Mesh::vect3f2vect3i(vect3<double>& a)
-{
-	vect3<long long> r;
-	for (size_t i = 0; i < 3; i++)
-	{
-		r[i] = long long(round(a[i] * MESH_PRECISION));
-	}
-	return r;
-}
-
-vect3<double> Mesh::vect3i2vect3f(vect3<int>& a)
-{
-	vect3<double> r;
-	for (size_t i = 0; i < 3; i++)
-	{
-		r[i] = a[i] / double(MESH_PRECISION);
-	}
-	return r;
-}
-
 void Mesh::insert_tri(int t0, int t1, int t2)
 {
 	// if ((t0 == t1 || t1 == t2 || t0 == t2))
@@ -70,7 +50,6 @@ void Mesh::insert_tri(int t0, int t1, int t2)
 		trianglesNum++;
 		tris.push_back(Triangle(t0, t1, t2));
 	}
-
 }
 
 void Mesh::reset()

@@ -373,8 +373,8 @@ void SurfReconstructor::genIsoOurs()
 				}
 			}
 		}
-		sample_points = new double[pow(getOverSampleQEF()+1, 3) * 4 * queue_flag];
-		sample_grads = new double[pow(getOverSampleQEF()+1, 3) * 3 * queue_flag];
+		sample_points = new double[int(pow(getOverSampleQEF()+1, 3)) * 4 * queue_flag];
+		sample_grads = new double[int(pow(getOverSampleQEF()+1, 3)) * 3 * queue_flag];
 		//TODO: Sampling
 		#pragma omp parallel //for schedule(dynamic, OMP_THREADS_NUM)
 		{

@@ -50,11 +50,6 @@ inline void HashGrid::CalcHashList()
 	Eigen::Vector3i xyzIdx;
 	for (size_t index = 0; index < ParticlesNum; index++)
 	{
-		if (index == 95096)
-		{
-			printf("");
-		}
-		
 		CalcXYZIdx((Particles->at(index)), xyzIdx);
 		HashList[index] = CalcCellHash(xyzIdx);
 		IndexList[index] = index;

@@ -66,7 +66,7 @@ private:
     std::vector<TNode*> WaitingStack;
     TNode* ProcessArray[inProcessSize];
 
-    std::atomic<int> queue_flag;
+    int queue_flag;
 protected:
     void loadRootBox();
 

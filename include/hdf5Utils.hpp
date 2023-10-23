@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "global.h"
-#include "pugixml.hpp"
+#include <pugixml.hpp>
 
 bool readShonDyParticleXDMF(const std::string dir_path,
                             const std::string xdmf_file,

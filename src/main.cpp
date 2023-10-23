@@ -166,7 +166,7 @@ void loadConfigJson(std::string dataPath)
                 intptr_t hFile;
                 struct _finddata_t fileInfo;
                 std::string p;
-                if ((hFile = _findfirst(p.assign(dataPath).append("\\").append(PREFIX).append("*.csv").c_str(), &fileInfo)) != -1)
+                if ((hFile = _findfirst(p.assign(dataPath).append("/").append(PREFIX).append("*.csv").c_str(), &fileInfo)) != -1)
                 {
                     do
                     {
@@ -378,16 +378,16 @@ int main(int argc, char **argv)
         break;
     case 2:
         h5DirPath = std::string(argv[1]);
-        outPath = h5DirPath + "\\out";
+        outPath = h5DirPath + "/out";
         std::cout << "H5 dir: " << h5DirPath << std::endl;
         run(h5DirPath, outPath);
         break;
     case 1:
         h5DirPath =
-        // "E:\\data\\multiR\\mr_csv";
-        // "E:\\data\\vtk\\csv";
-        "E:\\data\\vtk_11\\vtk\\e3ad64c6-7d73-4712-8b40-1b26ee28e5e5";
-        outPath = h5DirPath + "\\out";
+        // "E:/data/multiR/mr_csv";
+        // "E:/data/vtk/csv";
+        "E:/data/vtk_11/vtk/e3ad64c6-7d73-4712-8b40-1b26ee28e5e5";
+        outPath = h5DirPath + "/out";
         run(h5DirPath, outPath);
         break;
     default:

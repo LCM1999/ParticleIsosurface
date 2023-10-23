@@ -34,7 +34,7 @@ struct TNode
 
 	TNode(SurfReconstructor* surf_constructor, unsigned long long id);
 
-	TNode::TNode(SurfReconstructor* surf_constructor, TNode* parent, Index i);
+	TNode(SurfReconstructor* surf_constructor, TNode* parent, Index i);
 
 	~TNode()
 	{

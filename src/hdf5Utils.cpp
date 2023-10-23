@@ -9,7 +9,7 @@ bool readShonDyParticleXDMF(const std::string dir_path,
                             std::vector<std::string> &files,
                             const int target_frame)
 {
-    std::string xdmf_path = dir_path + "\\" + xdmf_file;
+    std::string xdmf_path = dir_path + "/" + xdmf_file;
     if (!std::filesystem::exists(xdmf_path))
     {
         std::cout << "Error: cannot find xdmf file: " << xdmf_path << std::endl;
@@ -17,7 +17,7 @@ bool readShonDyParticleXDMF(const std::string dir_path,
     }
 
     pugi::xml_document doc;
-    pugi::xml_parse_result result = doc.load_file(xdmf_path);
+    pugi::xml_parse_result result = doc.load_file(xdmf_path.c_str());
     if (!result)
     {
         std::cout << "Load result: " << result.description() << std::endl;

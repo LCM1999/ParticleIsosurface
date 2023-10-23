@@ -10,7 +10,7 @@ bool readShonDyParticlesPVD(
     double &radius,
     std::vector<std::string> &files
 ) {
-    std::string pvd_path = dir_path + "\\" + pvd_file;
+    std::string pvd_path = dir_path + "/" + pvd_file;
     if (! std::filesystem::exists(pvd_path))
     {
         std::cout << "Error: cannot find PVD file: " << pvd_path << std::endl;
@@ -18,7 +18,7 @@ bool readShonDyParticlesPVD(
     }
 
     pugi::xml_document doc;
-    pugi::xml_parse_result result = doc.load_file(pvd_path);
+    pugi::xml_parse_result result = doc.load_file(pvd_path.c_str());
     if (!result)
     {
         std::cout << "Load result: " << result.description() << std::endl;
