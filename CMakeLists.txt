@@ -13,7 +13,7 @@ set(PROJECT_NAME Isosurface_smiplify)
 # Find packages
 ################################################################################
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+if( UNIX )
     set(MPI_DIR /usr/lib/x86_64-linux-gnu/openmpi)
     set(HDF5_DIR /home/lcm/h5/CMake-hdf5-1.14.2/build/HDF5-1.14.2-Linux/HDF_Group/HDF5/1.14.2/cmake)
     set(EIGEN3_DIR /home/lcm/eigen/eigen-3.4.0/build)

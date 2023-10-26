@@ -136,20 +136,24 @@ void loadConfigJson(std::string dataPath)
         {
             OUTPUT_TYPE = readInJSON.at("OUTPUT_TYPE");
         }
-
-        const std::string filePath = readInJSON.at("DATA_FILE");
-
-        if (DATA_TYPE == 2)
-        {
-            readShonDyParticlesPVD(dataPath, filePath, IS_CONST_RADIUS, RADIUS, DATA_PATHES);
-            exit(0);
-        } else if (DATA_TYPE == 1) {
+        if (DATA_TYPE == 1) {
             if (readInJSON.contains("TARGET_FRAME"))
             {
                 TARGET_FRAME = readInJSON.at("TARGET_FRAME");
             }
-            if (! readShonDyParticleXDMF(dataPath, filePath, DATA_PATHES, TARGET_FRAME)) {
-                exit(1);
+            // if (! readShonDyParticleXDMF(dataPath, filePath, DATA_PATHES, TARGET_FRAME)) {
+            //     exit(1);
+            // }
+            const auto filePath = readInJSON.at("DATA_FILE");
+            for (auto it = filePath.begin(); it != filePath.end(); it++)
+            {
+                if (TARGET_FRAME != 0) {
+                    if (TARGET_FRAME != int(std::distance(filePath.begin(), it))+1)
+                    {
+                        continue;
+                    }
+                }
+                DATA_PATHES.push_back(*it);
             }
         } else {
             if (readInJSON.contains("PREFIX"))
@@ -386,8 +390,11 @@ int main(int argc, char **argv)
         h5DirPath =
         // "E:/data/multiR/mr_csv";
         // "E:/data/vtk/csv";
-        "E:/data/vtk_11/vtk/e3ad64c6-7d73-4712-8b40-1b26ee28e5e5";
-        outPath = h5DirPath + "/out";
+        // "E:/data/vtk_11/vtk/e3ad64c6-7d73-4712-8b40-1b26ee28e5e5/h5";
+        "E:/data/watertank2.7/water";
+        outPath = 
+        // "E:/data/vtk_11/vtk/e3ad64c6-7d73-4712-8b40-1b26ee28e5e5/out";
+        "E:/data/watertank2.7/out";
         run(h5DirPath, outPath);
         break;
     default:
