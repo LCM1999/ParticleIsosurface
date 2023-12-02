@@ -4,6 +4,7 @@ HashGrid::HashGrid(std::vector<Eigen::Vector3d>& particles, double* bounding, do
 {
 	Particles = &particles;
 	ParticlesNum = Particles->size();
+	Radius = radius;
 	CellSize = radius * inf_factor + 2 * radius;
 
 	int i = 0;

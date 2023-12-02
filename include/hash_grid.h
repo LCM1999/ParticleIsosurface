@@ -16,6 +16,7 @@ public:
 
 	std::vector<Eigen::Vector3d>* Particles;
 	unsigned int ParticlesNum;
+	double Radius;
 	double CellSize;
 	double Bounding[6];
 	unsigned int XYZCellNum[3];

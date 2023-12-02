@@ -243,8 +243,10 @@ double Evaluator::CalculateMaxScalarConstR()
     const double influnce = radius * smooth_factor;
     const double influnce2 = influnce * influnce;
 
-    k_value += general_kernel(3 * radius2, influnce2, influnce) * 8;
-    k_value += general_kernel(11 * radius2, influnce2, influnce) * 4 * 6;
+    k_value += general_kernel(0.0, influnce2, influnce);
+    k_value += general_kernel(4 * radius2, influnce2, influnce) * 6;
+    k_value += general_kernel(8 * radius2, influnce2, influnce) * 12;
+    k_value += general_kernel(12 * radius2, influnce2, influnce) * 8;
 
     return radius * radius2 * k_value;
 }
@@ -252,27 +254,35 @@ double Evaluator::CalculateMaxScalarConstR()
 double Evaluator::CalculateMaxScalarVarR()
 {
     double max_scalar = 0;
-    std::vector<double>* radiuses = constructor->getSearcher()->getCheckedRadiuses();
+    // std::vector<double>* radiuses = constructor->getSearcher()->getCheckedRadiuses();
+    auto searchers = constructor->getSearcher();
 
-    double radius2, influnce, influnce2;
-    for (const double r : *radiuses)
+    double r, radius2, influnce, influnce2, temp_scalar;
+    for (const auto searcher : *(searchers->getSearchers()))
     {
-        double temp_scalar = 0;
+        temp_scalar = 0.0;
+        r = searcher->Radius;
         radius2 = r * r;
         influnce = r * smooth_factor;
         influnce2 = influnce * influnce;
-        temp_scalar += general_kernel(3 * radius2, influnce2, influnce) * 8;
-        temp_scalar += general_kernel(11 * radius2, influnce2, influnce) * 4 * 6;
+        // std::cout << radius2 << ", " << influnce << ", " << influnce2 << std::endl;
+        temp_scalar += general_kernel(0.0, influnce2, influnce);
+        temp_scalar += general_kernel(4 * radius2, influnce2, influnce) * 6;
+        temp_scalar += general_kernel(8 * radius2, influnce2, influnce) * 12;
+        temp_scalar += general_kernel(12 * radius2, influnce2, influnce) * 8;
         temp_scalar = r * radius2 * temp_scalar;
+        // max_scalar += r * radius2 * temp_scalar * (searcher->ParticlesNum / searchers->getParticlesNum());
+        // std::cout << temp_scalar << ", " << r << std::endl;
         if (temp_scalar > max_scalar)
         {
             max_scalar = temp_scalar;
         }
+        // std::cout << max_scalar << ", " << temp_scalar << ", " << (searcher->ParticlesNum / searchers->getParticlesNum()) << std::endl;
     }
     return max_scalar;
 }
 
-double Evaluator::RecommendIsoValueConstR()
+double Evaluator::RecommendIsoValueConstR(const double iso_factor)
 {
     double k_value = 0.0;
     const double radius = Radius;
@@ -281,28 +291,35 @@ double Evaluator::RecommendIsoValueConstR()
     const double influnce = radius * smooth_factor;
     const double influnce2 = influnce * influnce;
 
-    k_value += general_kernel(1.9 * radius2, influnce2, influnce);
+    k_value += general_kernel(iso_factor * radius2, influnce2, influnce);
 
     return (((radius2 * radius * k_value) 
     - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
 }
 
-double Evaluator::RecommendIsoValueVarR()
+double Evaluator::RecommendIsoValueVarR(const double iso_factor)
 {
     double recommend = 0.0;
-    std::vector<double>* radiuses = constructor->getSearcher()->getCheckedRadiuses();
+    auto searchers = constructor->getSearcher();
+    // std::vector<double>* radiuses = constructor->getSearcher()->getCheckedRadiuses();
 
-    double radius2, influnce, influnce2, k_value;
-    for (const double r : *radiuses)
+    double r, radius2, influnce, influnce2, temp_scalar;
+    for (const auto searcher : *(searchers->getSearchers()))
     {
+        temp_scalar = 0.0;
+        r = searcher->Radius;
         radius2 = r * r;
         influnce = r * smooth_factor;
         influnce2 = influnce * influnce;
-        k_value = 0;
-        k_value += general_kernel(1.9 * radius2, influnce2, influnce);
-        recommend += (radius2 * r) * k_value;
+        temp_scalar += general_kernel(iso_factor * radius2, influnce2, influnce);
+        temp_scalar = radius2 * r * temp_scalar;
+        // recommend += (radius2 * r) * k_value * (searcher->ParticlesNum / searchers->getParticlesNum());
+        if (temp_scalar > recommend)
+        {
+            recommend = temp_scalar;
+        }
     }
-    return ((recommend / radiuses->size()) - constructor->getMinScalar()) / constructor->getMaxScalar() * 255;
+    return (recommend - constructor->getMinScalar()) / constructor->getMaxScalar() * 255;
 }
 
 void Evaluator::CalcParticlesNormal()

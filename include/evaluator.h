@@ -41,11 +41,12 @@ public:
     bool CheckSplash(const int& pIdx);
     double CalculateMaxScalarConstR();
     double CalculateMaxScalarVarR();
-    double RecommendIsoValueConstR();
-    double RecommendIsoValueVarR();
+    double RecommendIsoValueConstR(const double iso_factor);
+    double RecommendIsoValueVarR(const double iso_factor);
     void CalcParticlesNormal();
 private:
-    const double bv_factor = 4.1887902047863909846168578443727;
+    const double sqrt3 = 1.7320508075688772935274463415059;
+    const double sqrt11 = 3.3166247903553998491149327366707;
     const double inv_pi = 0.31830988618379067153776752674503;
 
     double neighbor_factor;

@@ -5,8 +5,8 @@
 #include <regex>
 
 #include "global.h"
-#include "hdf5Utils.hpp"
-#include "pvdReader.hpp"
+// #include "hdf5Utils.hpp"
+// #include "pvdReader.hpp"
 #include "iso_common.h"
 #include "iso_method_ours.h"
 #include "json.hpp"
@@ -20,11 +20,6 @@
 #else
 #include "unistd.h"
 #endif
-
-#define DEFAULT_SCALE 1
-#define DEFAULT_FLATNESS 0.99
-#define DEFAULT_INF_FACTOR 4.0
-// #define DEFAULT_MESH_REFINE_LEVEL 4
 
 int OMP_USE_DYNAMIC_THREADS = 0;
 int OMP_THREADS_NUM = 16;
@@ -40,7 +35,11 @@ bool WITH_NORMAL;
 std::vector<std::string> DATA_PATHES;
 std::string OUTPUT_TYPE = "ply";
 double RADIUS = 0;
-bool USE_CUDA = false;
+float SMOOTH_FACTOR = 2.0;
+float ISO_FACTOR = 1.9;
+// bool USE_CUDA = false;
+bool CALC_P_NORMAL = false;
+bool GEN_SPLASH = true;
 
 void writeObjFile(Mesh &m, std::string fn)
 {
@@ -122,11 +121,13 @@ void loadConfigJson(std::string dataPath)
         inJSONFile >> readInJSON;
         inJSONFile.close();
         DATA_TYPE = readInJSON.at("DATA_TYPE");
-        if (readInJSON.contains("USE_CUDA"))
+        if (readInJSON.contains("CALC_P_NORMAL"))
         {
-            USE_CUDA = readInJSON.at("USE_CUDA");
-        } else {
-            USE_CUDA = false;
+            CALC_P_NORMAL = readInJSON.at("CALC_P_NORMAL");
+        }
+        if (readInJSON.contains("GEN_SPLASH"))
+        {
+            CALC_P_NORMAL = readInJSON.at("GEN_SPLASH");
         }
         if (readInJSON.contains("NEED_RECORD"))
         {
@@ -190,6 +191,14 @@ void loadConfigJson(std::string dataPath)
                 IS_CONST_RADIUS = true;
             } else {
                 IS_CONST_RADIUS = false;
+            }
+            if (readInJSON.contains("SMOOTH_FACTOR"))
+            {
+                SMOOTH_FACTOR = readInJSON.at("SMOOTH_FACTOR");
+            }
+            if (readInJSON.contains("ISO_FACTOR"))
+            {
+                ISO_FACTOR = readInJSON.at("ISO_FACTOR");
             }
         }
     }
@@ -259,7 +268,7 @@ void loadParticlesFromCSV(std::string &csvPath,
         particles.push_back(Eigen::Vector3d(elements[xIdx], elements[yIdx], elements[zIdx]));
         if (!IS_CONST_RADIUS)
         {
-            radiuses->push_back(elements[radiusIdx] * DEFAULT_SCALE);
+            radiuses->push_back(elements[radiusIdx]);
         }
         getline(ifn, line);
     }
@@ -286,7 +295,7 @@ void run(std::string dataDirPath, std::string outPath)
             loadParticlesFromCSV(dataPath, particles, radiuses);
             break;
         case 1:
-            readShonDyParticleData(dataPath, particles, radiuses, DEFAULT_SCALE);
+            // readShonDyParticleData(dataPath, particles, radiuses, DEFAULT_SCALE);
             if (abs(*std::max_element(radiuses->begin(), radiuses->end()) - *std::min_element(radiuses->begin(), radiuses->end())) < 1e-7)
             {
                 IS_CONST_RADIUS = true;
@@ -298,7 +307,7 @@ void run(std::string dataDirPath, std::string outPath)
             exit(1);
         }
         printf("Particles Number = %zd\n", particles.size());
-        SurfReconstructor* constructor = new SurfReconstructor(particles, radiuses, mesh, RADIUS, DEFAULT_FLATNESS, DEFAULT_INF_FACTOR);
+        SurfReconstructor* constructor = new SurfReconstructor(particles, radiuses, mesh, RADIUS, ISO_FACTOR, SMOOTH_FACTOR);
         Recorder* recorder = new Recorder(dataDirPath, frame.substr(0, frame.size() - 4), constructor);
         constructor->Run();
         if (NEED_RECORD)
@@ -368,36 +377,35 @@ int main(int argc, char **argv)
     omp_set_dynamic(OMP_USE_DYNAMIC_THREADS);
     omp_set_num_threads(OMP_THREADS_NUM);
 
-    std::string h5DirPath;
+    std::string dataDirPath;
     std::string outPath;
 
     switch (argc)
     {
     case 3:
-        h5DirPath = std::string(argv[1]);
+        dataDirPath = std::string(argv[1]);
         outPath = std::string(argv[2]);
-        std::cout << "H5 dir: " << h5DirPath << std::endl;
+        std::cout << "Data dir: " << dataDirPath << std::endl;
         std::cout << "Out dir: " << outPath << std::endl;
-        run(h5DirPath, outPath);
+        run(dataDirPath, outPath);
         break;
     case 2:
-        h5DirPath = std::string(argv[1]);
-        outPath = h5DirPath + "/out";
-        std::cout << "H5 dir: " << h5DirPath << std::endl;
-        run(h5DirPath, outPath);
+        dataDirPath = std::string(argv[1]);
+        outPath = dataDirPath + "/out";
+        std::cout << "Data dir: " << dataDirPath << std::endl;
+        run(dataDirPath, outPath);
         break;
     case 1:
-        h5DirPath =
+    default:
+        dataDirPath =
         // "E:/data/multiR/mr_csv";
         // "E:/data/vtk/csv";
         // "E:/data/vtk_11/vtk/e3ad64c6-7d73-4712-8b40-1b26ee28e5e5/h5";
-        "E:/data/watertank2.7/water";
+        "C:/Users/11379/Desktop/liu";
         outPath = 
         // "E:/data/vtk_11/vtk/e3ad64c6-7d73-4712-8b40-1b26ee28e5e5/out";
-        "E:/data/watertank2.7/out";
-        run(h5DirPath, outPath);
-        break;
-    default:
+        "C:/Users/11379/Desktop/liu/out";
+        run(dataDirPath, outPath);
         break;
     }
 

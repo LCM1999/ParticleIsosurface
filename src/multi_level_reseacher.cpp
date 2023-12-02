@@ -9,6 +9,7 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3d>* particles, 
     maxRadius = *std::max_element(radiuses->begin(), radiuses->end());
     minRadius = *std::min_element(radiuses->begin(), radiuses->end());
     infFactor = inf_factor;
+    particlesNum = particles->size();
     std::vector<std::pair<double, double>> bin_bounds;
     double bin_extent = minRadius * 0.5;
     int bins = std::max(int(ceil((maxRadius - minRadius) / bin_extent)), 1);

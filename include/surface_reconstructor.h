@@ -23,23 +23,24 @@ private:
     double _BORDER = (1.0 / 16.0);
     int _DEPTH_MAX = 6; // 7
     int _DEPTH_MIN = 5; // 4
-    double _NEIGHBOR_FACTOR = 4.0f;
-    double _SMOOTH_FACTOR = 2.0f;
-    double _ISO_VALUE = 0.0f;
+    double _NEIGHBOR_FACTOR = 4.0;
+    double _SMOOTH_FACTOR = 2.0;
+    double _ISO_FACTOR = 1.9;
+    double _ISO_VALUE = 0.0;
 
-    double _MAX_SCALAR = -1.0f;
-    double _MIN_SCALAR = 0.0f;
-    double _BAD_QEF = 0.0001f;
-    double _FLATNESS = 0.99f;
+    double _MAX_SCALAR = -1.0;
+    double _MIN_SCALAR = 0.0;
+    double _BAD_QEF = 0.0001;
+    double _FLATNESS = 0.99;
     int _MIN_NEIGHBORS_NUM = 25;
     int _SPARSE_NEIGHBORS_NUM = 16;
 
     bool _USE_ANI = true;
     bool _USE_XMEAN = true;
-    double _XMEAN_DELTA = 0.0f;
+    double _XMEAN_DELTA = 0.0;
 
     double _TOLERANCE = 1e-8;
-    double _RATIO_TOLERANCE = 0.1f;
+    double _RATIO_TOLERANCE = 0.1;
     //double _LOW_MESH_QUALITY = 0.17320508075688772935274463415059;
 
     HashGrid* _hashgrid = NULL;
