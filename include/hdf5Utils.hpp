@@ -14,7 +14,7 @@ bool readShonDyParticleXDMF(const std::string dir_path,
 
 bool readShonDyParticleData(const std::string &fileName,
                             std::vector<Eigen::Vector3d> &positions,
-                            std::vector<double>* radiuses, const double scale);
+                            std::vector<double>* radiuses);
 
 void readInt(hid_t fileID, const std::string &veclLocation,
              std::vector<int> &readVec);

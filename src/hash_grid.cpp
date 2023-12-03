@@ -1,10 +1,49 @@
+#include "iso_common.h"
 #include "hash_grid.h"
 
-HashGrid::HashGrid(std::vector<Eigen::Vector3d>& particles, double* bounding, double radius, double inf_factor)
+HashGrid::HashGrid(std::vector<Eigen::Vector3d>* particles, double* bounding, double radius, double inf_factor)
 {
-	Particles = &particles;
+	assert(IS_CONST_RADIUS);
+	Particles = particles;
 	ParticlesNum = Particles->size();
+
+	Radius = radius;
 	CellSize = radius * inf_factor + 2 * radius;
+
+	int i = 0;
+	double length = 0.0;
+	double center = 0.0;
+
+	for (i = 0; i < 3; i++)
+	{
+		length = ((ceil((bounding[i * 2 + 1] - bounding[i * 2]) / CellSize)) * CellSize);
+		center = (bounding[i * 2] + bounding[i * 2 + 1]) / 2;
+		Bounding[i * 2] = center - length / 2;
+		Bounding[i * 2 + 1] = center + length / 2;
+	}
+	XYZCellNum[0] = std::max(int(ceil((Bounding[1] - Bounding[0]) / CellSize)), 1);
+	XYZCellNum[1] = std::max(int(ceil((Bounding[3] - Bounding[2]) / CellSize)), 1);
+	XYZCellNum[2] = std::max(int(ceil((Bounding[5] - Bounding[4]) / CellSize)), 1);
+	CellNum = (long long)XYZCellNum[0] * (long long)XYZCellNum[1] * (long long)XYZCellNum[2];
+
+	HashList.resize(ParticlesNum, 0);
+	IndexList.resize(ParticlesNum, 0);
+
+	BuildTable();
+	HashList.clear();
+}
+
+HashGrid::HashGrid(std::vector<Eigen::Vector3d>* particles, std::vector<double>* radiuses, 
+	std::vector<unsigned int>& pIndexes, double* bounding, unsigned int radiusId, double inf_factor)
+{
+	assert(!IS_CONST_RADIUS);
+	Particles = particles;
+	PIndexes.assign(pIndexes.begin(), pIndexes.end());
+	ParticlesNum = PIndexes.size();
+
+	RadiusId = radiusId;
+	Radius = radiuses->at(RadiusId);
+	CellSize = Radius * inf_factor + 2 * Radius;
 
 	int i = 0;
 	double length = 0.0;
@@ -50,7 +89,12 @@ inline void HashGrid::CalcHashList()
 	Eigen::Vector3i xyzIdx;
 	for (size_t index = 0; index < ParticlesNum; index++)
 	{
-		CalcXYZIdx((Particles->at(index)), xyzIdx);
+		if (IS_CONST_RADIUS)
+		{
+			CalcXYZIdx(Particles->at(index), xyzIdx);
+		} else {
+			CalcXYZIdx(Particles->at(PIndexes[index]), xyzIdx);
+		}
 		HashList[index] = CalcCellHash(xyzIdx);
 		IndexList[index] = index;
 	}

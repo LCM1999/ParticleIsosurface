@@ -20,13 +20,23 @@ public:
     SurfReconstructor* constructor;
 	std::vector<Eigen::Vector3d>* GlobalPoses;
     std::vector<double>* GlobalRadius;
+    std::vector<double>* GlobalRadius2;
+    std::vector<double>* GlobalRadius3;
+    std::vector<double>* GlobalInflunce2;
+    std::vector<double>* GlobalSigma;
+
     double _MAX_RADIUS, _MIN_RADIUS;
 
     double Radius = 0;
+    double Radius2 = 0;
+    double Radius3 = 0;
+    double Influnce2 = 0;
+    double Sigma = 0;
     std::vector<std::uint8_t> GlobalSplash;
     std::vector<Eigen::Vector3d> PariclesNormals;
 	Eigen::Vector3d* GlobalxMeans;
     Eigen::Matrix3d* GlobalGs;
+    std::vector<double> GlobalDeterminant;
 
 	Evaluator(  SurfReconstructor* surf_constructor, std::vector<Eigen::Vector3d>* global_particles, 
                 std::vector<double>* radiuses,
@@ -41,19 +51,18 @@ public:
     bool CheckSplash(const int& pIdx);
     double CalculateMaxScalarConstR();
     double CalculateMaxScalarVarR();
-    double RecommendIsoValueConstR();
-    double RecommendIsoValueVarR();
+    double RecommendIsoValueConstR(const double iso_factor);
+    double RecommendIsoValueVarR(const double iso_factor);
     void CalcParticlesNormal();
 private:
-    const double bv_factor = 4.1887902047863909846168578443727;
+    const double sqrt3 = 1.7320508075688772935274463415059;
+    const double sqrt11 = 3.3166247903553998491149327366707;
     const double inv_pi = 0.31830988618379067153776752674503;
 
-    double neighbor_factor;
-    double smooth_factor;
+    double NeighborFactor;
+    double SmoothFactor;
 
-    double general_kernel(double d2, double h2, double h);
-    double spiky_kernel(double d, double h);
-    double viscosity_kernel(double d, double h);
+    double general_kernel(double d2, double h2, double sigma);
 
 	double IsotropicInterpolate(const int pIdx, const double d);
 	double AnisotropicInterpolate(const int pIdx, const Eigen::Vector3d& diff);

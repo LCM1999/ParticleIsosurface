@@ -9,25 +9,45 @@ Evaluator::Evaluator(SurfReconstructor* surf_constructor,
 {
     constructor = surf_constructor;
 	GlobalPoses = global_particles;
+    NeighborFactor = constructor->getNeighborFactor();
+    SmoothFactor = constructor->getSmoothFactor();
     GlobalRadius = radiuses;
     if (!IS_CONST_RADIUS)
     {
         _MAX_RADIUS = constructor->getSearcher()->getMaxRadius();
         _MIN_RADIUS = constructor->getSearcher()->getMinRadius();
+        GlobalRadius2 = new std::vector<double>(GlobalRadius->size());
+        GlobalRadius3 = new std::vector<double>(GlobalRadius->size());
+        GlobalInflunce2 = new std::vector<double>(GlobalRadius->size());
+        GlobalSigma = new std::vector<double>(GlobalRadius->size());
+        double influnce;
+        for (int i = 0; i < GlobalRadius->size(); i++)
+        {
+            influnce = GlobalRadius->at(i) * SmoothFactor;
+            GlobalRadius2->at(i) = pow(GlobalRadius->at(i), 2);
+            GlobalRadius3->at(i) = GlobalRadius->at(i) * GlobalRadius2->at(i);
+            GlobalInflunce2->at(i) = pow(influnce, 2);
+            GlobalSigma->at(i) = (315 / (64 * pow(influnce, 9))) * inv_pi;
+        }
+    } else {
+        Radius = radius;
+        Radius2 = Radius * Radius;
+        Radius3 = Radius * Radius2;
+        Influnce2 = pow(Radius * SmoothFactor, 2);
+        Sigma = (315 / (64 * pow(radius * SmoothFactor, 9))) * inv_pi;
     }
-    Radius = radius;
 
-    neighbor_factor = constructor->getNeighborFactor();
-    smooth_factor = constructor->getSmoothFactor();
-
-
-    PariclesNormals.clear();
+    if (CALC_P_NORMAL)
+    {
+        PariclesNormals.clear();
+        PariclesNormals.resize(constructor->getGlobalParticlesNum(), Eigen::Vector3d(0, 0, 0)); 
+    }
+    
     GlobalSplash.clear();
-    PariclesNormals.resize(constructor->getGlobalParticlesNum(), Eigen::Vector3d(0, 0, 0));
     GlobalSplash.resize(constructor->getGlobalParticlesNum(), 0);
-
     GlobalxMeans = new Eigen::Vector3d[constructor->getGlobalParticlesNum()];
     GlobalGs = new Eigen::Matrix3d[constructor->getGlobalParticlesNum()];
+    GlobalDeterminant.resize(constructor->getGlobalParticlesNum());
 	if (constructor->getUseAni())
 	{
         compute_Gs_xMeans();
@@ -238,32 +258,35 @@ bool Evaluator::CheckSplash(const int& pIdx)
 double Evaluator::CalculateMaxScalarConstR()
 {
     double k_value = 0;
-    const double radius = Radius;
-    const double radius2 = radius * radius;
-    const double influnce = radius * smooth_factor;
-    const double influnce2 = influnce * influnce;
 
-    k_value += general_kernel(3 * radius2, influnce2, influnce) * 8;
-    k_value += general_kernel(11 * radius2, influnce2, influnce) * 4 * 6;
+    k_value += general_kernel(0.0, Influnce2, Sigma);
+    k_value += general_kernel(4 * Radius2, Influnce2, Sigma) * 6;
+    k_value += general_kernel(8 * Radius2, Influnce2, Sigma) * 12;
+    k_value += general_kernel(12 * Radius2, Influnce2, Sigma) * 8;
 
-    return radius * radius2 * k_value;
+    return Radius3 * k_value;
 }
 
 double Evaluator::CalculateMaxScalarVarR()
 {
     double max_scalar = 0;
-    std::vector<double>* radiuses = constructor->getSearcher()->getCheckedRadiuses();
-
-    double radius2, influnce, influnce2;
-    for (const double r : *radiuses)
+    auto searchers = constructor->getSearcher();
+    unsigned int rId;
+    // double r, radius2, influnce, influnce2, temp_scalar;
+    double temp_scalar;
+    for (const auto searcher : *(searchers->getSearchers()))
     {
-        double temp_scalar = 0;
-        radius2 = r * r;
-        influnce = r * smooth_factor;
-        influnce2 = influnce * influnce;
-        temp_scalar += general_kernel(3 * radius2, influnce2, influnce) * 8;
-        temp_scalar += general_kernel(11 * radius2, influnce2, influnce) * 4 * 6;
-        temp_scalar = r * radius2 * temp_scalar;
+        temp_scalar = 0.0;
+        rId = searcher->RadiusId;
+        // r = searcher->Radius;
+        // radius2 = r * r;
+        // influnce = r * SmoothFactor;
+        // influnce2 = influnce * influnce;
+        temp_scalar += general_kernel(0.0, GlobalInflunce2->at(rId), GlobalSigma->at(rId));
+        temp_scalar += general_kernel(4 * GlobalRadius2->at(rId), GlobalInflunce2->at(rId), GlobalSigma->at(rId)) * 6;
+        temp_scalar += general_kernel(8 * GlobalRadius2->at(rId), GlobalInflunce2->at(rId), GlobalSigma->at(rId)) * 12;
+        temp_scalar += general_kernel(12 * GlobalRadius2->at(rId), GlobalInflunce2->at(rId), GlobalSigma->at(rId)) * 8;
+        temp_scalar = GlobalRadius3->at(rId) * temp_scalar;
         if (temp_scalar > max_scalar)
         {
             max_scalar = temp_scalar;
@@ -272,43 +295,44 @@ double Evaluator::CalculateMaxScalarVarR()
     return max_scalar;
 }
 
-double Evaluator::RecommendIsoValueConstR()
+double Evaluator::RecommendIsoValueConstR(const double iso_factor)
 {
     double k_value = 0.0;
-    const double radius = Radius;
-    const double radius2 = radius * radius;
 
-    const double influnce = radius * smooth_factor;
-    const double influnce2 = influnce * influnce;
+    k_value += general_kernel(iso_factor * Radius2, Influnce2, Sigma);
 
-    k_value += general_kernel(1.9 * radius2, influnce2, influnce);
-
-    return (((radius2 * radius * k_value) 
+    return (((Radius3 * k_value) 
     - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
 }
 
-double Evaluator::RecommendIsoValueVarR()
+double Evaluator::RecommendIsoValueVarR(const double iso_factor)
 {
     double recommend = 0.0;
-    std::vector<double>* radiuses = constructor->getSearcher()->getCheckedRadiuses();
+    auto searchers = constructor->getSearcher();
+    unsigned int rId;
+    // double r, radius2, influnce, influnce2, temp_scalar;
+    double temp_scalar;
 
-    double radius2, influnce, influnce2, k_value;
-    for (const double r : *radiuses)
+    for (const auto searcher : *(searchers->getSearchers()))
     {
-        radius2 = r * r;
-        influnce = r * smooth_factor;
-        influnce2 = influnce * influnce;
-        k_value = 0;
-        k_value += general_kernel(1.9 * radius2, influnce2, influnce);
-        recommend += (radius2 * r) * k_value;
+        temp_scalar = 0.0;
+        rId = searcher->RadiusId;
+        // r = searcher->Radius;
+        // radius2 = r * r;
+        // influnce = r * SmoothFactor;
+        // influnce2 = influnce * influnce;
+        temp_scalar += general_kernel(iso_factor * GlobalRadius2->at(rId), GlobalInflunce2->at(rId), GlobalSigma->at(rId));
+        temp_scalar = GlobalRadius3->at(rId) * temp_scalar;
+        if (temp_scalar > recommend)
+        {
+            recommend = temp_scalar;
+        }
     }
-    return ((recommend / radiuses->size()) - constructor->getMinScalar()) / constructor->getMaxScalar() * 255;
+    return (recommend - constructor->getMinScalar()) / constructor->getMaxScalar() * 255;
 }
 
 void Evaluator::CalcParticlesNormal()
 {
-    //double recommand_surface_threshold = RecommendSurfaceThreshold();
-    //printf("   Recommend Surface Threshold = %f\n", recommand_surface_threshold);
 #pragma omp parallel for schedule(static, OMP_THREADS_NUM) 
     for (int pIdx = 0; pIdx < constructor->getGlobalParticlesNum(); pIdx++)
     {
@@ -324,31 +348,16 @@ void Evaluator::CalcParticlesNormal()
     }
 }
 
-inline double Evaluator::general_kernel(double d2, double h2, double h)
+inline double Evaluator::general_kernel(double d2, double h2, double sigma)
 {
     double p_dist = (d2 >= h2 ? 0.0 : pow(h2 - d2, 3));
-    double sigma = (315 / (64 * pow(h, 9))) * inv_pi;
-    return p_dist * sigma;
-}
-
-inline double Evaluator::spiky_kernel(double d, double h)
-{
-    double p_dist = (d >= h ? 0.0 : pow(h - d, 3));
-    double sigma = (15 / pow(h, 6)) * inv_pi;
-    return p_dist * sigma;
-}
-
-inline double Evaluator::viscosity_kernel(double d, double h)
-{
-    double p_dist = (d >= h ? 0.0 : (-pow(d, 3) / (2 * pow(h, 3)) + pow(d, 2) / pow(h, 2) + d / (2 * h) - 1));
-    double sigma = (15 / (2 * pow(h, 3))) * inv_pi;
     return p_dist * sigma;
 }
 
 inline double Evaluator::IsotropicInterpolate(const int pIdx, const double d2)
 {
     double radius = (IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx));
-    double influnce = radius * smooth_factor;
+    double influnce = radius * SmoothFactor;
     double influnce2 = influnce * influnce;
 	if (d2 > influnce2)
 		return 0.0f;
@@ -358,18 +367,18 @@ inline double Evaluator::IsotropicInterpolate(const int pIdx, const double d2)
 
 inline double Evaluator::AnisotropicInterpolate(const int pIdx, const Eigen::Vector3d& diff)
 {
-    double radius = (IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx));
-    double influnce = radius * smooth_factor;
-    double influnce2 = influnce * influnce;
-    double k_value = general_kernel((GlobalGs[pIdx] * diff).squaredNorm(), influnce2, influnce);
-    return (pow(radius, 3)) * (GlobalGs[pIdx].determinant() * k_value);
+    double k_value = general_kernel(
+        (GlobalGs[pIdx] * diff).squaredNorm(), 
+        (IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2->at(pIdx)), 
+        (IS_CONST_RADIUS ? Sigma : GlobalSigma->at(pIdx)));
+    return (IS_CONST_RADIUS ? Radius3 : GlobalRadius3->at(pIdx)) * (GlobalDeterminant[pIdx] * k_value);
 }
 
 inline void Evaluator::compute_single_xMean(Eigen::Vector3d p, Eigen::Vector3d neighbor, Eigen::Vector3d &xMean, double r)
 {
     double d2 = (neighbor - p).squaredNorm();
     double d = sqrt(d2);
-    double wj = wij(d, r * neighbor_factor);
+    double wj = wij(d, r * NeighborFactor);
     double wSum = wj;
     xMean = neighbor * wj;
     xMean /= wSum;
@@ -378,19 +387,19 @@ inline void Evaluator::compute_single_xMean(Eigen::Vector3d p, Eigen::Vector3d n
 
 inline void Evaluator::compute_xMeans(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Eigen::Vector3d &xMean)
 {
-    double pR, pD, pD2;
+    double pR, pD2;
     pR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx);
-    pD = smooth_factor * pR;
-    pD2 = pD * pD;
+    // pD = SmoothFactor * pR;
+    pD2 = IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2->at(pIdx);
     double nR, nD, nD2, nI, nI2, d, d2, wj, wSum = 0;
     for (int nIdx : temp_neighbors)
     {
         if (nIdx == pIdx)
             continue;
         nR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(nIdx);
-        nD = smooth_factor * nR * 1.3;
+        nD = SmoothFactor * nR * 1.3;
         nD2 = nD * nD;
-        nI = nR * neighbor_factor;
+        nI = nR * NeighborFactor;
         nI2 = nI * nI;
         d2 = (((GlobalPoses->at(nIdx))) - ((GlobalPoses->at(pIdx)))).squaredNorm();
         if (d2 >= nI2)
@@ -427,7 +436,7 @@ inline void Evaluator::compute_xMeans(int pIdx, std::vector<int> temp_neighbors,
 
 inline void Evaluator::compute_single_G(Eigen::Vector3d p, Eigen::Vector3d pm, Eigen::Vector3d n, Eigen::Matrix3d &G, double r)
 {
-    const double invH = 1.0 / smooth_factor;
+    const double invH = 1.0 / SmoothFactor;
     double wSum = 0, d, wj;
 
     Eigen::Vector3d wd = Eigen::Vector3d::Zero();
@@ -435,7 +444,7 @@ inline void Evaluator::compute_single_G(Eigen::Vector3d p, Eigen::Vector3d pm, E
     cov += Eigen::DiagonalMatrix<double, 3>(invH, invH, invH);
     wSum = 0.0f;
     d = (p - n).norm();
-    wj = wij(d, r * neighbor_factor);
+    wj = wij(d, r * NeighborFactor);
     wSum += wj;
     wd = n - pm;
     cov += ((wd * wd.transpose()).cast<double>() * wj);
@@ -464,7 +473,7 @@ inline void Evaluator::compute_single_G(Eigen::Vector3d p, Eigen::Vector3d pm, E
 
 inline void Evaluator::compute_G(Eigen::Vector3d p, Eigen::Vector3d xMean, std::vector<int> neighbors, Eigen::Matrix3d &G)
 {
-    const double invH = 1/smooth_factor;
+    const double invH = 1/SmoothFactor;
     double wSum = 0, d, wj;
     double nR, nI;
 
@@ -475,7 +484,7 @@ inline void Evaluator::compute_G(Eigen::Vector3d p, Eigen::Vector3d xMean, std::
     for (int nIdx : neighbors)
     {
         nR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(nIdx);
-        nI = nR * neighbor_factor;
+        nI = nR * NeighborFactor;
         d = (p - GlobalPoses->at(nIdx)).norm();
         wj = wij(d, nI);
         wSum += wj;
@@ -508,7 +517,8 @@ inline void Evaluator::compute_G(Eigen::Vector3d p, Eigen::Vector3d xMean, std::
 inline void Evaluator::compute_Gs_xMeans()
 {
     const double invH = 1.0;
-#pragma omp parallel for schedule(static, OMP_THREADS_NUM) 
+    unsigned int splash_cnt_total = 0, cnt1 = 0, cnt2 = 0;
+// #pragma omp parallel for schedule(static, OMP_THREADS_NUM) 
     for (int pIdx = 0; pIdx < constructor->getGlobalParticlesNum(); pIdx++)
     {
         std::vector<int> tempNeighbors;
@@ -526,6 +536,8 @@ inline void Evaluator::compute_Gs_xMeans()
         {
             G = Eigen::DiagonalMatrix<double, 3>(invH, invH, invH);
             GlobalSplash[pIdx] = 1;
+            splash_cnt_total++;
+            cnt1++;
         }
 
         compute_xMeans(pIdx, tempNeighbors, neighbors, closerNeigbors, xMean);
@@ -534,14 +546,20 @@ inline void Evaluator::compute_Gs_xMeans()
         {
             G = Eigen::DiagonalMatrix<double, 3>(invH, invH, invH);
             GlobalSplash[pIdx] = 1;
+            splash_cnt_total++;
+            cnt2++;
         } 
         else
         {
             compute_G(GlobalPoses->at(pIdx), xMean, neighbors, G);
         }
+
         GlobalxMeans[pIdx] = Eigen::Vector3d(xMean);
         GlobalGs[pIdx] = Eigen::Matrix3d(G);
+        GlobalDeterminant[pIdx] = G.determinant();
     }
+
+    std::cout << "total: " << splash_cnt_total << ", " << cnt1 << ", " << cnt2 << std::endl;
 }
 
 inline double Evaluator::wij(double d, double r)

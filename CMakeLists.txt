@@ -61,7 +61,6 @@ add_executable(${PROJECT_NAME}
     src/global.cpp
     src/recorder.cpp
     src/hdf5Utils.cpp
-    src/pvdReader.cpp
     src/multi_level_reseacher.cpp
     src/rply.c
 )
