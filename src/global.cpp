@@ -10,116 +10,45 @@ Mesh::Mesh(const int mesh_precision)
 	BuildIcosaTable();
 }
 
-int Mesh::insert_vert(const Eigen::Vector3d& p)
+int Mesh::insert_vert(unsigned long long id1, unsigned long long id2, const Eigen::Vector3d& p)
 {
-	vect3<double> tp(p);
-	vect3<long long> tmp = vect3f2vect3i(tp);
-	// vect3<double> tmp(double(precise(p[0])), double(precise(p[1])), double(precise(p[2])));
-	if (vertices_map.find(tmp) == vertices_map.end())
-	{
+	// vect3<double> tp(p);
+	// vect3<long long> tmp = vect3f2vect3i(tp);
+	// // vect3<double> tmp(double(precise(p[0])), double(precise(p[1])), double(precise(p[2])));
+	// if (vertices_map.find(tmp) == vertices_map.end())
+	// {
+	// 	verticesNum++;
+	// 	vertices_map[tmp] = verticesNum;
+	// 	// vertices.push_back(vect3i2vect3f(tmp));
+	// 	vertices.push_back(p);
+	// }
+	auto [iterator, inserted] = 
+		vertices_map.try_emplace(generate_string(std::vector<unsigned long long>({id1, id2})), verticesNum);
+	if (inserted) {
 		verticesNum++;
-		vertices_map[tmp] = verticesNum;
-		// vertices.push_back(vect3i2vect3f(tmp));
 		vertices.push_back(p);
 	}
-	return vertices_map[tmp];
-}
-
-double Mesh::precise(double x)
-{
-	std::stringstream is;
-    double res;
-    is.precision(MESH_PRECISION);
-    is << x;
-    is >> res;
-    return res;
-}
-
-vect3<long long> Mesh::vect3f2vect3i(vect3<double>& a)
-{
-	vect3<long long> r;
-	for (size_t i = 0; i < 3; i++)
-	{
-		r[i] = long long(round(a[i] * MESH_PRECISION));
-	}
-	return r;
-}
-
-vect3<double> Mesh::vect3i2vect3f(vect3<int>& a)
-{
-	vect3<double> r;
-	for (size_t i = 0; i < 3; i++)
-	{
-		r[i] = a[i] / double(MESH_PRECISION);
-	}
-	return r;
-}
-
-bool Mesh::similiar_point(Eigen::Vector3d& v1, Eigen::Vector3d& v2)
-{
-	for (size_t i = 0; i < 3; i++)
-	{
-		if (abs(v1[i] - v2[i]) >= MESH_PRECISION)
-		{
-			return false;
-		}
-	}
-	return true;
+	return iterator->second + 1;
 }
 
 void Mesh::insert_tri(int t0, int t1, int t2)
 {
-	if ((t0 == t1 || t1 == t2 || t0 == t2))
-	{
-		return;
-	}
-	
-	// vect3i t0_i = vect3f2vect3i(vertices[(t0 - 1)]);
-	// vect3i t1_i = vect3f2vect3i(vertices[(t1 - 1)]);
-	// vect3i t2_i = vect3f2vect3i(vertices[(t2 - 1)]);
-	// Triangle<vect3i> ti(t0_i, t1_i, t2_i);
-	// //double length[3];
-	// //int top, bottom1, bottom2;
-	// //double height, half;
-	// //double area;
-	// //half = 0;
-	// //for (size_t i = 0; i < 3; i++)
-	// //{
-	// //	length[i] = (vertices[t.v[triangle_edge2vert[i][1]] - 1] - vertices[t.v[triangle_edge2vert[i][0]] - 1]).length();
-	// //	half += length[i];
-	// //}
-	// //half /= 2;
-	// //for (size_t i = 0; i < 3; i++)
-	// //{
-	// //	if (length[i] >= length[triangle_edge2vert[i][0]] && length[i] >= length[triangle_edge2vert[i][1]])
-	// //	{
-	// //		top = i; bottom1 = triangle_edge2vert[i][0]; bottom2 = triangle_edge2vert[i][1];
-	// //		break;
-	// //	}
-	// //}
-	// //area = sqrt(half * (half - length[0]) * (half - length[1]) * (half - length[2]));
-	// //height = area * 2 / length[top];
-	// //if ((height / length[top]) < LOW_MESH_QUALITY)
-	// //{
-	// //	vertices[t.v[top] - 1] =
-	// //		(vertices[t.v[bottom1] - 1] * (length[bottom1] / (length[bottom1] + length[bottom2])) +
-	// //			vertices[t.v[bottom2] - 1] * (length[bottom2] / (length[bottom1] + length[bottom2])));
-	// //	//printf("Elimit: %d, %d;  ", t.v[top], t.v[top]);
-	// //}
-	// //else
-	// //{
-	// //}
-	// if (tris_map.find(ti) == tris_map.end())
+	// if ((t0 == t1 || t1 == t2 || t0 == t2))
+	// {
+	// 	return;
+	// }
+	// Triangle tv(t0, t1, t2);
+	// if (tris_map.find(tv) == tris_map.end())
 	// {
 	// 	trianglesNum++;
-	// 	tris_map[ti] = trianglesNum;
+	// 	tris_map[tv] = trianglesNum;
+	// 	tris.push_back(tv);
 	// }
-	Triangle tv(t0, t1, t2);
-	if (tris_map.find(tv) == tris_map.end())
-	{
+	auto [iterator, inserted] = 
+		tris_map.try_emplace(generate_string(std::vector<int>({t0, t1, t2})), trianglesNum);
+	if (inserted) {
 		trianglesNum++;
-		tris_map[tv] = trianglesNum;
-		tris.push_back(tv);
+		tris.push_back(Triangle(t0, t1, t2));
 	}
 }
 
@@ -171,7 +100,9 @@ void Mesh::AppendSplash_ConstR(std::vector<Eigen::Vector3d>& splash_particles, c
 		tmp_vec_indices.resize(12);
 		for (size_t i = 0; i < 12; i++)
 		{
-			tmp_vec_indices[i] = insert_vert(pos + IcosaTable[i] * radius);
+			verticesNum++;
+			vertices.push_back(Vertex(pos + IcosaTable[i] * radius));
+			tmp_vec_indices[i] = verticesNum;
 		}
 		for (size_t i = 0; i < 5; i++)
 		{
@@ -192,7 +123,9 @@ void Mesh::AppendSplash_VarR(std::vector<Eigen::Vector3d>& splash_particles, std
 		tmp_vec_indices.resize(12);
 		for (size_t i = 0; i < 12; i++)
 		{
-			tmp_vec_indices[i] = insert_vert(splash_particles[spi] + IcosaTable[i] * splash_radius[spi]);
+			verticesNum++;
+			vertices.push_back(Vertex(splash_particles[spi] + IcosaTable[i] * splash_radius[spi]));
+			tmp_vec_indices[i] = verticesNum;
 		}
 		for (size_t i = 0; i < 5; i++)
 		{

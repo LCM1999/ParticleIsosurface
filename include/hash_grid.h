@@ -12,10 +12,17 @@ public:
 	HashGrid();
 	~HashGrid() {};
 
-	HashGrid(std::vector<Eigen::Vector3d>& particles, double* bounding, double radius, double inf_factor);
+	/* Constructor for const radius*/
+	HashGrid(std::vector<Eigen::Vector3d>* particles, double* bounding, double radius, double inf_factor);
+	/* Constructor for variable radius*/
+	HashGrid(std::vector<Eigen::Vector3d>* particles, std::vector<double>* radiuses, 
+		std::vector<unsigned int>& pIndexes, double* bounding, unsigned int radiusId, double inf_factor);
 
 	std::vector<Eigen::Vector3d>* Particles;
+	std::vector<unsigned int> PIndexes;
 	unsigned int ParticlesNum;
+	unsigned int RadiusId;
+	double Radius;
 	double CellSize;
 	double Bounding[6];
 	unsigned int XYZCellNum[3];

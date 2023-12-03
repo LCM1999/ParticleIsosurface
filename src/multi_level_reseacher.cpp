@@ -5,10 +5,11 @@
 
 MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3d>* particles, double* bounding, std::vector<double>* radiuses, double inf_factor)
 {
-    std::vector<std::vector<Eigen::Vector3d>> sortedParticles;
-    maxRadius = *std::max_element(radiuses->begin(), radiuses->end());
-    minRadius = *std::min_element(radiuses->begin(), radiuses->end());
+    // std::vector<std::vector<Eigen::Vector3d>> sortedParticles;
+    maxRadius = *std::max_element(radiuses->begin(), radiuses->end()) * 1.01;
+    minRadius = *std::min_element(radiuses->begin(), radiuses->end()) * 0.99;
     infFactor = inf_factor;
+    particlesNum = particles->size();
     std::vector<std::pair<double, double>> bin_bounds;
     double bin_extent = minRadius * 0.5;
     int bins = std::max(int(ceil((maxRadius - minRadius) / bin_extent)), 1);
@@ -29,27 +30,28 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3d>* particles, 
         }
         return -1;
     };
-    sortedParticles.clear();
+    // sortedParticles.clear();
     sortedIndex.clear();
-    sortedParticles.resize(bins);
+    // sortedParticles.resize(bins);
     sortedIndex.resize(bins);
     for (size_t i = 0; i < bins; i++)
     {
-        sortedParticles[i].clear();
+        // sortedParticles[i].clear();
         sortedIndex[i].clear();
     }
 
     for (int i = 0; i < radiuses->size(); i++)
     {
-        sortedParticles[whichBin(radiuses->at(i))].push_back(particles->at(i));
+        // sortedParticles[whichBin(radiuses->at(i))].push_back(particles->at(i));
         sortedIndex[whichBin(radiuses->at(i))].push_back(i);
         avgRadius += radiuses->at(i);
     }
     avgRadius /= radiuses->size();
     if (avgRadius < minRadius) avgRadius = minRadius;
     if (avgRadius > maxRadius) avgRadius = maxRadius;
-    for (int i = 0; i < sortedParticles.size(); i++)
+    for (int i = 0; i < bins; i++)
     {
+        if (sortedIndex[i].size() == 0) continue;
         double temp_bounding [6] = {0.0f};
         temp_bounding[0] = bounding[0];
         temp_bounding[1] = bounding[1];
@@ -57,7 +59,12 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3d>* particles, 
         temp_bounding[3] = bounding[3];
         temp_bounding[4] = bounding[4];
         temp_bounding[5] = bounding[5];
-        searchers.push_back(new HashGrid(sortedParticles[i], temp_bounding, bin_bounds[i].second, inf_factor));
+        unsigned int binRadiusId = *std::max_element(sortedIndex[i].begin(), sortedIndex[i].end(), 
+            [&](unsigned int& a, unsigned int& b) {
+                return radiuses->at(a) < radiuses->at(b);
+            });
+        // std::cout << sortedIndex[i].size() << ", " << radiuses->at(binRadiusId) << std::endl;
+        searchers.push_back(new HashGrid(particles, radiuses, sortedIndex[i], temp_bounding, binRadiusId, inf_factor));
     }
     std::set<double> st(radiuses->begin(), radiuses->end());
     checkedRadiuses.assign(st.begin(), st.end());

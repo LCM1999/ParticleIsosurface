@@ -32,9 +32,9 @@ struct TNode
 {
 	TNode() {}
 
-	TNode(SurfReconstructor* surf_constructor);
+	TNode(SurfReconstructor* surf_constructor, unsigned long long id);
 
-	TNode::TNode(SurfReconstructor* surf_constructor, TNode* parent, Index i);
+	TNode(SurfReconstructor* surf_constructor, TNode* parent, Index i);
 
 	~TNode()
 	{
@@ -49,6 +49,7 @@ struct TNode
 
 	char depth = 0;
 	char type;
+	unsigned long long id;
 
 	TNode *children[8];
 

@@ -15,12 +15,13 @@ static double sign(unsigned int x)
 	return x ? 1 : -1;
 };
 
-TNode::TNode(SurfReconstructor* surf_constructor)
+TNode::TNode(SurfReconstructor* surf_constructor, unsigned long long id)
 {
 	constructor = surf_constructor;
 	children[0] = children[1] = children[2] = children[3] =
 		children[4] = children[5] = children[6] = children[7] = 0;
 	type = UNCERTAIN;
+	this->id = id;
 }
 
 TNode::TNode(SurfReconstructor* surf_constructor, TNode* parent, Index i)
@@ -35,6 +36,7 @@ TNode::TNode(SurfReconstructor* surf_constructor, TNode* parent, Index i)
 	children[0] = children[1] = children[2] = children[3] =
 		children[4] = children[5] = children[6] = children[7] = 0;
 	type = UNCERTAIN;
+	this->id = parent->id * 8 + i.v;
 }
 
 double TNode::calcErrorDMC(Eigen::Vector4d p, double* verts, double* verts_grad, const int oversample)
@@ -167,9 +169,9 @@ void TNode::NodeCalcNode(double* sample_points, double* sample_grads, double cel
 		node << pc;
 	}
 	constructor->getEvaluator()->SingleEval(node.head(3), node[3]);
-	if (err/cellsize < 0.001)
+	if (err/cellsize < 0.0001)
 	{
-		node[3] = 0;
+		node[3] = 0.0;
 	}
 }
 
