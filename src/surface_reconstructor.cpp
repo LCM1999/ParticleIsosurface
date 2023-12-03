@@ -350,7 +350,7 @@ void SurfReconstructor::genIsoOurs()
 		cuvrs = new double[queue_flag];
 		min_raiduses = new double[queue_flag];
 		emptys = new bool[queue_flag];
-		#pragma omp parallel //for schedule(dynamic, OMP_THREADS_NUM) 
+		#pragma omp parallel
 		{
 			#pragma omp single
 			{
@@ -364,7 +364,7 @@ void SurfReconstructor::genIsoOurs()
 		sample_points = new double[int(pow(getOverSampleQEF()+1, 3)) * 4 * queue_flag];
 		sample_grads = new double[int(pow(getOverSampleQEF()+1, 3)) * 3 * queue_flag];
 		//TODO: Sampling
-		#pragma omp parallel //for schedule(dynamic, OMP_THREADS_NUM)
+		#pragma omp parallel
 		{
 			#pragma omp single
 			{

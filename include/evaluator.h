@@ -25,8 +25,6 @@ public:
     std::vector<double>* GlobalInflunce2;
     std::vector<double>* GlobalSigma;
 
-    double _MAX_RADIUS, _MIN_RADIUS;
-
     double Radius = 0;
     double Radius2 = 0;
     double Radius3 = 0;
@@ -67,9 +65,7 @@ private:
 	double IsotropicInterpolate(const int pIdx, const double d);
 	double AnisotropicInterpolate(const int pIdx, const Eigen::Vector3d& diff);
 	void compute_Gs_xMeans();
-    void compute_single_xMean(Eigen::Vector3d p, Eigen::Vector3d neighbor, Eigen::Vector3d &xMean, double r);
     void compute_xMeans(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Eigen::Vector3d &xMean);
-    void compute_single_G(Eigen::Vector3d p, Eigen::Vector3d pm, Eigen::Vector3d n, Eigen::Matrix3d &G, double r);
     void compute_G(Eigen::Vector3d p, Eigen::Vector3d xMean, std::vector<int> neighbors, Eigen::Matrix3d &G);
 	double wij(double d, double r);
 

@@ -14,8 +14,6 @@ Evaluator::Evaluator(SurfReconstructor* surf_constructor,
     GlobalRadius = radiuses;
     if (!IS_CONST_RADIUS)
     {
-        _MAX_RADIUS = constructor->getSearcher()->getMaxRadius();
-        _MIN_RADIUS = constructor->getSearcher()->getMinRadius();
         GlobalRadius2 = new std::vector<double>(GlobalRadius->size());
         GlobalRadius3 = new std::vector<double>(GlobalRadius->size());
         GlobalInflunce2 = new std::vector<double>(GlobalRadius->size());
@@ -333,7 +331,7 @@ double Evaluator::RecommendIsoValueVarR(const double iso_factor)
 
 void Evaluator::CalcParticlesNormal()
 {
-#pragma omp parallel for schedule(static, OMP_THREADS_NUM) 
+#pragma omp parallel for
     for (int pIdx = 0; pIdx < constructor->getGlobalParticlesNum(); pIdx++)
     {
         double tempScalar = 0;
@@ -372,17 +370,6 @@ inline double Evaluator::AnisotropicInterpolate(const int pIdx, const Eigen::Vec
         (IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2->at(pIdx)), 
         (IS_CONST_RADIUS ? Sigma : GlobalSigma->at(pIdx)));
     return (IS_CONST_RADIUS ? Radius3 : GlobalRadius3->at(pIdx)) * (GlobalDeterminant[pIdx] * k_value);
-}
-
-inline void Evaluator::compute_single_xMean(Eigen::Vector3d p, Eigen::Vector3d neighbor, Eigen::Vector3d &xMean, double r)
-{
-    double d2 = (neighbor - p).squaredNorm();
-    double d = sqrt(d2);
-    double wj = wij(d, r * NeighborFactor);
-    double wSum = wj;
-    xMean = neighbor * wj;
-    xMean /= wSum;
-    xMean = p * (1 - constructor->getXMeanDelta()) + xMean * constructor->getXMeanDelta();    
 }
 
 inline void Evaluator::compute_xMeans(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Eigen::Vector3d &xMean)
@@ -434,43 +421,6 @@ inline void Evaluator::compute_xMeans(int pIdx, std::vector<int> temp_neighbors,
     }
 }
 
-inline void Evaluator::compute_single_G(Eigen::Vector3d p, Eigen::Vector3d pm, Eigen::Vector3d n, Eigen::Matrix3d &G, double r)
-{
-    const double invH = 1.0 / SmoothFactor;
-    double wSum = 0, d, wj;
-
-    Eigen::Vector3d wd = Eigen::Vector3d::Zero();
-    Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
-    cov += Eigen::DiagonalMatrix<double, 3>(invH, invH, invH);
-    wSum = 0.0f;
-    d = (p - n).norm();
-    wj = wij(d, r * NeighborFactor);
-    wSum += wj;
-    wd = n - pm;
-    cov += ((wd * wd.transpose()).cast<double>() * wj);
-    cov /= wSum;
-
-    Eigen::JacobiSVD<Eigen::Matrix3d> svd(cov, Eigen::ComputeFullU | Eigen::ComputeFullV);
-    
-    Eigen::Matrix3d u = svd.matrixU();
-    Eigen::Vector3d w = svd.singularValues();
-    Eigen::Matrix3d v = svd.matrixV();
-    
-    w = Eigen::Vector3d(w.array().abs());
-    const double maxSingularVal = w.maxCoeff();
-
-    const double kr = 4.0;
-    w[0] = std::max(w[0], maxSingularVal / kr);
-    w[1] = std::max(w[1], maxSingularVal / kr);
-    w[2] = std::max(w[2], maxSingularVal / kr);
-
-    Eigen::Matrix3d invSigma = w.asDiagonal().inverse();
-    // Compute G
-    const double scale =
-        std::pow(w[0] * w[1] * w[2], 1.0 / 3.0);  // volume preservation
-    G = ((v * invSigma * u.transpose()) * invH * scale).cast<double>();
-}
-
 inline void Evaluator::compute_G(Eigen::Vector3d p, Eigen::Vector3d xMean, std::vector<int> neighbors, Eigen::Matrix3d &G)
 {
     const double invH = 1/SmoothFactor;
@@ -517,8 +467,7 @@ inline void Evaluator::compute_G(Eigen::Vector3d p, Eigen::Vector3d xMean, std::
 inline void Evaluator::compute_Gs_xMeans()
 {
     const double invH = 1.0;
-    unsigned int splash_cnt_total = 0, cnt1 = 0, cnt2 = 0;
-// #pragma omp parallel for schedule(static, OMP_THREADS_NUM) 
+#pragma omp parallel for
     for (int pIdx = 0; pIdx < constructor->getGlobalParticlesNum(); pIdx++)
     {
         std::vector<int> tempNeighbors;
@@ -536,8 +485,6 @@ inline void Evaluator::compute_Gs_xMeans()
         {
             G = Eigen::DiagonalMatrix<double, 3>(invH, invH, invH);
             GlobalSplash[pIdx] = 1;
-            splash_cnt_total++;
-            cnt1++;
         }
 
         compute_xMeans(pIdx, tempNeighbors, neighbors, closerNeigbors, xMean);
@@ -546,8 +493,6 @@ inline void Evaluator::compute_Gs_xMeans()
         {
             G = Eigen::DiagonalMatrix<double, 3>(invH, invH, invH);
             GlobalSplash[pIdx] = 1;
-            splash_cnt_total++;
-            cnt2++;
         } 
         else
         {
@@ -558,8 +503,6 @@ inline void Evaluator::compute_Gs_xMeans()
         GlobalGs[pIdx] = Eigen::Matrix3d(G);
         GlobalDeterminant[pIdx] = G.determinant();
     }
-
-    std::cout << "total: " << splash_cnt_total << ", " << cnt1 << ", " << cnt2 << std::endl;
 }
 
 inline double Evaluator::wij(double d, double r)

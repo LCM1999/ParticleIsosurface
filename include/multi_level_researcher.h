@@ -27,7 +27,6 @@ public:
     inline double getAvgRadius() {return avgRadius;}
     inline double getParticlesNum() {return particlesNum;}
 
-
     void GetNeighbors(const Eigen::Vector3d& pos, std::vector<int>& neighbors);
     void GetInBoxParticles(const Eigen::Vector3d& box1, const Eigen::Vector3d& box2, std::vector<int>& insides);
 };

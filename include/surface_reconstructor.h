@@ -82,7 +82,6 @@ protected:
     // Method for CSV mode
     void genIsoOurs();
     void checkEmptyAndCalcCurv(TNode* tnode, bool& empty, double& curv, double& min_radius);
-    void eval(TNode* tnode);
     void beforeSampleEval(TNode* tnode, double& curv, double& min_radius, bool& empty);
     void afterSampleEval(
         TNode* tnode, double& curv, double& min_radius, double* sample_points, double* sample_grads);
@@ -94,7 +93,7 @@ public:
         std::vector<double>* radiuses, 
         Mesh* mesh, 
         double radius, 
-        double flatness,
+        double iso_factor,
         double inf_factor);
 
     ~SurfReconstructor() {};
