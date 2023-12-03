@@ -74,27 +74,39 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3d>* particles, 
 void MultiLevelSearcher::GetNeighbors(const Eigen::Vector3d& pos, std::vector<int>& neighbors)
 {
     std::vector<int> subNeighbors;
-    for (size_t searcherId = 0; searcherId < searchers.size(); searcherId++)
+    size_t sIndexId = 0, searcherId = 0;
+    for (sIndexId = 0; sIndexId < sortedIndex.size(); sIndexId++)
     {
+        if (sortedIndex[sIndexId].empty())
+        {
+            continue;
+        }
         subNeighbors.clear();
         searchers[searcherId]->GetPIdxList(pos, subNeighbors);
         for (size_t nId = 0; nId < subNeighbors.size(); nId++)
         {
-            neighbors.push_back(sortedIndex[searcherId][subNeighbors[nId]]);
+            neighbors.push_back(sortedIndex[sIndexId][subNeighbors[nId]]);
         }
+        searcherId++;
     }
 }
 
 void MultiLevelSearcher::GetInBoxParticles(const Eigen::Vector3d& box1, const Eigen::Vector3d& box2, std::vector<int>& insides)
 {
     std::vector<int> subInsides;
-    for (size_t searcherId = 0; searcherId < searchers.size(); searcherId++)
+    size_t sIndexId = 0, searcherId = 0;
+    for (sIndexId = 0; sIndexId < sortedIndex.size(); sIndexId++)
     {
+        if (sortedIndex[sIndexId].empty())
+        {
+            continue;
+        }
         subInsides.clear();
         searchers[searcherId]->GetInBoxParticles(box1, box2, subInsides);
         for (size_t nId = 0; nId < subInsides.size(); nId++)
         {
-            insides.push_back(sortedIndex[searcherId][subInsides[nId]]);
+            insides.push_back(sortedIndex[sIndexId][subInsides[nId]]);
         }
+        searcherId++;
     }
 }

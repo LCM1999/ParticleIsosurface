@@ -126,7 +126,7 @@ void loadConfigJson(std::string dataPath)
         }
         if (readInJSON.contains("GEN_SPLASH"))
         {
-            CALC_P_NORMAL = readInJSON.at("GEN_SPLASH");
+            GEN_SPLASH = readInJSON.at("GEN_SPLASH");
         }
         if (readInJSON.contains("NEED_RECORD"))
         {
@@ -317,15 +317,7 @@ void run(std::string dataDirPath, std::string outPath)
         {
             std::filesystem::create_directories(outPath);
         }
-        std::cout << "Output path: " << outPath + "/" + output_name + ".ply"<< std::endl;
-        // std::string timestamp = frame.substr(frame.find_last_of('_') + 1, frame.size() - frame.find_last_of('.') + frame.find_last_of('_'));
-        // std::string int_part = timestamp.substr(0, std::distance(timestamp.begin(), std::find(timestamp.begin(), timestamp.end(), '.')));
-        // std::string double_part = "";
-        // if (timestamp.find('.') != timestamp.npos)
-        // {
-        //     double_part = timestamp.substr(std::distance(timestamp.begin(), std::find(timestamp.begin(), timestamp.end(), '.')) + 1, timestamp.size());
-        // }
-        // output_name += std::string(6 - int_part.size(), '0') + int_part + double_part + std::string(6 - double_part.size(), '0');
+        std::cout << "Output path: " << outPath + "/" + output_name + "." + OUTPUT_TYPE<< std::endl;
         try
         {
             if ("ply" == OUTPUT_TYPE || "PLY" == OUTPUT_TYPE)
@@ -393,15 +385,15 @@ int main(int argc, char **argv)
     case 1:
     default:
         dataDirPath =
-        "E:/data/multiR/mr_csv";
+        // "E:/data/multiR/mr_csv";
         // "E:/data/vtk/csv";
         // "E:/data/vtk_11/vtk/oil/h5";
-        // "C:/Users/11379/Desktop/liu";
+        "C:/Users/11379/Desktop/liu";
         outPath = 
-        "E:/data/multiR/mr_csv/out";
+        // "E:/data/multiR/mr_csv/out";
         // "E:/data/vtk/csv/out";
         // "E:/data/vtk_11/vtk/oil/out";
-        // "C:/Users/11379/Desktop/liu/out";
+        "C:/Users/11379/Desktop/liu/out";
         run(dataDirPath, outPath);
         break;
     }
