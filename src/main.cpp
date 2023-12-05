@@ -5,7 +5,7 @@
 #include <regex>
 
 #include "global.h"
-#include "hdf5Utils.hpp"
+// #include "hdf5Utils.hpp"
 #include "iso_common.h"
 #include "iso_method_ours.h"
 #include "json.hpp"
@@ -291,16 +291,20 @@ void run(std::string dataDirPath, std::string outPath)
             loadParticlesFromCSV(dataPath, particles, radiuses);
             break;
         case 1:
-            readShonDyParticleData(dataPath, particles, radiuses);
-            if (abs(*std::max_element(radiuses->begin(), radiuses->end()) - *std::min_element(radiuses->begin(), radiuses->end())) < 1e-7)
-            {
-                IS_CONST_RADIUS = true;
-                RADIUS = radiuses->at(0);
-            }
+            // readShonDyParticleData(dataPath, particles, radiuses);
+
             break;
         default:
             printf("ERROR: Unknown DATA TYPE;");
             exit(1);
+        }
+        if (!IS_CONST_RADIUS)
+        {
+            if (abs(*std::max_element(radiuses->begin(), radiuses->end()) - *std::min_element(radiuses->begin(), radiuses->end())) < 1e-7)
+            {
+                    IS_CONST_RADIUS = true;
+                    RADIUS = radiuses->at(0);
+            }            
         }
         printf("Particles Number = %zd\n", particles.size());
         SurfReconstructor* constructor = new SurfReconstructor(particles, radiuses, mesh, RADIUS, ISO_FACTOR, SMOOTH_FACTOR);

@@ -19,6 +19,7 @@ Evaluator::Evaluator(SurfReconstructor* surf_constructor,
         GlobalInflunce2 = new std::vector<double>(GlobalRadius->size());
         GlobalSigma = new std::vector<double>(GlobalRadius->size());
         double influnce;
+#pragma omp parallel for
         for (int i = 0; i < GlobalRadius->size(); i++)
         {
             influnce = GlobalRadius->at(i) * SmoothFactor;
@@ -384,7 +385,7 @@ inline void Evaluator::compute_xMeans(int pIdx, std::vector<int> temp_neighbors,
         if (nIdx == pIdx)
             continue;
         nR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(nIdx);
-        nD = SmoothFactor * nR * 1.3;
+        nD = SmoothFactor * nR * 1.4;
         nD2 = nD * nD;
         nI = nR * NeighborFactor;
         nI2 = nI * nI;
