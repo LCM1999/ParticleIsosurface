@@ -35,7 +35,6 @@ private:
     int _MIN_NEIGHBORS_NUM = 25;
     int _SPARSE_NEIGHBORS_NUM = 16;
 
-    bool _USE_ANI = true;
     bool _USE_XMEAN = true;
     double _XMEAN_DELTA = 0.0;
 
@@ -113,7 +112,6 @@ public:
     inline double getFlatness() {return _FLATNESS;}
     inline int getMinNeighborsNum() {return _MIN_NEIGHBORS_NUM;}
     inline int getSparseNeighborsNum() {return _SPARSE_NEIGHBORS_NUM;};
-    inline bool getUseAni() {return _USE_ANI;}
     inline bool getUseXMean() {return _USE_XMEAN;}
     inline double getXMeanDelta() {return _XMEAN_DELTA;}
     inline double getTolerance() {return _TOLERANCE;}

@@ -19,6 +19,7 @@ Evaluator::Evaluator(SurfReconstructor* surf_constructor,
         GlobalInflunce2 = new std::vector<double>(GlobalRadius->size());
         GlobalSigma = new std::vector<double>(GlobalRadius->size());
         double influnce;
+#pragma omp parallel for
         for (int i = 0; i < GlobalRadius->size(); i++)
         {
             influnce = GlobalRadius->at(i) * SmoothFactor;
@@ -44,12 +45,13 @@ Evaluator::Evaluator(SurfReconstructor* surf_constructor,
     GlobalSplash.clear();
     GlobalSplash.resize(constructor->getGlobalParticlesNum(), 0);
     GlobalxMeans = new Eigen::Vector3d[constructor->getGlobalParticlesNum()];
-    GlobalGs = new Eigen::Matrix3d[constructor->getGlobalParticlesNum()];
-    GlobalDeterminant.resize(constructor->getGlobalParticlesNum());
-	if (constructor->getUseAni())
-	{
-        compute_Gs_xMeans();
-	}
+    if (USE_ANI)
+    {
+        GlobalGs = new Eigen::Matrix3d[constructor->getGlobalParticlesNum()];
+        GlobalDeterminant.resize(constructor->getGlobalParticlesNum());
+    }
+    
+    compute_Gs_xMeans();
 }
 
 void Evaluator::SingleEval(const Eigen::Vector3d& pos, double& scalar)
@@ -71,7 +73,12 @@ void Evaluator::SingleEval(const Eigen::Vector3d& pos, double& scalar)
         }
 
         diff = pos - GlobalxMeans[pIdx];
-        scalar += AnisotropicInterpolate(pIdx, diff);
+        if (USE_ANI)
+        {
+            scalar += AnisotropicInterpolate(pIdx, diff);
+        } else {
+            scalar += IsotropicInterpolate(pIdx, diff.squaredNorm());
+        }
     }
     scalar = constructor->getIsoValue() - ((scalar - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
 }
@@ -91,7 +98,7 @@ void Evaluator::SingleEvalWithGrad(const Eigen::Vector3d& pos, double& scalar, E
 	double temp_scalars[6] = {0.0f};
     double sample_radius = 0.0f;
 
-    if (constructor->getUseAni())
+    if (USE_ANI)
     {
         AnisotropicEval(pos, info, temp_scalars, sample_radius);
     }
@@ -131,42 +138,26 @@ void Evaluator::GridEval(
     {
         Eigen::Vector4d p(sample_points[i*4 + 0], sample_points[i*4 + 1], sample_points[i*4 + 2], sample_points[i*4 + 3]);
         double scalar = 0.0f;
-        if (constructor->getUseAni())
+        std::vector<int> neighbors;
+        if (IS_CONST_RADIUS)
         {
-            std::vector<int> neighbors;
-            if (IS_CONST_RADIUS)
+            constructor->getHashGrid()->GetPIdxList(p.head(3), neighbors);
+        } else {
+            constructor->getSearcher()->GetNeighbors(p.head(3), neighbors);
+        }
+        if (!neighbors.empty())
+        {
+            for (const int pIdx : neighbors)
             {
-                constructor->getHashGrid()->GetPIdxList(p.head(3), neighbors);
-            } else {
-                constructor->getSearcher()->GetNeighbors(p.head(3), neighbors);
-            }
-            if (!neighbors.empty())
-            {
-                for (const int pIdx : neighbors)
+                if (USE_ANI)
                 {
                     scalar += AnisotropicInterpolate(pIdx, p.head(3) - GlobalxMeans[pIdx]);
+                } else {
+                    scalar += IsotropicInterpolate(pIdx, (p.head(3) - GlobalxMeans[pIdx]).squaredNorm());
                 }
             }
         }
-        else
-        {
-            std::vector<int> neighbors;
-            if (IS_CONST_RADIUS)
-            {
-                constructor->getHashGrid()->GetPIdxList(p.head(3), neighbors);
-            } else {
-                constructor->getSearcher()->GetNeighbors(p.head(3), neighbors);
-            }
-            if (!neighbors.empty())
-            {
-                double d2;
-                for (int pIdx : neighbors)
-                {
-                    d2 = (p.head(3) - GlobalPoses->at(pIdx)).squaredNorm();
-                    scalar += IsotropicInterpolate(pIdx, d2);
-                }
-            }
-        }
+
         scalar = constructor->getIsoValue() - ((scalar - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
         sample_points[i*4 + 3] = scalar;
         origin_sign = (sample_points[3] >= 0);
@@ -354,13 +345,11 @@ inline double Evaluator::general_kernel(double d2, double h2, double sigma)
 
 inline double Evaluator::IsotropicInterpolate(const int pIdx, const double d2)
 {
-    double radius = (IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx));
-    double influnce = radius * SmoothFactor;
-    double influnce2 = influnce * influnce;
-	if (d2 > influnce2)
-		return 0.0f;
-	double kernel_value = 315 / (64 * pow(influnce, 9)) * inv_pi * pow((influnce2 - d2), 3);
-	return pow(radius, 3) * kernel_value;
+    double k_value = general_kernel(
+        d2, 
+        (IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2->at(pIdx)), 
+        (IS_CONST_RADIUS ? Sigma : GlobalSigma->at(pIdx)));
+	return (IS_CONST_RADIUS ? Radius3 : GlobalRadius3->at(pIdx)) * k_value;
 }
 
 inline double Evaluator::AnisotropicInterpolate(const int pIdx, const Eigen::Vector3d& diff)
@@ -496,12 +485,18 @@ inline void Evaluator::compute_Gs_xMeans()
         } 
         else
         {
-            compute_G(GlobalPoses->at(pIdx), xMean, neighbors, G);
+            if (USE_ANI)
+            {
+                compute_G(GlobalPoses->at(pIdx), xMean, neighbors, G);
+            }
         }
-
+        
         GlobalxMeans[pIdx] = Eigen::Vector3d(xMean);
-        GlobalGs[pIdx] = Eigen::Matrix3d(G);
-        GlobalDeterminant[pIdx] = G.determinant();
+        if (USE_ANI)
+        {
+            GlobalGs[pIdx] = Eigen::Matrix3d(G);
+            GlobalDeterminant[pIdx] = G.determinant();
+        }
     }
 }
 

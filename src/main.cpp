@@ -24,6 +24,7 @@ int OMP_USE_DYNAMIC_THREADS = 0;
 int OMP_THREADS_NUM = 16;
 
 bool IS_CONST_RADIUS = false;
+bool USE_ANI = true;
 
 // variants for test
 short DATA_TYPE = 0;    // CSV:0, H5: 1
@@ -120,6 +121,10 @@ void loadConfigJson(std::string dataPath)
         inJSONFile >> readInJSON;
         inJSONFile.close();
         DATA_TYPE = readInJSON.at("DATA_TYPE");
+        if (readInJSON.contains("USE_ANI"))
+        {
+            USE_ANI = readInJSON.at("USE_ANI");
+        }
         if (readInJSON.contains("CALC_P_NORMAL"))
         {
             CALC_P_NORMAL = readInJSON.at("CALC_P_NORMAL");
