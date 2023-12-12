@@ -297,7 +297,7 @@ struct dual_grid
 
 struct dual_cell
 {
-	std::array<Eigen::Vector3d, 12> vertices;
+	std::array<Eigen::Vector3f, 12> vertices;
 	std::vector<std::array<int, 3>> faces;
 };
 

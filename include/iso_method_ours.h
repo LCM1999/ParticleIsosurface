@@ -8,18 +8,18 @@
 
 class SurfReconstructor;
 
-typedef Eigen::Vector<double, 5> Vector5d;
-typedef Eigen::Vector<double, 5> Vector5d;
-typedef Eigen::Vector<double, 6> Vector6d;
-typedef Eigen::Vector<double, 6> Vector6d;
-typedef Eigen::Vector<double, 7> Vector7d;
-typedef Eigen::Vector<double, 7> Vector7d;
-typedef Eigen::Matrix<double, 5, 5> Matrix5d;
-typedef Eigen::Matrix<double, 5, 5> Matrix5d;
-typedef Eigen::Matrix<double, 6, 6> Matrix6d;
-typedef Eigen::Matrix<double, 6, 6> Matrix6d;
-typedef Eigen::Matrix<double, 7, 7> Matrix7d;
-typedef Eigen::Matrix<double, 7, 7> Matrix7d;
+typedef Eigen::Vector<float, 5> Vector5f;
+typedef Eigen::Vector<float, 5> Vector5f;
+typedef Eigen::Vector<float, 6> Vector6f;
+typedef Eigen::Vector<float, 6> Vector6f;
+typedef Eigen::Vector<float, 7> Vector7f;
+typedef Eigen::Vector<float, 7> Vector7f;
+typedef Eigen::Matrix<float, 5, 5> Matrix5f;
+typedef Eigen::Matrix<float, 5, 5> Matrix5f;
+typedef Eigen::Matrix<float, 6, 6> Matrix6f;
+typedef Eigen::Matrix<float, 6, 6> Matrix6f;
+typedef Eigen::Matrix<float, 7, 7> Matrix7f;
+typedef Eigen::Matrix<float, 7, 7> Matrix7f;
 
 extern int tree_cells;
 
@@ -43,9 +43,9 @@ struct TNode
 
 	SurfReconstructor* constructor;
 
-	Eigen::Vector3d center;
-	double half_length;
-	Eigen::Vector4d node = Eigen::Vector4d::Zero();
+	Eigen::Vector3f center;
+	float half_length;
+	Eigen::Vector4f node = Eigen::Vector4f::Zero();
 
 	char depth = 0;
 	char type;
@@ -53,7 +53,7 @@ struct TNode
 
 	TNode *children[8];
 
-	bool changeSignDMC(Eigen::Vector4d* verts);
+	bool changeSignDMC(Eigen::Vector4f* verts);
 
 	int getWeight()
 	{
@@ -85,7 +85,7 @@ struct TNode
 		return type == LEAF || type == EMPTY;
 	}
 
-	bool contain(const Eigen::Vector3d& pos)
+	bool contain(const Eigen::Vector3f& pos)
 	{
 		if (std::abs(pos[0] - center[0]) <= half_length &&
 			std::abs(pos[1] - center[1]) <= half_length &&
@@ -103,18 +103,18 @@ struct TNode
 		return t * t;
 	}
 
-	double calcErrorDMC(
-		Eigen::Vector4d p, double* verts, double* verts_grad, const int oversample);
+	float calcErrorDMC(
+		Eigen::Vector4f p, float* verts, float* verts_grad, const int oversample);
 
-	void vertAll(double& curv, bool& signchange, double& qef_error, double& sample);
+	void vertAll(float& curv, bool& signchange, float& qef_error, float& sample);
 
-	void GenerateSampling(double* sample_points);
+	void GenerateSampling(float* sample_points);
 
 	void NodeSampling(
-		double& curv, bool& signchange, double cellsize,
-		double* sample_points, double* sample_grads);
+		float& curv, bool& signchange, float cellsize,
+		float* sample_points, float* sample_grads);
 
-	void NodeCalcNode(double* sample_points, double* sample_grads, double cellsize);
+	void NodeCalcNode(float* sample_points, float* sample_grads, float cellsize);
 
 	// void NodeFeatureCalc();
 
@@ -133,5 +133,4 @@ struct TNode
 		}
 		return count;
 	}
-
 };

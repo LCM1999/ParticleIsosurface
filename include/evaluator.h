@@ -18,57 +18,57 @@ public:
 	~Evaluator();
 
     SurfReconstructor* constructor;
-	std::vector<Eigen::Vector3d>* GlobalPoses;
-    std::vector<double>* GlobalRadius;
-    std::vector<double>* GlobalRadius2;
-    std::vector<double>* GlobalRadius3;
-    std::vector<double>* GlobalInflunce2;
-    std::vector<double>* GlobalSigma;
+	std::vector<Eigen::Vector3f>* GlobalPoses;
+    std::vector<float>* GlobalRadius;
+    std::vector<float> GlobalRadius2;
+    std::vector<float> GlobalRadius3;
+    std::vector<float> GlobalInflunce2;
+    std::vector<float> GlobalSigma;
 
-    double Radius = 0;
-    double Radius2 = 0;
-    double Radius3 = 0;
-    double Influnce2 = 0;
-    double Sigma = 0;
+    float Radius = 0;
+    float Radius2 = 0;
+    float Radius3 = 0;
+    float Influnce2 = 0;
+    float Sigma = 0;
     std::vector<std::uint8_t> GlobalSplash;
-    std::vector<Eigen::Vector3d> PariclesNormals;
-	Eigen::Vector3d* GlobalxMeans;
-    Eigen::Matrix3d* GlobalGs;
-    std::vector<double> GlobalDeterminant;
+    std::vector<Eigen::Vector3f> PariclesNormals;
+	std::vector<Eigen::Vector3f> GlobalxMeans;
+    std::vector<Eigen::Matrix3f> GlobalGs;
+    std::vector<float> GlobalDeterminant;
 
-	Evaluator(  SurfReconstructor* surf_constructor, std::vector<Eigen::Vector3d>* global_particles, 
-                std::vector<double>* radiuses,
-                double radius);
+	Evaluator(  SurfReconstructor* surf_constructor, std::vector<Eigen::Vector3f>* global_particles, 
+                std::vector<float>* radiuses,
+                float radius);
 
-	void SingleEval(const Eigen::Vector3d& pos, double& scalar);
-    void SingleEvalWithGrad(const Eigen::Vector3d& pos, double& scalar, Eigen::Vector3d& gradient, bool use_normalize = true, bool use_signed = true, bool grad_normalize = true);
+	void SingleEval(const Eigen::Vector3f& pos, float& scalar);
+    void SingleEvalWithGrad(const Eigen::Vector3f& pos, float& scalar, Eigen::Vector3f& gradient, bool use_normalize = true, bool use_signed = true, bool grad_normalize = true);
     void GridEval(
-        double* sample_points, double* field_gradients, double cellsize, 
+        float* sample_points, float* field_gradients, float cellsize, 
         bool& signchange, int oversample, bool grad_normalize = true);
 
     bool CheckSplash(const int& pIdx);
-    double CalculateMaxScalarConstR();
-    double CalculateMaxScalarVarR();
-    double RecommendIsoValueConstR(const double iso_factor);
-    double RecommendIsoValueVarR(const double iso_factor);
+    float CalculateMaxScalarConstR();
+    float CalculateMaxScalarVarR();
+    float RecommendIsoValueConstR(const float iso_factor);
+    float RecommendIsoValueVarR(const float iso_factor);
     void CalcParticlesNormal();
 private:
-    const double sqrt3 = 1.7320508075688772935274463415059;
-    const double sqrt11 = 3.3166247903553998491149327366707;
-    const double inv_pi = 0.31830988618379067153776752674503;
+    const float sqrt3 = 1.7320508075688772935274463415059;
+    const float sqrt11 = 3.3166247903553998491149327366707;
+    const float inv_pi = 0.31830988618379067153776752674503;
 
-    double NeighborFactor;
-    double SmoothFactor;
+    float NeighborFactor;
+    float SmoothFactor;
 
-    double general_kernel(double d2, double h2, double sigma);
+    float general_kernel(float d2, float h2, float sigma);
 
-	double IsotropicInterpolate(const int pIdx, const double d);
-	double AnisotropicInterpolate(const int pIdx, const Eigen::Vector3d& diff);
+	float IsotropicInterpolate(const int pIdx, const float d);
+	float AnisotropicInterpolate(const int pIdx, const Eigen::Vector3f& diff);
 	void compute_Gs_xMeans();
-    void compute_xMeans(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Eigen::Vector3d &xMean);
-    void compute_G(Eigen::Vector3d p, Eigen::Vector3d xMean, std::vector<int> neighbors, Eigen::Matrix3d &G);
-	double wij(double d, double r);
+    void compute_xMeans(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Eigen::Vector3f &xMean);
+    void compute_G(Eigen::Vector3f p, Eigen::Vector3f xMean, std::vector<int> neighbors, Eigen::Matrix3f &G);
+	float wij(float d, float r);
 
-    void IsotropicEval(const Eigen::Vector3d& pos, double& info, double* temp_scalars, double& sample_radius);
-    void AnisotropicEval(const Eigen::Vector3d& pos, double& info, double* temp_scalars, double& sample_radius);
+    void IsotropicEval(const Eigen::Vector3f& pos, float& info, float* temp_scalars, float& sample_radius);
+    void AnisotropicEval(const Eigen::Vector3f& pos, float& info, float* temp_scalars, float& sample_radius);
 };

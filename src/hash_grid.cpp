@@ -1,7 +1,7 @@
 #include "iso_common.h"
 #include "hash_grid.h"
 
-HashGrid::HashGrid(std::vector<Eigen::Vector3d>* particles, double* bounding, double radius, double inf_factor)
+HashGrid::HashGrid(std::vector<Eigen::Vector3f>* particles, float* bounding, float radius, float inf_factor)
 {
 	assert(IS_CONST_RADIUS);
 	Particles = particles;
@@ -11,8 +11,8 @@ HashGrid::HashGrid(std::vector<Eigen::Vector3d>* particles, double* bounding, do
 	CellSize = radius * inf_factor + 2 * radius;
 
 	int i = 0;
-	double length = 0.0;
-	double center = 0.0;
+	float length = 0.0;
+	float center = 0.0;
 
 	for (i = 0; i < 3; i++)
 	{
@@ -33,8 +33,8 @@ HashGrid::HashGrid(std::vector<Eigen::Vector3d>* particles, double* bounding, do
 	HashList.clear();
 }
 
-HashGrid::HashGrid(std::vector<Eigen::Vector3d>* particles, std::vector<double>* radiuses, 
-	std::vector<unsigned int>& pIndexes, double* bounding, unsigned int radiusId, double inf_factor)
+HashGrid::HashGrid(std::vector<Eigen::Vector3f>* particles, std::vector<float>* radiuses, 
+	std::vector<unsigned int>& pIndexes, float* bounding, unsigned int radiusId, float inf_factor)
 {
 	assert(!IS_CONST_RADIUS);
 	Particles = particles;
@@ -46,8 +46,8 @@ HashGrid::HashGrid(std::vector<Eigen::Vector3d>* particles, std::vector<double>*
 	CellSize = Radius * inf_factor + 2 * Radius;
 
 	int i = 0;
-	double length = 0.0;
-	double center = 0.0;
+	float length = 0.0;
+	float center = 0.0;
 
 	for (i = 0; i < 3; i++)
 	{
@@ -121,7 +121,7 @@ inline void HashGrid::FindStartEnd()
 	}
 }
 
-void HashGrid::CalcXYZIdx(const Eigen::Vector3d& pos, Eigen::Vector3i& xyzIdx)
+void HashGrid::CalcXYZIdx(const Eigen::Vector3f& pos, Eigen::Vector3i& xyzIdx)
 {
 	xyzIdx.setZero();
 	for (int i = 0; i < 3; i++)
@@ -155,7 +155,7 @@ void HashGrid::GetInCellList(const long long hash, std::vector<int>& pIdxList)
 }
 
 void HashGrid::GetInBoxParticles(
-	const Eigen::Vector3d& box1, const Eigen::Vector3d& box2, 
+	const Eigen::Vector3f& box1, const Eigen::Vector3f& box2, 
 	std::vector<int>& insides)
 {
 	Eigen::Vector3i minXyzIdx, maxXyzIdx;
@@ -177,7 +177,7 @@ void HashGrid::GetInBoxParticles(
     }
 }
 
-void HashGrid::GetPIdxList(const Eigen::Vector3d& pos, std::vector<int>& pIdxList)
+void HashGrid::GetPIdxList(const Eigen::Vector3f& pos, std::vector<int>& pIdxList)
 {
 	pIdxList.clear();
 	Eigen::Vector3i xyzIdx;

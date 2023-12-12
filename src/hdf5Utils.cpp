@@ -47,55 +47,6 @@ bool readShonDyParticleXDMF(const std::string dir_path,
     return true;
 }
 
-bool readShonDyParticleData(const std::string &fileName,
-                            std::vector<Eigen::Vector3d> &positions,
-                            std::vector<double>* radiuses)
-{
-    if (!std::filesystem::exists(fileName))
-    {
-        std::cout << "Error: cannot find hdf5 file: " << fileName << std::endl;
-        return false;
-    }
-
-    // open file
-    auto hdf5FileID = H5Fopen(fileName.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
-    if (hdf5FileID < 0)
-    {
-        std::cout << "Error: cannot read hdf5 file: " << fileName << std::endl;
-        return false;
-    }
-
-    // read particle positions
-    auto nodeSize = size(hdf5FileID, "position");
-    const int numberOfNodes = nodeSize / 3;
-    std::vector<double> nodes(nodeSize);
-    std::vector<double> radiusesDouble(numberOfNodes);
-    readDouble(hdf5FileID, "position", nodes);
-    positions.resize(numberOfNodes);
-
-    // read particle densities
-    if (radiuses != nullptr)
-    {
-        readDouble(hdf5FileID, "particleRadius", radiusesDouble);
-        radiuses->resize(numberOfNodes);
-    }
-    
-    // convert double data to double
-    for (int i = 0; i < numberOfNodes; i++)
-    {
-        positions[i] =
-            Eigen::Vector3d(nodes[3 * i], nodes[3 * i + 1], nodes[3 * i + 2]);
-        if (radiuses != nullptr)
-        {
-            (*radiuses)[i] = radiusesDouble[i];
-        }
-    }
-
-    // close file
-    H5Fclose(hdf5FileID);
-    return true;
-}
-
 void readInt(hid_t fileID, const std::string &vecLocation,
              std::vector<int> &readVec)
 {

@@ -56,8 +56,8 @@ void VisitorExtract::calc_vertices()
 			
 			if ( sign(v1.node) != sign(v2.node))
 			{
-				Eigen::Vector4d tmpv1 = v1.node, tmpv2 = v2.node, tmpv = Eigen::Vector4d::Zero();
-				double ratio;
+				Eigen::Vector4f tmpv1 = v1.node, tmpv2 = v2.node, tmpv = Eigen::Vector4f::Zero();
+				float ratio;
 				while ((tmpv1 - tmpv2).head(3).norm() >
 				(IS_CONST_RADIUS ? constructor->getConstRadius(): constructor->getSearcher()->getMinRadius()) / 2)
 				{
@@ -78,7 +78,7 @@ void VisitorExtract::calc_vertices()
 						break;
 					}
 				}
-				ratio = invlerp(tmpv1[3], tmpv2[3], 0.0);
+				ratio = invlerp(tmpv1[3], tmpv2[3], 0.0f);
 				if (ratio < constructor->getRatioTolerance())
 					tmpv = tmpv1;
 				else if (ratio > (1 - constructor->getRatioTolerance()))
@@ -261,7 +261,7 @@ bool VisitorExtract::on_vert(
 		}
 		return false;
 
-		// std::array<Eigen::Vector3d, 12> points;
+		// std::array<Eigen::Vector3f, 12> points;
 		
 		// auto calculate_point = [&](int e_index, int v_index1, int v_index2) {
 		// 	auto& v1 = *trans_vertices[v_index1];
@@ -269,8 +269,8 @@ bool VisitorExtract::on_vert(
 			
 		// 	if ((v1.node[3] > 0 ? 1 : -1) != (v2.node[3] > 0 ? 1 : -1))
 		// 	{
-		// 		Eigen::Vector4d tmpv1 = v1.node, tmpv2 = v2.node, tmpv = Eigen::Vector4d::Zero();
-		// 		double ratio;
+		// 		Eigen::Vector4f tmpv1 = v1.node, tmpv2 = v2.node, tmpv = Eigen::Vector4f::Zero();
+		// 		float ratio;
 		// 		while ((tmpv1 - tmpv2).head(3).norm() >
 		// 		(IS_CONST_RADIUS ? constructor->getConstRadius(): constructor->getSearcher()->getMinRadius()) / 2)
 		// 		{

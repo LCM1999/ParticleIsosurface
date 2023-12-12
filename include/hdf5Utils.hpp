@@ -12,9 +12,9 @@ bool readShonDyParticleXDMF(const std::string dir_path,
                             std::vector<std::string> &files,
                             const int target_frame);
 
-bool readShonDyParticleData(const std::string &fileName,
-                            std::vector<Eigen::Vector3d> &positions,
-                            std::vector<double>* radiuses);
+// bool readShonDyParticleData(const std::string &fileName,
+//                             std::vector<Eigen::Vector3d> &positions,
+//                             std::vector<double>* radiuses);
 
 void readInt(hid_t fileID, const std::string &veclLocation,
              std::vector<int> &readVec);

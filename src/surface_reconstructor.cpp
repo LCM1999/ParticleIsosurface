@@ -1,6 +1,5 @@
 #include <queue>
 #include <omp.h>
-//#include <metis.h>
 
 #include "surface_reconstructor.h"
 #include "hash_grid.h"
@@ -13,9 +12,9 @@
 
 #define DEFAULT_INF_FACTOR 4.0
 
-SurfReconstructor::SurfReconstructor(std::vector<Eigen::Vector3d>& particles, 
-std::vector<double>* radiuses, Mesh* mesh, 
-double radius, double iso_factor, double smooth_factor)
+SurfReconstructor::SurfReconstructor(std::vector<Eigen::Vector3f>& particles, 
+std::vector<float>& radiuses, Mesh* mesh, 
+float radius, float iso_factor, float smooth_factor)
 {
 	_GlobalParticles = particles;
 	_GlobalParticlesNum = _GlobalParticles.size();
@@ -36,7 +35,7 @@ inline void SurfReconstructor::loadRootBox()
 {
 	_BoundingBox[0] = _BoundingBox[2] = _BoundingBox[4] = FLT_MAX;
 	_BoundingBox[1] = _BoundingBox[3] = _BoundingBox[5] = -FLT_MAX;
-	for (const Eigen::Vector3d& p: _GlobalParticles)
+	for (const Eigen::Vector3f& p: _GlobalParticles)
 	{
 		if (p.x() < _BoundingBox[0]) _BoundingBox[0] = p.x();
 		if (p.x() > _BoundingBox[1]) _BoundingBox[1] = p.x();
@@ -46,17 +45,17 @@ inline void SurfReconstructor::loadRootBox()
 		if (p.z() > _BoundingBox[5]) _BoundingBox[5] = p.z();
 	}
 	// _BoundingBox[0] = (*std::min_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	// [&] (Eigen::Vector3d& a, Eigen::Vector3d& b) { return a.x() < b.x(); })).x();
+	// [&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.x() < b.x(); })).x();
 	// _BoundingBox[1] = (*std::max_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	// [&] (Eigen::Vector3d& a, Eigen::Vector3d& b) { return a.x() < b.x(); })).x();
+	// [&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.x() < b.x(); })).x();
 	// _BoundingBox[2] = (*std::min_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	// [&] (Eigen::Vector3d& a, Eigen::Vector3d& b) { return a.y() < b.y(); })).y();
+	// [&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.y() < b.y(); })).y();
 	// _BoundingBox[3] = (*std::max_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	// [&] (Eigen::Vector3d& a, Eigen::Vector3d& b) { return a.y() < b.y(); })).y();
+	// [&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.y() < b.y(); })).y();
 	// _BoundingBox[4] = (*std::min_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	// [&] (Eigen::Vector3d& a, Eigen::Vector3d& b) { return a.z() < b.z(); })).z();
+	// [&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.z() < b.z(); })).z();
 	// _BoundingBox[5] = (*std::max_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	// [&] (Eigen::Vector3d& a, Eigen::Vector3d& b) { return a.z() < b.z(); })).z();
+	// [&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.z() < b.z(); })).z();
 }
 
 void SurfReconstructor::shrinkBox()
@@ -107,8 +106,8 @@ void SurfReconstructor::shrinkBox()
 
 void SurfReconstructor::resizeRootBoxConstR()
 {
-    double maxLen, resizeLen;
-	double r = _RADIUS;
+    float maxLen, resizeLen;
+	float r = _RADIUS;
 	maxLen = (std::max)({ 
 		(_BoundingBox[1] - _BoundingBox[0]) , 
 		(_BoundingBox[3] - _BoundingBox[2]) , 
@@ -123,7 +122,7 @@ void SurfReconstructor::resizeRootBoxConstR()
 	_RootHalfLength = resizeLen / 2;
 	for (size_t i = 0; i < 3; i++)
 	{
-		double center = (_BoundingBox[i * 2] + _BoundingBox[i * 2 + 1]) / 2;
+		float center = (_BoundingBox[i * 2] + _BoundingBox[i * 2 + 1]) / 2;
 		_BoundingBox[i * 2] = center - _RootHalfLength;
 		_BoundingBox[i * 2 + 1] = center + _RootHalfLength;
 		_RootCenter[i] = center;
@@ -134,8 +133,8 @@ void SurfReconstructor::resizeRootBoxConstR()
 
 void SurfReconstructor::resizeRootBoxVarR()
 {
-	double maxLen, resizeLen;
-	double minR = _searcher->getMinRadius(), maxR = _searcher->getMaxRadius(), avgR = _searcher->getAvgRadius();
+	float maxLen, resizeLen;
+	float minR = _searcher->getMinRadius(), maxR = _searcher->getMaxRadius(), avgR = _searcher->getAvgRadius();
 	maxLen = (std::max)({ 
 		(_BoundingBox[1] - _BoundingBox[0]) , 
 		(_BoundingBox[3] - _BoundingBox[2]) , 
@@ -150,7 +149,7 @@ void SurfReconstructor::resizeRootBoxVarR()
 	_RootHalfLength = resizeLen / 2;
 	for (size_t i = 0; i < 3; i++)
 	{
-		double center = (_BoundingBox[i * 2] + _BoundingBox[i * 2 + 1]) / 2;
+		float center = (_BoundingBox[i * 2] + _BoundingBox[i * 2 + 1]) / 2;
 		_BoundingBox[i * 2] = center - _RootHalfLength;
 		_BoundingBox[i * 2 + 1] = center + _RootHalfLength;
 		_RootCenter[i] = center;
@@ -160,15 +159,15 @@ void SurfReconstructor::resizeRootBoxVarR()
 }
 
 
-void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, double& curv, double& min_radius)
+void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, unsigned char& empty, float& curv, float& min_radius)
 {
-	Eigen::Vector3d norms(0, 0, 0);
+	Eigen::Vector3f norms(0, 0, 0);
 	int area = 0;
 	std::vector<int> insides;
 	min_radius = IS_CONST_RADIUS ? _RADIUS : FLT_MAX;
-	const Eigen::Vector3d 
-	box1 = tnode->center - Eigen::Vector3d(tnode->half_length, tnode->half_length, tnode->half_length),
-	box2 = tnode->center + Eigen::Vector3d(tnode->half_length, tnode->half_length, tnode->half_length);
+	const Eigen::Vector3f 
+	box1 = tnode->center - Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length),
+	box2 = tnode->center + Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length);
 	if (IS_CONST_RADIUS)
 	{
 		_hashgrid->GetInBoxParticles(box1, box2, insides);
@@ -183,26 +182,26 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, double&
 		{
 			if (!_evaluator->CheckSplash(in))
 			{
-				if (_GlobalParticles[in].x() > (box1.x() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _SMOOTH_FACTOR)) && 
-					_GlobalParticles[in].x() < (box2.x() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _SMOOTH_FACTOR)) &&
-					_GlobalParticles[in].y() > (box1.y() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _SMOOTH_FACTOR)) && 
-					_GlobalParticles[in].y() < (box2.y() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _SMOOTH_FACTOR)) &&
-					_GlobalParticles[in].z() > (box1.z() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _SMOOTH_FACTOR)) && 
-					_GlobalParticles[in].z() < (box2.z() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses->at(in)) * _SMOOTH_FACTOR)))
+				if (_GlobalParticles[in].x() > (box1.x() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _SMOOTH_FACTOR)) && 
+					_GlobalParticles[in].x() < (box2.x() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _SMOOTH_FACTOR)) &&
+					_GlobalParticles[in].y() > (box1.y() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _SMOOTH_FACTOR)) && 
+					_GlobalParticles[in].y() < (box2.y() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _SMOOTH_FACTOR)) &&
+					_GlobalParticles[in].z() > (box1.z() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _SMOOTH_FACTOR)) && 
+					_GlobalParticles[in].z() < (box2.z() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _SMOOTH_FACTOR)))
 				{
 					if (CALC_P_NORMAL)
 					{
-						Eigen::Vector3d tempNorm = _evaluator->PariclesNormals[in];
-						if (tempNorm == Eigen::Vector3d(0, 0, 0))	{continue;}
+						Eigen::Vector3f tempNorm = _evaluator->PariclesNormals[in];
+						if (tempNorm == Eigen::Vector3f(0, 0, 0))	{continue;}
 						norms += tempNorm;
 						area++;
 					}
 					
 					if (!IS_CONST_RADIUS)
 					{
-						if (min_radius > _GlobalRadiuses->at(in))
+						if (min_radius > _GlobalRadiuses[in])
 						{
-							min_radius = _GlobalRadiuses->at(in);
+							min_radius = _GlobalRadiuses[in];
 						}
 					}
 					all_splash = false;
@@ -214,7 +213,7 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, bool& empty, double&
 	curv = (area == 0) ? 1.0 : (norms.norm() / area);
 }
 
-void SurfReconstructor::beforeSampleEval(TNode* tnode, double& curv, double& min_radius, bool& empty)
+void SurfReconstructor::beforeSampleEval(TNode* tnode, float& curv, float& min_radius, unsigned char& empty)
 {
 	switch (tnode->type)
 	{
@@ -228,7 +227,7 @@ void SurfReconstructor::beforeSampleEval(TNode* tnode, double& curv, double& min
 		checkEmptyAndCalcCurv(tnode, empty, curv, min_radius);
 		if (empty)
 		{
-			_evaluator->SingleEval((Eigen::Vector3d&)tnode->node, tnode->node[3]);
+			_evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3]);
 			tnode->type = EMPTY;
 			return;
 		}
@@ -240,12 +239,12 @@ void SurfReconstructor::beforeSampleEval(TNode* tnode, double& curv, double& min
 }
 
 void SurfReconstructor::afterSampleEval(
-	TNode* tnode, double& curv, double& min_radius, 
-	double* sample_points, double* sample_grads)
+	TNode* tnode, float& curv, float& min_radius, 
+	float* sample_points, float* sample_grads)
 {
 	bool isbig = (tnode->depth < _DEPTH_MIN);
 	bool signchange = false;
-	double cellsize = 2 * tnode->half_length;
+	float cellsize = 2 * tnode->half_length;
 
 	if (!isbig)
 	{
@@ -277,11 +276,7 @@ void SurfReconstructor::afterSampleEval(
 
 void SurfReconstructor::genIsoOurs()
 {
-    double t_start = get_time();
-
-	TNode* root;
-	Mesh* m = _OurMesh;
-	TNode* loaded_tree = nullptr;
+    float t_start = get_time();
 
 	auto sign = [&](unsigned int x)
 	{
@@ -291,24 +286,23 @@ void SurfReconstructor::genIsoOurs()
 	if (_STATE == 0)
 	{
 		printf("-= Calculating Tree Structure =-\n");
-		root = new TNode(this, 0);
-		root->center << _RootCenter[0], _RootCenter[1], _RootCenter[2];
-		root->node << _RootCenter[0], _RootCenter[1], _RootCenter[2], 0.0;
-		root->half_length = _RootHalfLength;
-		_OurRoot = root;
+		_OurRoot = new TNode(this, 0);
+		_OurRoot->center << _RootCenter[0], _RootCenter[1], _RootCenter[2];
+		_OurRoot->node << _RootCenter[0], _RootCenter[1], _RootCenter[2], 0.0;
+		_OurRoot->half_length = _RootHalfLength;
 	} else if (_STATE == 1) {
 		printf("-= Generate Surface =-\n");
-		double t_gen_mesh = get_time();
-		m->tris.reserve(1000000);
-		VisitorExtract v(this, m);
+		float t_gen_mesh = get_time();
+		_OurMesh->tris.reserve(1000000);
+		VisitorExtract v(this, _OurMesh);
 		TraversalData td(_OurRoot);
 		traverse_node<trav_vert>(v, td);
 		v.calc_vertices();
 		v.generate_mesh();
 		if (GEN_SPLASH)
 		{
-			std::vector<Eigen::Vector3d> splash_pos;
-			std::vector<double> splash_radiuses;
+			std::vector<Eigen::Vector3f> splash_pos;
+			std::vector<float> splash_radiuses;
 			for (int pIdx = 0; pIdx < getGlobalParticlesNum(); pIdx++)
 			{
 				if (_evaluator->CheckSplash(pIdx))
@@ -316,29 +310,29 @@ void SurfReconstructor::genIsoOurs()
 					splash_pos.push_back(_GlobalParticles[pIdx]);
 					if (!IS_CONST_RADIUS)
 					{
-						splash_radiuses.push_back(_GlobalRadiuses->at(pIdx));
+						splash_radiuses.push_back(_GlobalRadiuses[pIdx]);
 					}
 				}
 			}
 			if (IS_CONST_RADIUS)
 			{
-				m->AppendSplash_ConstR(splash_pos, _RADIUS);
+				_OurMesh->AppendSplash_ConstR(splash_pos, _RADIUS);
 			} else {
-				m->AppendSplash_VarR(splash_pos, splash_radiuses);
+				_OurMesh->AppendSplash_VarR(splash_pos, splash_radiuses);
 			}
 		}
-		double t_alldone = get_time();
+		float t_alldone = get_time();
 		printf("Time generating polygons = %f\n", t_alldone - t_gen_mesh);
 		return;
 	}
 	int depth = 0;
-	double half = root->half_length;
-	double* sample_points;
-	double* sample_grads;
-	double* cuvrs;
-	double* min_raiduses;
-	bool* emptys;
-	WaitingStack.push_back(root);
+	float half = _OurRoot->half_length;
+	float* sample_points = nullptr;
+	float* sample_grads = nullptr;
+	std::vector<float> cuvrs;
+	std::vector<float> min_raiduses;
+	std::vector<unsigned char> emptys;
+	WaitingStack.push_back(_OurRoot);
 	while (!WaitingStack.empty())
 	{
 		printf("%d \n", WaitingStack.size());
@@ -347,9 +341,12 @@ void SurfReconstructor::genIsoOurs()
 			ProcessArray[queue_flag] = WaitingStack.back();
 			WaitingStack.pop_back();
 		}
-		cuvrs = new double[queue_flag];
-		min_raiduses = new double[queue_flag];
-		emptys = new bool[queue_flag];
+		cuvrs.clear();
+		min_raiduses.clear();
+		emptys.clear();
+		cuvrs.resize(queue_flag);
+		min_raiduses.resize(queue_flag);
+		emptys.resize(queue_flag);
 		#pragma omp parallel
 		{
 			#pragma omp single
@@ -361,9 +358,18 @@ void SurfReconstructor::genIsoOurs()
 				}
 			}
 		}
-		sample_points = new double[int(pow(getOverSampleQEF()+1, 3)) * 4 * queue_flag];
-		sample_grads = new double[int(pow(getOverSampleQEF()+1, 3)) * 3 * queue_flag];
-		//TODO: Sampling
+		if (sample_points != nullptr)
+		{
+			delete[] sample_points;
+			sample_points = nullptr;
+		}
+		if (sample_grads != nullptr)
+		{
+			delete[] sample_grads;
+			sample_grads = nullptr;
+		}
+		sample_points = new float[int(pow(getOverSampleQEF()+1, 3)) * 4 * queue_flag];
+		sample_grads = new float[int(pow(getOverSampleQEF()+1, 3)) * 3 * queue_flag];
 		#pragma omp parallel
 		{
 			#pragma omp single
@@ -394,12 +400,7 @@ void SurfReconstructor::genIsoOurs()
 		depth++;
 		half/=2;
 	}
-	delete[] sample_points;
-	delete[] sample_grads;
-	delete[] cuvrs;
-	delete[] min_raiduses;
-	delete[] emptys;
-	double t_finish = get_time();
+	float t_finish = get_time();
 	printf("Time generating tree = %f\n", t_finish - t_start);	
 	_STATE++;
 }
@@ -416,8 +417,8 @@ void SurfReconstructor::generalModeRun()
     _OurMesh->reset();
     _STATE = 0;
 
-    double time_all_start = get_time();
-	double temp_time, last_temp_time;
+    float time_all_start = get_time();
+	float temp_time, last_temp_time;
 
 	printf("-= Box =-\n");
 	loadRootBox();
@@ -429,14 +430,14 @@ void SurfReconstructor::generalModeRun()
 	{
     	_hashgrid = new HashGrid(&_GlobalParticles, _BoundingBox, _RADIUS, _NEIGHBOR_FACTOR);
 	} else {
-		_searcher = new MultiLevelSearcher(&_GlobalParticles, _BoundingBox, _GlobalRadiuses, _NEIGHBOR_FACTOR);
+		_searcher = new MultiLevelSearcher(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, _NEIGHBOR_FACTOR);
 	}
     last_temp_time = temp_time;
     temp_time = get_time();
 	printf("   Build Neighbor Searcher Time = %f \n", temp_time - last_temp_time);
 
     printf("-= Initialize Evaluator =-\n");
-	_evaluator = new Evaluator(this, &_GlobalParticles, _GlobalRadiuses, _RADIUS);
+	_evaluator = new Evaluator(this, &_GlobalParticles, &_GlobalRadiuses, _RADIUS);
 	last_temp_time = temp_time;
 	temp_time = get_time();
 	printf("   Initialize Evaluator Time = %f \n", temp_time - last_temp_time);
@@ -469,11 +470,5 @@ void SurfReconstructor::generalModeRun()
 	genIsoOurs();
 
 	printf("-=  Total time= %f  =-\n", get_time() - time_all_start);
-	// if (IS_CONST_RADIUS)
-	// {
-    // 	delete(_hashgrid);
-	// } else {
-	// 	delete(_searcher);
-	// }
 }
 

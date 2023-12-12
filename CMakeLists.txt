@@ -24,16 +24,17 @@ if(NOT OpenMP_FOUND)
     message(FATAL_ERROR "OpenMP not found!")
 endif()
 
-# find_package(MPI REQUIRED)
-# if(NOT MPI_FOUND)
-#     message(FATAL_ERROR "MPI not found!")
-# endif()
+find_package(MPI REQUIRED)
+if(NOT MPI_FOUND)
+    message(FATAL_ERROR "MPI not found!")
+endif()
 
 # set(HDF5_PREFER_PARALLEL "ON")
-# find_package(HDF5 REQUIRED NAMES hdf5 COMPONENTS C static HL)
-# if(NOT HDF5_FOUND)
-#    message(FATAL_ERROR "HDF5 not found!")
-# endif()
+set(HDF5_DIR F:/hdf5-1.12.1/cmake/hdf5)
+find_package(HDF5 REQUIRED NAMES hdf5 COMPONENTS C static HL)
+if(NOT HDF5_FOUND)
+   message(FATAL_ERROR "HDF5 not found!")
+endif()
 
 find_package(EIGEN3 REQUIRED)
 if(NOT EIGEN3_FOUND)
@@ -60,7 +61,7 @@ add_executable(${PROJECT_NAME}
     src/surface_reconstructor.cpp
     src/global.cpp
     src/recorder.cpp
-    # src/hdf5Utils.cpp
+    src/hdf5Utils.cpp
     src/multi_level_reseacher.cpp
     src/rply.c
 )
@@ -75,8 +76,8 @@ add_library(pugixml
 target_include_directories(${PROJECT_NAME} 
     PUBLIC
     include
-    # ${MPI_CXX_INCLUDE_DIRS}
-    # ${HDF5_INCLUDE_DIR}
+    ${MPI_CXX_INCLUDE_DIRS}
+    ${HDF5_INCLUDE_DIR}
     ${EIGEN3_INCLUDE_DIR}
 )
 
@@ -84,7 +85,7 @@ target_include_directories(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME} 
     PUBLIC
-    # ${HDF5_C_STATIC_LIBRARY}
+    ${HDF5_C_STATIC_LIBRARY}
     Eigen3::Eigen
     OpenMP::OpenMP_CXX
     pugixml

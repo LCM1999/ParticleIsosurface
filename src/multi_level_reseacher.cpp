@@ -3,25 +3,25 @@
 
 #include "hash_grid.h"
 
-MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3d>* particles, double* bounding, std::vector<double>* radiuses, double inf_factor)
+MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3f>* particles, float* bounding, std::vector<float>* radiuses, float inf_factor)
 {
-    // std::vector<std::vector<Eigen::Vector3d>> sortedParticles;
+    // std::vector<std::vector<Eigen::Vector3f>> sortedParticles;
     maxRadius = *std::max_element(radiuses->begin(), radiuses->end()) * 1.01;
     minRadius = *std::min_element(radiuses->begin(), radiuses->end()) * 0.99;
     infFactor = inf_factor;
     particlesNum = particles->size();
-    std::vector<std::pair<double, double>> bin_bounds;
-    double bin_extent = minRadius * 0.5;
+    std::vector<std::pair<float, float>> bin_bounds;
+    float bin_extent = minRadius * 0.5;
     int bins = std::max(int(ceil((maxRadius - minRadius) / bin_extent)), 1);
     bin_extent = (maxRadius - minRadius) / bins;
     for (size_t i = 0; i < bins; i++)
     {
         bin_bounds.push_back(
-            std::pair<double, double>(
+            std::pair<float, float>(
                 minRadius+(i*bin_extent), 
                 std::min(minRadius+((i+1)*bin_extent), maxRadius)));
     }
-    auto whichBin = [&](const double r)
+    auto whichBin = [&](const float r)
     {
         for (auto tit = bin_bounds.begin(); tit < bin_bounds.end(); tit++)
         {
@@ -52,7 +52,7 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3d>* particles, 
     for (int i = 0; i < bins; i++)
     {
         if (sortedIndex[i].size() == 0) continue;
-        double temp_bounding [6] = {0.0f};
+        float temp_bounding [6] = {0.0f};
         temp_bounding[0] = bounding[0];
         temp_bounding[1] = bounding[1];
         temp_bounding[2] = bounding[2];
@@ -66,12 +66,12 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3d>* particles, 
         // std::cout << sortedIndex[i].size() << ", " << radiuses->at(binRadiusId) << std::endl;
         searchers.push_back(new HashGrid(particles, radiuses, sortedIndex[i], temp_bounding, binRadiusId, inf_factor));
     }
-    std::set<double> st(radiuses->begin(), radiuses->end());
+    std::set<float> st(radiuses->begin(), radiuses->end());
     checkedRadiuses.assign(st.begin(), st.end());
     printf("   Seachers level: %d.\n", searchers.size());
 }
 
-void MultiLevelSearcher::GetNeighbors(const Eigen::Vector3d& pos, std::vector<int>& neighbors)
+void MultiLevelSearcher::GetNeighbors(const Eigen::Vector3f& pos, std::vector<int>& neighbors)
 {
     std::vector<int> subNeighbors;
     size_t sIndexId = 0, searcherId = 0;
@@ -91,7 +91,7 @@ void MultiLevelSearcher::GetNeighbors(const Eigen::Vector3d& pos, std::vector<in
     }
 }
 
-void MultiLevelSearcher::GetInBoxParticles(const Eigen::Vector3d& box1, const Eigen::Vector3d& box2, std::vector<int>& insides)
+void MultiLevelSearcher::GetInBoxParticles(const Eigen::Vector3f& box1, const Eigen::Vector3f& box2, std::vector<int>& insides)
 {
     std::vector<int> subInsides;
     size_t sIndexId = 0, searcherId = 0;

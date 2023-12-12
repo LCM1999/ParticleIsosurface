@@ -10,7 +10,7 @@
 
 int tree_cells = 0;
 
-static double sign(unsigned int x)
+static float sign(unsigned int x)
 {
 	return x ? 1 : -1;
 };
@@ -29,7 +29,7 @@ TNode::TNode(SurfReconstructor* surf_constructor, TNode* parent, Index i)
 	constructor = surf_constructor;
 	depth = parent->depth + 1;
 	half_length = parent->half_length / 2;
-	center = parent->center + (Eigen::Vector3d(sign(i.x), sign(i.y), sign(i.z)) * half_length);
+	center = parent->center + (Eigen::Vector3f(sign(i.x), sign(i.y), sign(i.z)) * half_length);
 	node[0] = center[0];
 	node[1] = center[1];
 	node[2] = center[2];
@@ -39,24 +39,24 @@ TNode::TNode(SurfReconstructor* surf_constructor, TNode* parent, Index i)
 	this->id = parent->id * 8 + i.v;
 }
 
-double TNode::calcErrorDMC(Eigen::Vector4d p, double* verts, double* verts_grad, const int oversample)
+float TNode::calcErrorDMC(Eigen::Vector4f p, float* verts, float* verts_grad, const int oversample)
 {
-	double err = 0;
+	float err = 0;
 	for (size_t i = 0; i < pow(oversample + 1, 3); i++)
 	{
-		Eigen::Vector4d v(verts[i * 4 + 0], verts[i * 4 + 1], verts[i * 4 + 2], verts[i * 4 + 3]);
-		Eigen::Vector3d g(verts_grad[i * 3 + 0], verts_grad[i * 3 + 1], verts_grad[i * 3 + 2]);
+		Eigen::Vector4f v(verts[i * 4 + 0], verts[i * 4 + 1], verts[i * 4 + 2], verts[i * 4 + 3]);
+		Eigen::Vector3f g(verts_grad[i * 3 + 0], verts_grad[i * 3 + 1], verts_grad[i * 3 + 2]);
 		err += squared(g.dot((p - v).head(3)) - p[3]) / (1 + g.squaredNorm());
 	}
 	return err;
 }
 
 void TNode::GenerateSampling(
-	double* sample_points)
+	float* sample_points)
 {
-	const double cellsize = 2 * half_length;
-	Eigen::Vector3d minV(center[0] - half_length, center[1] - half_length, center[2] - half_length);
-	Eigen::Vector3d maxV(center[0] + half_length, center[1] + half_length, center[2] + half_length);
+	const float cellsize = 2 * half_length;
+	Eigen::Vector3f minV(center[0] - half_length, center[1] - half_length, center[2] - half_length);
+	Eigen::Vector3f maxV(center[0] + half_length, center[1] + half_length, center[2] + half_length);
 
 	for (int z = 0; z <= constructor->getOverSampleQEF(); z++)
 	{
@@ -65,11 +65,11 @@ void TNode::GenerateSampling(
 			for (int x = 0; x <= constructor->getOverSampleQEF(); x++)
 			{
 				sample_points[(z * (constructor->getOverSampleQEF()+1) * (constructor->getOverSampleQEF()+1) + y * (constructor->getOverSampleQEF()+1) + x) * 4 + 0] = 
-				(1 - double(x) / constructor->getOverSampleQEF()) * minV[0] + (double(x) / constructor->getOverSampleQEF()) * maxV[0];
+				(1 - float(x) / constructor->getOverSampleQEF()) * minV[0] + (float(x) / constructor->getOverSampleQEF()) * maxV[0];
 				sample_points[(z * (constructor->getOverSampleQEF()+1) * (constructor->getOverSampleQEF()+1) + y * (constructor->getOverSampleQEF()+1) + x) * 4 + 1] = 
-				(1 - double(y) / constructor->getOverSampleQEF()) * minV[1] + (double(y) / constructor->getOverSampleQEF()) * maxV[1];
+				(1 - float(y) / constructor->getOverSampleQEF()) * minV[1] + (float(y) / constructor->getOverSampleQEF()) * maxV[1];
 				sample_points[(z * (constructor->getOverSampleQEF()+1) * (constructor->getOverSampleQEF()+1) + y * (constructor->getOverSampleQEF()+1) + x) * 4 + 2] = 
-				(1 - double(z) / constructor->getOverSampleQEF()) * minV[2] + (double(z) / constructor->getOverSampleQEF()) * maxV[2];
+				(1 - float(z) / constructor->getOverSampleQEF()) * minV[2] + (float(z) / constructor->getOverSampleQEF()) * maxV[2];
 				sample_points[(z * (constructor->getOverSampleQEF()+1) * (constructor->getOverSampleQEF()+1) + y * (constructor->getOverSampleQEF()+1) + x) * 4 + 3] = 0;
 			}
 		}
@@ -77,17 +77,17 @@ void TNode::GenerateSampling(
 }
 
 void TNode::NodeSampling(
-	double& curv, bool& signchange, double cellsize,
-	double* sample_points, double* sample_grads)
+	float& curv, bool& signchange, float cellsize,
+	float* sample_points, float* sample_grads)
 {
 	bool origin_sign;
 	signchange = false;
 	constructor->getEvaluator()->GridEval(sample_points, sample_grads, cellsize, signchange, constructor->getOverSampleQEF(), false);
-	Eigen::Vector3d norms(0, 0, 0);
-	double area = 0;
+	Eigen::Vector3f norms(0, 0, 0);
+	float area = 0;
 	for (int i = 0; i < pow(constructor->getOverSampleQEF() + 1, 3); i++)
 	{
-		Eigen::Vector3d n(
+		Eigen::Vector3f n(
 			sample_grads[i * 3 + 0], 
 			sample_grads[i * 3 + 1], 
 			sample_grads[i * 3 + 2]);
@@ -96,18 +96,18 @@ void TNode::NodeSampling(
 		area += n.norm();
 	}
 
-	double field_curv = (area == 0) ? 1.0 : (norms.norm() / area);
+	float field_curv = (area == 0) ? 1.0 : (norms.norm() / area);
 	curv = std::min(curv, field_curv);
 }
 
-void TNode::NodeCalcNode(double* sample_points, double* sample_grads, double cellsize)
+void TNode::NodeCalcNode(float* sample_points, float* sample_grads, float cellsize)
 {
-	const double border = constructor->getBorder() * cellsize;
-	Eigen::Vector3d minV(center[0] - half_length + border, center[1] - half_length + border, center[2] - half_length + border);
-	Eigen::Vector3d maxV(center[0] + half_length - border, center[1] + half_length - border, center[2] + half_length - border);
-	QEFNormal<double, 4> node_q;
+	const float border = constructor->getBorder() * cellsize;
+	Eigen::Vector3f minV(center[0] - half_length + border, center[1] - half_length + border, center[2] - half_length + border);
+	Eigen::Vector3f maxV(center[0] + half_length - border, center[1] + half_length - border, center[2] + half_length - border);
+	QEFNormal<float, 4> node_q;
 	node_q.zero();
-	std::vector<Eigen::Vector3d> node_plane_norms, node_plane_pts;
+	std::vector<Eigen::Vector3f> node_plane_norms, node_plane_pts;
 	int node_index;
 	for (int z = 0; z <= constructor->getOverSampleQEF(); z++)
 	{
@@ -116,26 +116,26 @@ void TNode::NodeCalcNode(double* sample_points, double* sample_grads, double cel
 			for (int x = 0; x <= constructor->getOverSampleQEF(); x++)
 			{
 				node_index = (z * (constructor->getOverSampleQEF() + 1) * (constructor->getOverSampleQEF() + 1) + y * (constructor->getOverSampleQEF() + 1) + x);
-				Eigen::Vector3d p(
+				Eigen::Vector3f p(
 					sample_points[node_index * 4 + 0], 
 					sample_points[node_index * 4 + 1], 
 					sample_points[node_index * 4 + 2]);
-				Vector5d pl = Vector5d::Zero();
+				Vector5f pl = Vector5f::Zero();
 				pl[0] = sample_grads[node_index * 3 + 0];
 				pl[1] = sample_grads[node_index * 3 + 1];
 				pl[2] = sample_grads[node_index * 3 + 2];
 				pl[3] = -1;
 				pl[4] = -(p[0] * pl[0] + p[1] * pl[1] + p[2] * pl[2]) + sample_points[node_index * 4 + 3];
-				node_q.combineSelf(Vector5d(pl.cast<double>()).data());
+				node_q.combineSelf(Vector5f(pl.cast<float>()).data());
 				node_plane_pts.push_back(p);
-				node_plane_norms.push_back(Eigen::Vector3d(pl[0], pl[1], pl[2]));
+				node_plane_norms.push_back(Eigen::Vector3f(pl[0], pl[1], pl[2]));
 			}
 		}
 	}
 	// build system to solve
 	const int node_n = 4;
-	Eigen::Matrix4d node_A = Eigen::Matrix4d::Zero();
-	double node_B[node_n];
+	Eigen::Matrix4f node_A = Eigen::Matrix4f::Zero();
+	float node_B[node_n];
 	for (int i = 0; i < node_n; i++)
 	{
 		int index = ((2 * node_n + 3 - i) * i) / 2;
@@ -148,11 +148,11 @@ void TNode::NodeCalcNode(double* sample_points, double* sample_grads, double cel
 	}
 	// minimize QEF constrained to cell
 	bool is_out = true;
-	double err = 1e30;
-	Eigen::Vector4d pc = Eigen::Vector4d::Zero();
+	float err = 1e30;
+	Eigen::Vector4f pc = Eigen::Vector4f::Zero();
 	// find minimal point
-	Eigen::Vector4d rvalue = Eigen::Vector4d::Zero();
-	Eigen::Matrix4d inv = node_A.inverse();
+	Eigen::Vector4f rvalue = Eigen::Vector4f::Zero();
+	Eigen::Matrix4f inv = node_A.inverse();
 	for (int i = 0; i < node_n; i++)
 	{
 		rvalue[i] = 0;
@@ -175,7 +175,7 @@ void TNode::NodeCalcNode(double* sample_points, double* sample_grads, double cel
 	}
 }
 
-bool TNode::changeSignDMC(Eigen::Vector4d* verts)
+bool TNode::changeSignDMC(Eigen::Vector4f* verts)
 {
 	return  sign(verts[0]) != sign(verts[1]) ||
 		sign(verts[0]) != sign(verts[2]) ||

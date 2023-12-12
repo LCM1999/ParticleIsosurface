@@ -5,7 +5,7 @@
 #include <regex>
 
 #include "global.h"
-// #include "hdf5Utils.hpp"
+#include "hdf5Utils.hpp"
 #include "iso_common.h"
 #include "iso_method_ours.h"
 #include "json.hpp"
@@ -27,14 +27,16 @@ bool IS_CONST_RADIUS = false;
 bool USE_ANI = true;
 
 // variants for test
-short DATA_TYPE = 0;    // CSV:0, H5: 1
+short DATA_TYPE = 0;
 bool NEED_RECORD = false;
 int TARGET_FRAME = 0;
-std::string PREFIX = "";
+// std::string PREFIX = "";
+std::string SUFFIX = "";    // CSV, H5
+bool USE_DIR = true;
 bool WITH_NORMAL;
 std::vector<std::string> DATA_PATHES;
 std::string OUTPUT_TYPE = "ply";
-double RADIUS = 0;
+float RADIUS = 0;
 float SMOOTH_FACTOR = 2.0;
 float ISO_FACTOR = 1.9;
 // bool USE_CUDA = false;
@@ -60,7 +62,7 @@ int writePlyFile(Mesh& m, std::string fn)
 {
     int num_vertices = int(m.verticesNum);
     int num_faces = int(m.trianglesNum);
-    double version;
+    float version;
     p_ply ply = ply_create(fn.c_str(), PLY_DEFAULT, NULL, 0, NULL);
     if (!ply) 
         return 0;   
@@ -158,11 +160,11 @@ void loadConfigJson(std::string dataPath)
                 DATA_PATHES.push_back(*it);
             }
         } else {
-            if (readInJSON.contains("PREFIX"))
+            if (readInJSON.contains("SUFFIX"))
             {
-                PREFIX = readInJSON.at("PREFIX");
+                SUFFIX = readInJSON.at("SUFFIX");
             }
-            if (PREFIX.empty() || PREFIX == "")
+            if (SUFFIX.empty() || SUFFIX == "")
             {
                 const std::string filePath = readInJSON.at("DATA_FILE");
                 std::string data_pathes = filePath;
@@ -172,7 +174,7 @@ void loadConfigJson(std::string dataPath)
                 intptr_t hFile;
                 struct _finddata_t fileInfo;
                 std::string p;
-                if ((hFile = _findfirst(p.assign(dataPath).append("/").append(PREFIX).append("*.csv").c_str(), &fileInfo)) != -1)
+                if ((hFile = _findfirst(p.assign(dataPath).append("/").append("*").append(SUFFIX).c_str(), &fileInfo)) != -1)
                 {
                     do
                     {
@@ -210,8 +212,8 @@ void loadConfigJson(std::string dataPath)
 }
 
 void loadParticlesFromCSV(std::string &csvPath,
-                          std::vector<Eigen::Vector3d> &particles,
-                          std::vector<double>* radiuses)
+                          std::vector<Eigen::Vector3f> &particles,
+                          std::vector<float> &radiuses)
 {
     std::ifstream ifn;
     ifn.open(csvPath.c_str());
@@ -222,13 +224,13 @@ void loadParticlesFromCSV(std::string &csvPath,
 
     std::string line;
     std::vector<std::string> titles;
-    std::vector<double> elements;
+    std::vector<float> elements;
     std::getline(ifn, line);
     replaceAll(line, "\"", "");
     parseString(&titles, line, ",");
     if (!IS_CONST_RADIUS)
     {
-        radiuses->clear();
+        radiuses.clear();
         radiusIdx = std::distance(titles.begin(),
         std::find_if(titles.begin(), titles.end(), 
         [&](const std::string &title) {
@@ -266,25 +268,74 @@ void loadParticlesFromCSV(std::string &csvPath,
     {
         elements.clear();
         parseStringToElements(&elements, line, ",");
-        particles.push_back(Eigen::Vector3d(elements[xIdx], elements[yIdx], elements[zIdx]));
+        particles.push_back(Eigen::Vector3f(elements[xIdx], elements[yIdx], elements[zIdx]));
         if (!IS_CONST_RADIUS)
         {
-            radiuses->push_back(elements[radiusIdx]);
+            radiuses.push_back(elements[radiusIdx]);
         }
         getline(ifn, line);
     }
 }
 
+bool readShonDyParticleData(const std::string &fileName,
+                            std::vector<Eigen::Vector3f> &positions,
+                            std::vector<float>& radiuses)
+{
+    if (!std::filesystem::exists(fileName))
+    {
+        std::cout << "Error: cannot find hdf5 file: " << fileName << std::endl;
+        return false;
+    }
+
+    // open file
+    auto hdf5FileID = H5Fopen(fileName.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+    if (hdf5FileID < 0)
+    {
+        std::cout << "Error: cannot read hdf5 file: " << fileName << std::endl;
+        return false;
+    }
+
+    // read particle positions
+    auto nodeSize = size(hdf5FileID, "position");
+    const int numberOfNodes = nodeSize / 3;
+    std::vector<double> nodes(nodeSize);
+    std::vector<double> radiusesdouble(numberOfNodes);
+    readDouble(hdf5FileID, "position", nodes);
+    positions.resize(numberOfNodes);
+
+    // read particle densities
+    if (!IS_CONST_RADIUS)
+    {
+        readDouble(hdf5FileID, "particleRadius", radiusesdouble);
+        radiuses.resize(numberOfNodes);
+    }
+    
+    // convert float data to float
+    for (int i = 0; i < numberOfNodes; i++)
+    {
+        positions[i] =
+            Eigen::Vector3f(nodes[3 * i], nodes[3 * i + 1], nodes[3 * i + 2]);
+        if (!IS_CONST_RADIUS)
+        {
+            radiuses[i] = radiusesdouble[i];
+        }
+    }
+
+    // close file
+    H5Fclose(hdf5FileID);
+    return true;
+}
+
 void run(std::string dataDirPath, std::string outPath)
 {
     loadConfigJson(dataDirPath);
-    double frameStart = 0;
+    float frameStart = 0;
     int index = 1;
-    std::vector<Eigen::Vector3d> particles;
-    std::vector<double>* radiuses = (IS_CONST_RADIUS ? nullptr : new std::vector<double>());
+    std::vector<Eigen::Vector3f> particles;
+    std::vector<float> radiuses;
     for (const std::string frame : DATA_PATHES)
     {
-        Mesh* mesh = new Mesh(int(pow(10, 4)));
+        Mesh mesh(int(pow(10, 4)));
         std::cout << "-=   Frame " << (TARGET_FRAME == 0 ? index : TARGET_FRAME) << " " << frame << "   =-"
                   << std::endl;
         std::string dataPath = dataDirPath + "/" + frame;
@@ -293,11 +344,15 @@ void run(std::string dataDirPath, std::string outPath)
         switch (DATA_TYPE)
         {
         case 0:
-            loadParticlesFromCSV(dataPath, particles, radiuses);
-            break;
+            if (".csv" == SUFFIX) {
+                loadParticlesFromCSV(dataPath, particles, radiuses);
+                break;
+            } else if (".h5" == SUFFIX) {
+                readShonDyParticleData(dataPath, particles, radiuses);
+                break;
+            }
         case 1:
-            // readShonDyParticleData(dataPath, particles, radiuses);
-
+            readShonDyParticleData(dataPath, particles, radiuses);
             break;
         default:
             printf("ERROR: Unknown DATA TYPE;");
@@ -305,22 +360,22 @@ void run(std::string dataDirPath, std::string outPath)
         }
         if (!IS_CONST_RADIUS)
         {
-            if (abs(*std::max_element(radiuses->begin(), radiuses->end()) - *std::min_element(radiuses->begin(), radiuses->end())) < 1e-7)
+            if (abs(*std::max_element(radiuses.begin(), radiuses.end()) - *std::min_element(radiuses.begin(), radiuses.end())) < 1e-7)
             {
                     IS_CONST_RADIUS = true;
-                    RADIUS = radiuses->at(0);
-            }            
+                    RADIUS = radiuses[0];
+            }
         }
         printf("Particles Number = %zd\n", particles.size());
-        SurfReconstructor* constructor = new SurfReconstructor(particles, radiuses, mesh, RADIUS, ISO_FACTOR, SMOOTH_FACTOR);
-        Recorder* recorder = new Recorder(dataDirPath, frame.substr(0, frame.size() - 4), constructor);
+        SurfReconstructor* constructor = new SurfReconstructor(particles, radiuses, &mesh, RADIUS, ISO_FACTOR, SMOOTH_FACTOR);
+        // Recorder recorder(dataDirPath, frame.substr(0, frame.size() - 4), &constructor);
         constructor->Run();
-        if (NEED_RECORD)
-        {
-            // recorder.RecordProgress();
-            recorder->RecordParticles();
-            // recorder->RecordFeatures();
-        }
+        // if (NEED_RECORD)
+        // {
+        //     // recorder.RecordProgress();
+        //     recorder.RecordParticles();
+        //     // recorder->RecordFeatures();
+        // }
         std::string output_name = frame.substr(0, frame.find_last_of('.'));
         if (! std::filesystem::exists(outPath))
         {
@@ -331,14 +386,14 @@ void run(std::string dataDirPath, std::string outPath)
         {
             if ("ply" == OUTPUT_TYPE || "PLY" == OUTPUT_TYPE)
             {
-                writePlyFile(*mesh,
+                writePlyFile(mesh,
                     outPath + "/" + output_name + ".ply");
             } else if ("obj" == OUTPUT_TYPE || "OBJ" == OUTPUT_TYPE) 
             {
-                writeObjFile(*mesh,
+                writeObjFile(mesh,
                     outPath + "/" + output_name + ".obj");    
             } else {
-                writePlyFile(*mesh,
+                writePlyFile(mesh,
                     outPath + "/" + output_name + ".ply");
             }  
         }
@@ -347,13 +402,11 @@ void run(std::string dataDirPath, std::string outPath)
             std::cerr << e.what() << '\n';
             std::cout << "Error happened during writing result." << std::endl;
             std::cout << "Result output path: " << outPath + "/" + output_name + "." + OUTPUT_TYPE + ";" << std::endl;
-            std::cout << "In Memory Mesh : Vertices=" << mesh->verticesNum << ", Cells=" << mesh->trianglesNum << ";" << std::endl;
+            std::cout << "In Memory Mesh : Vertices=" << mesh.verticesNum << ", Cells=" << mesh.trianglesNum << ";" << std::endl;
             exit(1);
         }
         index++;
-        delete(mesh);
-        delete(constructor);
-        delete(recorder);
+        delete constructor;
     }
 }
 
@@ -397,12 +450,12 @@ int main(int argc, char **argv)
         // "E:/data/multiR/mr_csv";
         // "E:/data/vtk/csv";
         // "E:/data/vtk_11/vtk/oil/h5";
-        "C:/Users/11379/Desktop/liu";
+        "F:/data/07cd506e-17ef-49ca-9e12-16d92d96b12d";
         outPath = 
         // "E:/data/multiR/mr_csv/out";
         // "E:/data/vtk/csv/out";
         // "E:/data/vtk_11/vtk/oil/out";
-        "C:/Users/11379/Desktop/liu/out";
+        "F:/data/07cd506e-17ef-49ca-9e12-16d92d96b12d/out";
         run(dataDirPath, outPath);
         break;
     }
