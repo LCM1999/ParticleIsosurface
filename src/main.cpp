@@ -32,7 +32,6 @@ bool NEED_RECORD = false;
 int TARGET_FRAME = 0;
 // std::string PREFIX = "";
 std::string SUFFIX = "";    // CSV, H5
-bool USE_DIR = true;
 bool WITH_NORMAL;
 std::vector<std::string> DATA_PATHES;
 std::string OUTPUT_TYPE = "ply";
@@ -344,6 +343,10 @@ void run(std::string dataDirPath, std::string outPath)
         switch (DATA_TYPE)
         {
         case 0:
+            if (SUFFIX == "")
+            {
+                SUFFIX = std::filesystem::path(dataPath).filename().extension().string();
+            }
             if (".csv" == SUFFIX) {
                 loadParticlesFromCSV(dataPath, particles, radiuses);
                 break;
@@ -368,14 +371,14 @@ void run(std::string dataDirPath, std::string outPath)
         }
         printf("Particles Number = %zd\n", particles.size());
         SurfReconstructor* constructor = new SurfReconstructor(particles, radiuses, &mesh, RADIUS, ISO_FACTOR, SMOOTH_FACTOR);
-        // Recorder recorder(dataDirPath, frame.substr(0, frame.size() - 4), &constructor);
+        Recorder recorder(dataDirPath, frame.substr(0, frame.size() - 4), constructor);
         constructor->Run();
-        // if (NEED_RECORD)
-        // {
-        //     // recorder.RecordProgress();
-        //     recorder.RecordParticles();
-        //     // recorder->RecordFeatures();
-        // }
+        if (NEED_RECORD)
+        {
+            // recorder.RecordProgress();
+            recorder.RecordParticles();
+            recorder.RecordFeatures();
+        }
         std::string output_name = frame.substr(0, frame.find_last_of('.'));
         if (! std::filesystem::exists(outPath))
         {
@@ -449,13 +452,13 @@ int main(int argc, char **argv)
         dataDirPath =
         // "E:/data/multiR/mr_csv";
         // "E:/data/vtk/csv";
-        // "E:/data/vtk_11/vtk/oil/h5";
-        "F:/data/07cd506e-17ef-49ca-9e12-16d92d96b12d";
+        "E:/data/car_render_test_data_2/Fluid";
+        // "E:/data/vtk/2a239e6f-fa76-4756-8b5f-390973215b30";
         outPath = 
         // "E:/data/multiR/mr_csv/out";
         // "E:/data/vtk/csv/out";
-        // "E:/data/vtk_11/vtk/oil/out";
-        "F:/data/07cd506e-17ef-49ca-9e12-16d92d96b12d/out";
+        "E:/data/car_render_test_data_2/Fluid/out";
+        // "E:/data/vtk/2a239e6f-fa76-4756-8b5f-390973215b30/out";
         run(dataDirPath, outPath);
         break;
     }

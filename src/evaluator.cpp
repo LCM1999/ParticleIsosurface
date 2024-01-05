@@ -82,7 +82,7 @@ void Evaluator::SingleEval(const Eigen::Vector3f& pos, float& scalar)
     scalar = constructor->getIsoValue() - ((scalar - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
 }
 
-void Evaluator::SingleEvalWithGrad(const Eigen::Vector3f& pos, float& scalar, Eigen::Vector3f& gradient, bool use_normalize, bool use_signed, bool grad_normalize)
+void Evaluator::SingleEvalWithGrad(const Eigen::Vector3f& pos, float& scalar, Eigen::Vector3f& gradient)
 {
 	if (constructor->getMaxScalar() >= 0)
 	{
@@ -93,50 +93,44 @@ void Evaluator::SingleEvalWithGrad(const Eigen::Vector3f& pos, float& scalar, Ei
         }
 	}
 
-	float info = 0.0f;
-	float temp_scalars[6] = {0.0f};
-    float sample_radius = 0.0f;
-
-    if (USE_ANI)
+    std::vector<int> neighbors;
+    if (IS_CONST_RADIUS)
     {
-        AnisotropicEval(pos, info, temp_scalars, sample_radius);
+        constructor->getHashGrid()->GetPIdxList(pos, neighbors);
+    } else {
+        constructor->getSearcher()->GetNeighbors(pos, neighbors);
     }
-    else
+    Eigen::Vector3f diff;
+    for (int pIdx : neighbors)
     {
-        IsotropicEval(pos, info, temp_scalars, sample_radius);
+        if (this->CheckSplash(pIdx))
+        {
+            continue;
+        }
+        diff = pos - GlobalxMeans[pIdx];
+        if (USE_ANI)
+        {
+            scalar += AnisotropicInterpolate(pIdx, diff);
+            gradient += AnisotropicInterpolateGrad(pIdx, diff);
+        } else {
+            scalar += IsotropicInterpolate(pIdx, diff.squaredNorm());
+            gradient += IsotropicInterpolateGrad(pIdx, diff.squaredNorm(), diff);
+        }
     }
-	
-    if (use_normalize)
-    {
-        scalar = ((info - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
-    }
-    if (use_signed)
-    {
-        scalar = constructor->getIsoValue() - scalar;
-    }
-	gradient[0] = ((temp_scalars[1] - temp_scalars[0]) / constructor->getMaxScalar() * 255) / (sample_radius * 2);
-	gradient[1] = ((temp_scalars[3] - temp_scalars[2]) / constructor->getMaxScalar() * 255) / (sample_radius * 2);
-	gradient[2] = ((temp_scalars[5] - temp_scalars[4]) / constructor->getMaxScalar() * 255) / (sample_radius * 2);
-    if (grad_normalize)
-    {
-        gradient.normalize();
-        gradient[0] = std::isnan(gradient[0]) ? 0.0f : gradient[0];
-        gradient[1] = std::isnan(gradient[1]) ? 0.0f : gradient[1];
-        gradient[2] = std::isnan(gradient[2]) ? 0.0f : gradient[2];
-    }
+    scalar = constructor->getIsoValue() - ((scalar - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
 }
 
 void Evaluator::GridEval(
     float* sample_points, float* field_gradients, float cellsize, 
     bool& signchange, int oversample, bool grad_normalize)
 {
-    //assert(!sample_points.empty());
     bool origin_sign;
     float step = cellsize / oversample;
     for (int i = 0; i < pow(oversample+1, 3); i++)
     {
         Eigen::Vector4f p(sample_points[i*4 + 0], sample_points[i*4 + 1], sample_points[i*4 + 2], sample_points[i*4 + 3]);
         float scalar = 0.0f;
+        Eigen::Vector3f gradient, diff;
         std::vector<int> neighbors;
         if (IS_CONST_RADIUS)
         {
@@ -148,11 +142,17 @@ void Evaluator::GridEval(
         {
             for (const int pIdx : neighbors)
             {
-                if (USE_ANI)
+                if (!CheckSplash(pIdx))
                 {
-                    scalar += AnisotropicInterpolate(pIdx, p.head(3) - GlobalxMeans[pIdx]);
-                } else {
-                    scalar += IsotropicInterpolate(pIdx, (p.head(3) - GlobalxMeans[pIdx]).squaredNorm());
+                    diff = p.head(3) - GlobalxMeans[pIdx];
+                    if (USE_ANI)
+                    {
+                        scalar += AnisotropicInterpolate(pIdx, diff);
+                        gradient += AnisotropicInterpolateGrad(pIdx, diff);
+                    } else {
+                        scalar += IsotropicInterpolate(pIdx, diff.squaredNorm());
+                        gradient += IsotropicInterpolateGrad(pIdx, diff.squaredNorm(), diff);
+                    }
                 }
             }
         }
@@ -164,74 +164,77 @@ void Evaluator::GridEval(
         {
             signchange = origin_sign ^ (scalar >= 0);
         }
+        field_gradients[i * 3 + 0] = gradient[0];
+        field_gradients[i * 3 + 1] = gradient[1];
+        field_gradients[i * 3 + 2] = gradient[2];
     }
-    int index, next_idx, last_idx;
-    for (int z = 0; z <= oversample; z++)
-    {
-        for (int y = 0; y <= oversample; y++)
-        {
-            for (int x = 0; x <= oversample; x++)
-            {
-                index = (z * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + x);
-                Eigen::Vector3f gradient(0.0f, 0.0f, 0.0f);
+    // int index, next_idx, last_idx;
+    // for (int z = 0; z <= oversample; z++)
+    // {
+    //     for (int y = 0; y <= oversample; y++)
+    //     {
+    //         for (int x = 0; x <= oversample; x++)
+    //         {
+    //             index = (z * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + x);
+    //             Eigen::Vector3f gradient(0.0f, 0.0f, 0.0f);
 
-                next_idx = (z * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + (x + 1));
-                last_idx = (z * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + (x - 1));
-                if (x == 0)
-                {
-                    gradient[0] = (sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3]) / step;
-                }
-                else if (x == oversample)
-                {
-                    gradient[0] = (sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3]) / step;
-                }
-                else
-                {
-                    gradient[0] = (sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3]) / (step * 2);
-                }
+    //             next_idx = (z * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + (x + 1));
+    //             last_idx = (z * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + (x - 1));
+    //             if (x == 0)
+    //             {
+    //                 gradient[0] = (sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3]) / step;
+    //             }
+    //             else if (x == oversample)
+    //             {
+    //                 gradient[0] = (sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3]) / step;
+    //             }
+    //             else
+    //             {
+    //                 gradient[0] = (sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3]) / (step * 2);
+    //             }
 
-                next_idx = (z * (oversample + 1) * (oversample + 1) + (y + 1) * (oversample + 1) + x);
-                last_idx = (z * (oversample + 1) * (oversample + 1) + (y - 1) * (oversample + 1) + x);
-                if (y == 0)
-                {
-                    gradient[1] = (sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3]) / step;
-                }
-                else if (y == oversample)
-                {
-                    gradient[1] = (sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3]) / step;
-                }
-                else
-                {
-                    gradient[1] = (sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3]) / (step * 2);
-                }
+    //             next_idx = (z * (oversample + 1) * (oversample + 1) + (y + 1) * (oversample + 1) + x);
+    //             last_idx = (z * (oversample + 1) * (oversample + 1) + (y - 1) * (oversample + 1) + x);
+    //             if (y == 0)
+    //             {
+    //                 gradient[1] = (sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3]) / step;
+    //             }
+    //             else if (y == oversample)
+    //             {
+    //                 gradient[1] = (sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3]) / step;
+    //             }
+    //             else
+    //             {
+    //                 gradient[1] = (sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3]) / (step * 2);
+    //             }
 
-                next_idx = ((z + 1) * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + x);
-                last_idx = ((z - 1) * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + x);
-                if (z == 0)
-                {
-                    gradient[2] = (sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3]) / step;
-                }
-                else if (z == oversample)
-                {
-                    gradient[2] = (sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3]) / step;
-                }
-                else
-                {
-                    gradient[2] = (sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3]) / (step * 2);
-                }
-                if (grad_normalize)
-                {
-                    gradient.normalize();
-                    gradient[0] = std::isnan(gradient[0]) ? 0.0f : gradient[0];
-                    gradient[1] = std::isnan(gradient[1]) ? 0.0f : gradient[1];
-                    gradient[2] = std::isnan(gradient[2]) ? 0.0f : gradient[2];
-                }
-                field_gradients[index * 3 + 0] = gradient[0];
-                field_gradients[index * 3 + 1] = gradient[1];
-                field_gradients[index * 3 + 2] = gradient[2];
-            }
-        }
-    }
+    //             next_idx = ((z + 1) * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + x);
+    //             last_idx = ((z - 1) * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + x);
+    //             if (z == 0)
+    //             {
+    //                 gradient[2] = (sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3]) / step;
+    //             }
+    //             else if (z == oversample)
+    //             {
+    //                 gradient[2] = (sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3]) / step;
+    //             }
+    //             else
+    //             {
+    //                 gradient[2] = (sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3]) / (step * 2);
+    //             }
+    //             if (grad_normalize)
+    //             {
+    //                 gradient.normalize();
+    //                 gradient[0] = std::isnan(gradient[0]) ? 0.0f : gradient[0];
+    //                 gradient[1] = std::isnan(gradient[1]) ? 0.0f : gradient[1];
+    //                 gradient[2] = std::isnan(gradient[2]) ? 0.0f : gradient[2];
+    //             }
+    //             field_gradients[index * 3 + 0] = gradient[0];
+    //             field_gradients[index * 3 + 1] = gradient[1];
+    //             field_gradients[index * 3 + 2] = gradient[2];
+    //         }
+    //     }
+    // }
 }
 
 bool Evaluator::CheckSplash(const int& pIdx)
@@ -251,6 +254,7 @@ float Evaluator::CalculateMaxScalarConstR()
     k_value += general_kernel(4 * Radius2, Influnce2, Sigma) * 6;
     k_value += general_kernel(8 * Radius2, Influnce2, Sigma) * 12;
     k_value += general_kernel(12 * Radius2, Influnce2, Sigma) * 8;
+    // k_value = general_kernel(0.0, Influnce2, Sigma);
 
     return Radius3 * k_value;
 }
@@ -260,16 +264,11 @@ float Evaluator::CalculateMaxScalarVarR()
     float max_scalar = 0;
     auto searchers = constructor->getSearcher();
     unsigned int rId;
-    // float r, radius2, influnce, influnce2, temp_scalar;
     float temp_scalar;
     for (const auto searcher : *(searchers->getSearchers()))
     {
         temp_scalar = 0.0;
         rId = searcher->RadiusId;
-        // r = searcher->Radius;
-        // radius2 = r * r;
-        // influnce = r * SmoothFactor;
-        // influnce2 = influnce * influnce;
         temp_scalar += general_kernel(0.0, GlobalInflunce2[rId], GlobalSigma[rId]);
         temp_scalar += general_kernel(4 * GlobalRadius2[rId], GlobalInflunce2[rId], GlobalSigma[rId]) * 6;
         temp_scalar += general_kernel(8 * GlobalRadius2[rId], GlobalInflunce2[rId], GlobalSigma[rId]) * 12;
@@ -287,7 +286,7 @@ float Evaluator::RecommendIsoValueConstR(const float iso_factor)
 {
     float k_value = 0.0;
 
-    k_value += general_kernel(iso_factor * Radius2, Influnce2, Sigma);
+    k_value = general_kernel(iso_factor * Radius2, Influnce2, Sigma);
 
     return (((Radius3 * k_value) 
     - constructor->getMinScalar()) / constructor->getMaxScalar() * 255);
@@ -298,18 +297,13 @@ float Evaluator::RecommendIsoValueVarR(const float iso_factor)
     float recommend = 0.0;
     auto searchers = constructor->getSearcher();
     unsigned int rId;
-    // float r, radius2, influnce, influnce2, temp_scalar;
     float temp_scalar;
 
     for (const auto searcher : *(searchers->getSearchers()))
     {
         temp_scalar = 0.0;
         rId = searcher->RadiusId;
-        // r = searcher->Radius;
-        // radius2 = r * r;
-        // influnce = r * SmoothFactor;
-        // influnce2 = influnce * influnce;
-        temp_scalar += general_kernel(iso_factor * GlobalRadius2[rId], GlobalInflunce2[rId], GlobalSigma[rId]);
+        temp_scalar = general_kernel(iso_factor * GlobalRadius2[rId], GlobalInflunce2[rId], GlobalSigma[rId]);
         temp_scalar = GlobalRadius3[rId] * temp_scalar;
         if (temp_scalar > recommend)
         {
@@ -328,18 +322,27 @@ void Evaluator::CalcParticlesNormal()
         Eigen::Vector3f tempGrad = Eigen::Vector3f::Zero();
         if (!CheckSplash(pIdx))
         {
-            SingleEvalWithGrad(GlobalPoses->at(pIdx), tempScalar, tempGrad);
-            PariclesNormals[pIdx][0] = tempGrad[0];
-            PariclesNormals[pIdx][1] = tempGrad[1];
-            PariclesNormals[pIdx][2] = tempGrad[2];
+            SingleEvalWithGrad(GlobalPoses->at(pIdx), tempScalar, PariclesNormals[pIdx]);
+            // PariclesNormals[pIdx][0] = tempGrad[0];
+            // PariclesNormals[pIdx][1] = tempGrad[1];
+            // PariclesNormals[pIdx][2] = tempGrad[2];
         }
     }
 }
 
 inline float Evaluator::general_kernel(float d2, float h2, float sigma)
 {
-    float p_dist = (d2 >= h2 ? 0.0 : pow(h2 - d2, 3));
+    float p_dist = (d2 > h2 ? 0.0 : pow(h2 - d2, 3));
     return p_dist * sigma;
+}
+
+inline Eigen::Vector3f Evaluator::gradient_kernel(float d2, float h2, float sigma, const Eigen::Vector3f diff)
+{
+    Eigen::Vector3f grad = Eigen::Vector3f::Zero();
+    grad[0] = sigma * (-6 * diff[0]) * (d2 > h2 ? 0.0f : ((h2 - d2) * (h2 - d2)));
+    grad[1] = sigma * (-6 * diff[1]) * (d2 > h2 ? 0.0f : ((h2 - d2) * (h2 - d2)));
+    grad[2] = sigma * (-6 * diff[2]) * (d2 > h2 ? 0.0f : ((h2 - d2) * (h2 - d2)));
+    return grad;
 }
 
 inline float Evaluator::IsotropicInterpolate(const int pIdx, const float d2)
@@ -351,13 +354,32 @@ inline float Evaluator::IsotropicInterpolate(const int pIdx, const float d2)
 	return (IS_CONST_RADIUS ? Radius3 : GlobalRadius3[pIdx]) * k_value;
 }
 
-inline float Evaluator::AnisotropicInterpolate(const int pIdx, const Eigen::Vector3f& diff)
+inline Eigen::Vector3f Evaluator::IsotropicInterpolateGrad(const int pIdx, const float d2, const Eigen::Vector3f diff)
+{
+    Eigen::Vector3f grad = gradient_kernel(
+        d2, 
+        (IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx]), 
+        (IS_CONST_RADIUS ? Sigma : GlobalSigma[pIdx]), diff);
+    return (IS_CONST_RADIUS ? Radius3 : GlobalRadius3[pIdx]) * grad;
+}
+
+inline float Evaluator::AnisotropicInterpolate(const int pIdx, const Eigen::Vector3f diff)
 {
     float k_value = general_kernel(
         (GlobalGs[pIdx] * diff).squaredNorm(), 
         (IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx]), 
         (IS_CONST_RADIUS ? Sigma : GlobalSigma[pIdx]));
     return (IS_CONST_RADIUS ? Radius3 : GlobalRadius3[pIdx]) * (GlobalDeterminant[pIdx] * k_value);
+}
+
+inline Eigen::Vector3f Evaluator::AnisotropicInterpolateGrad(const int pIdx, const Eigen::Vector3f diff)
+{
+    Eigen::Vector3f grad = gradient_kernel(
+        (GlobalGs[pIdx] * diff).squaredNorm(), 
+        // diff.squaredNorm(), 
+        (IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx]), 
+        (IS_CONST_RADIUS ? Sigma : GlobalSigma[pIdx]), (GlobalGs[pIdx] * diff));
+    return (IS_CONST_RADIUS ? Radius3 : GlobalRadius3[pIdx]) * (GlobalDeterminant[pIdx] * grad);
 }
 
 inline void Evaluator::compute_xMeans(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Eigen::Vector3f &xMean)
@@ -372,7 +394,7 @@ inline void Evaluator::compute_xMeans(int pIdx, std::vector<int> temp_neighbors,
         if (nIdx == pIdx)
             continue;
         nR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(nIdx);
-        nD = SmoothFactor * nR * 1.4;
+        nD = SmoothFactor * nR * 1.6;
         nD2 = nD * nD;
         nI = nR * NeighborFactor;
         nI2 = nI * nI;
@@ -511,116 +533,3 @@ inline float Evaluator::wij(float d, float r)
 	}
 }
 
-inline void Evaluator::IsotropicEval(const Eigen::Vector3f& pos, float& info, float* temp_scalars, float& sample_radius)
-{    
-    std::vector<int> neighbors;
-    if (IS_CONST_RADIUS)
-    {
-        constructor->getHashGrid()->GetPIdxList(pos, neighbors);
-    } else {
-        constructor->getSearcher()->GetNeighbors(pos, neighbors);
-    }
-    if (neighbors.empty())
-    {
-        return;
-    }
-
-    sample_radius = IS_CONST_RADIUS ? Radius : 
-    (*std::min_element(neighbors.begin(), neighbors.end(), [&](const int& a, const int& b) {
-        return GlobalRadius[a] < GlobalRadius[b];
-    }));
-
-    Eigen::Vector3f x_up_pos(pos[0] + sample_radius, pos[1], pos[2]),
-                    x_down_pos(pos[0] - sample_radius, pos[1], pos[2]),
-                    y_up_pos(pos[0], pos[1] + sample_radius, pos[2]),
-                    y_down_pos(pos[0], pos[1] - sample_radius, pos[2]),
-                    z_up_pos(pos[0], pos[1], pos[2] + sample_radius),
-                    z_down_pos(pos[0], pos[1], pos[2] - sample_radius);
-
-    float d;
-    for (int pIdx : neighbors)
-    {
-        if (this->CheckSplash(pIdx))
-        {
-            continue;
-        }
-        
-        d = (pos - GlobalPoses->at(pIdx)).norm();
-        info += IsotropicInterpolate(pIdx, d);
-
-        d = (x_up_pos - GlobalPoses->at(pIdx)).norm();
-        temp_scalars[0] += IsotropicInterpolate(pIdx, d);
-
-        d = (x_down_pos - GlobalPoses->at(pIdx)).norm();
-        temp_scalars[1] += IsotropicInterpolate(pIdx, d);
-
-        d = (y_up_pos - GlobalPoses->at(pIdx)).norm();
-        temp_scalars[2] += IsotropicInterpolate(pIdx, d);
-
-        d = (y_down_pos - GlobalPoses->at(pIdx)).norm();
-        temp_scalars[3] += IsotropicInterpolate(pIdx, d);
-
-        d = (z_up_pos - GlobalPoses->at(pIdx)).norm();
-        temp_scalars[4] += IsotropicInterpolate(pIdx, d);
-
-        d = (z_down_pos - GlobalPoses->at(pIdx)).norm();
-        temp_scalars[5] += IsotropicInterpolate(pIdx, d);
-    }
-}
-
-inline void Evaluator::AnisotropicEval(const Eigen::Vector3f& pos, float& info, float* temp_scalars, float& sample_radius)
-{
-    std::vector<int> neighbors;
-    if (IS_CONST_RADIUS)
-    {
-        constructor->getHashGrid()->GetPIdxList(pos, neighbors);
-    } else {
-        constructor->getSearcher()->GetNeighbors(pos, neighbors);
-    }
-    if (neighbors.empty())
-    {
-        return;
-    }
-
-    sample_radius = IS_CONST_RADIUS ? Radius : 
-    GlobalRadius->at(*std::min_element(neighbors.begin(), neighbors.end(), [&](const int& a, const int& b) {
-        return GlobalRadius->at(a) < GlobalRadius->at(b);
-    }));
-
-    Eigen::Vector3f x_up_pos(pos[0] + sample_radius, pos[1], pos[2]),
-                    x_down_pos(pos[0] - sample_radius, pos[1], pos[2]),
-                    y_up_pos(pos[0], pos[1] + sample_radius, pos[2]),
-                    y_down_pos(pos[0], pos[1] - sample_radius, pos[2]),
-                    z_up_pos(pos[0], pos[1], pos[2] + sample_radius),
-                    z_down_pos(pos[0], pos[1], pos[2] - sample_radius);
-
-    Eigen::Vector3f diff;
-    for (int pIdx : neighbors)
-    {
-        if (this->CheckSplash(pIdx))
-        {
-            continue;
-        }
-        
-        diff = pos - GlobalxMeans[pIdx];
-        info += AnisotropicInterpolate(pIdx, diff);
-
-        diff = x_up_pos - GlobalxMeans[pIdx];
-        temp_scalars[0] += AnisotropicInterpolate(pIdx, diff);
-
-        diff = x_down_pos - GlobalxMeans[pIdx];
-        temp_scalars[1] += AnisotropicInterpolate(pIdx, diff);
-
-        diff = y_up_pos - GlobalxMeans[pIdx];
-        temp_scalars[2] += AnisotropicInterpolate(pIdx, diff);
-
-        diff = y_down_pos - GlobalxMeans[pIdx];
-        temp_scalars[3] += AnisotropicInterpolate(pIdx, diff);
-
-        diff = z_up_pos - GlobalxMeans[pIdx];
-        temp_scalars[4] += AnisotropicInterpolate(pIdx, diff);
-
-        diff = z_down_pos - GlobalxMeans[pIdx];
-        temp_scalars[5] += AnisotropicInterpolate(pIdx, diff);
-    }
-}

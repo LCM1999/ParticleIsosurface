@@ -35,7 +35,7 @@ public:
 	void CalcXYZIdx(const Eigen::Vector3f& pos, Eigen::Vector3i& xyzIdx);
 	long long CalcCellHash(const Eigen::Vector3i& xyzIdx);
 	void GetInCellList(const long long hash, std::vector<int>& pIdxList);
-    void GetInBoxParticles(const Eigen::Vector3f& box1, const Eigen::Vector3f& box2, std::vector<int>& insides);
+    void GetInBoxParticles(Eigen::Vector3f box1, Eigen::Vector3f box2, std::vector<int>& insides);
 	// void FindParticlesNeighbor(const int& pIdx, std::vector<int>& pIdxList);
 private:
 	void BuildTable();

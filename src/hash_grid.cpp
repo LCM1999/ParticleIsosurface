@@ -130,9 +130,9 @@ void HashGrid::CalcXYZIdx(const Eigen::Vector3f& pos, Eigen::Vector3i& xyzIdx)
 
 long long HashGrid::CalcCellHash(const Eigen::Vector3i& xyzIdx)
 {
-	if (xyzIdx[0] < 0 || xyzIdx[0] > XYZCellNum[0] ||
-		xyzIdx[1] < 0 || xyzIdx[1] > XYZCellNum[1] ||
-		xyzIdx[2] < 0 || xyzIdx[2] > XYZCellNum[2])
+	if (xyzIdx[0] < 0 || xyzIdx[0] >= XYZCellNum[0] ||
+		xyzIdx[1] < 0 || xyzIdx[1] >= XYZCellNum[1] ||
+		xyzIdx[2] < 0 || xyzIdx[2] >= XYZCellNum[2])
 		return -1;
 	return (long long)xyzIdx[2] * (long long)XYZCellNum[0] * (long long)XYZCellNum[1] + 
 		(long long)xyzIdx[1] * (long long)XYZCellNum[0] + (long long)xyzIdx[0];
@@ -155,13 +155,19 @@ void HashGrid::GetInCellList(const long long hash, std::vector<int>& pIdxList)
 }
 
 void HashGrid::GetInBoxParticles(
-	const Eigen::Vector3f& box1, const Eigen::Vector3f& box2, 
+	Eigen::Vector3f box1, Eigen::Vector3f box2, 
 	std::vector<int>& insides)
 {
 	Eigen::Vector3i minXyzIdx, maxXyzIdx;
+	for (size_t i = 0; i < 3; i++)
+	{
+		box1[i] = std::max(box1[i], Bounding[2*i]);
+		box2[i] = std::min(box2[i], Bounding[2*i+1]);
+	}
 	CalcXYZIdx(box1, minXyzIdx);
 	CalcXYZIdx(box2, maxXyzIdx);
 
+	int bad_temp_hash = 0;
 	long long temp_hash;
 	for (int x = (minXyzIdx.x()-1); x <= (maxXyzIdx.x()+1); x++)
     {
@@ -170,7 +176,10 @@ void HashGrid::GetInBoxParticles(
             for (int z = (minXyzIdx.z()-1); z <= (maxXyzIdx.z()+1); z++)
             {
                 temp_hash = CalcCellHash(Eigen::Vector3i(x, y, z));
-                if (temp_hash < 0) {continue;}
+                if (temp_hash < 0) {
+					bad_temp_hash++;
+					continue;
+				}
                 GetInCellList(temp_hash, insides);
             }
         }

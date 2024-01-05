@@ -144,7 +144,7 @@ void SurfReconstructor::resizeRootBoxVarR()
 	while (resizeLen - maxLen < (_NEIGHBOR_FACTOR * maxR * 2))
 	{
 		_DEPTH_MAX++;
-		resizeLen = pow(2, _DEPTH_MAX) * maxR;
+		resizeLen = pow(2, _DEPTH_MAX) * minR;
 	}
 	_RootHalfLength = resizeLen / 2;
 	for (size_t i = 0; i < 3; i++)
@@ -162,7 +162,7 @@ void SurfReconstructor::resizeRootBoxVarR()
 void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, unsigned char& empty, float& curv, float& min_radius)
 {
 	Eigen::Vector3f norms(0, 0, 0);
-	int area = 0;
+	float area = 0.0f;
 	std::vector<int> insides;
 	min_radius = IS_CONST_RADIUS ? _RADIUS : FLT_MAX;
 	const Eigen::Vector3f 
@@ -194,7 +194,7 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, unsigned char& empty
 						Eigen::Vector3f tempNorm = _evaluator->PariclesNormals[in];
 						if (tempNorm == Eigen::Vector3f(0, 0, 0))	{continue;}
 						norms += tempNorm;
-						area++;
+						area += tempNorm.norm();
 					}
 					
 					if (!IS_CONST_RADIUS)
@@ -210,7 +210,7 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, unsigned char& empty
 		}
 		empty = all_splash;
 	}
-	curv = (area == 0) ? 1.0 : (norms.norm() / area);
+	curv = (area == 0) ? 0.0 : (norms.norm() / area);
 }
 
 void SurfReconstructor::beforeSampleEval(TNode* tnode, float& curv, float& min_radius, unsigned char& empty)
@@ -335,7 +335,7 @@ void SurfReconstructor::genIsoOurs()
 	WaitingStack.push_back(_OurRoot);
 	while (!WaitingStack.empty())
 	{
-		printf("%d \n", WaitingStack.size());
+		std::cout << WaitingStack.size() << std::endl;
 		for (queue_flag = 0; queue_flag < inProcessSize && !WaitingStack.empty(); queue_flag++)
 		{
 			ProcessArray[queue_flag] = WaitingStack.back();
@@ -400,6 +400,8 @@ void SurfReconstructor::genIsoOurs()
 		depth++;
 		half/=2;
 	}
+	delete[] sample_points;
+	delete[] sample_grads;
 	float t_finish = get_time();
 	printf("Time generating tree = %f\n", t_finish - t_start);	
 	_STATE++;

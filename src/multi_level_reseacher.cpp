@@ -34,11 +34,11 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3f>* particles, 
     sortedIndex.clear();
     // sortedParticles.resize(bins);
     sortedIndex.resize(bins);
-    for (size_t i = 0; i < bins; i++)
-    {
-        // sortedParticles[i].clear();
-        sortedIndex[i].clear();
-    }
+    // for (size_t i = 0; i < bins; i++)
+    // {
+    //     // sortedParticles[i].clear();
+    //     sortedIndex[i].clear();
+    // }
 
     for (int i = 0; i < radiuses->size(); i++)
     {

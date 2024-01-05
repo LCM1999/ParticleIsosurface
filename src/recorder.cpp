@@ -66,10 +66,17 @@ void Recorder::RecordParticles()
 	Evaluator* evaluator = constructor->getEvaluator();
 	Eigen::Vector3i xyz;
 	FILE* f = fopen((_Output_Dir + "/rp_" + _Frame_Name + ".txt").c_str(), "w");
-	fprintf(f, "\"x\",\"y\",\"z\",\"type\"\n");
+	fprintf(f, "\"x\",\"y\",\"z\",\"g_x\",\"g_y\",\"g_z\",\"type\"\n");
 	for (int pIdx = 0; pIdx < constructor->getGlobalParticlesNum(); pIdx++)
 	{
-		fprintf(f, "%f,%f,%f,%d\n", evaluator->GlobalxMeans[pIdx][0], evaluator->GlobalxMeans[pIdx][1], evaluator->GlobalxMeans[pIdx][2], evaluator->CheckSplash(pIdx)?1:0);
+		fprintf(f, "%f,%f,%f,%f,%f,%f,%d\n", 
+		evaluator->GlobalxMeans[pIdx][0], 
+		evaluator->GlobalxMeans[pIdx][1], 
+		evaluator->GlobalxMeans[pIdx][2], 
+		evaluator->PariclesNormals[pIdx][0], 
+		evaluator->PariclesNormals[pIdx][1], 
+		evaluator->PariclesNormals[pIdx][2], 
+		evaluator->CheckSplash(pIdx)?1:0);
 	}
 	fclose(f);
 }

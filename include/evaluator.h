@@ -41,10 +41,10 @@ public:
                 float radius);
 
 	void SingleEval(const Eigen::Vector3f& pos, float& scalar);
-    void SingleEvalWithGrad(const Eigen::Vector3f& pos, float& scalar, Eigen::Vector3f& gradient, bool use_normalize = true, bool use_signed = true, bool grad_normalize = true);
+    void SingleEvalWithGrad(const Eigen::Vector3f& pos, float& scalar, Eigen::Vector3f& gradient);
     void GridEval(
         float* sample_points, float* field_gradients, float cellsize, 
-        bool& signchange, int oversample, bool grad_normalize = true);
+        bool& signchange, int oversample, bool grad_normalize = false);
 
     bool CheckSplash(const int& pIdx);
     float CalculateMaxScalarConstR();
@@ -61,14 +61,14 @@ private:
     float SmoothFactor;
 
     float general_kernel(float d2, float h2, float sigma);
+    Eigen::Vector3f gradient_kernel(float d2, float h2, float sigma, Eigen::Vector3f diff);
 
 	float IsotropicInterpolate(const int pIdx, const float d);
-	float AnisotropicInterpolate(const int pIdx, const Eigen::Vector3f& diff);
+    Eigen::Vector3f IsotropicInterpolateGrad(const int pIdx, const float d2, const Eigen::Vector3f diff);
+	float AnisotropicInterpolate(const int pIdx, const Eigen::Vector3f diff);
+    Eigen::Vector3f AnisotropicInterpolateGrad(const int pIdx, const Eigen::Vector3f diff);
 	void compute_Gs_xMeans();
     void compute_xMeans(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Eigen::Vector3f &xMean);
     void compute_G(Eigen::Vector3f p, Eigen::Vector3f xMean, std::vector<int> neighbors, Eigen::Matrix3f &G);
 	float wij(float d, float r);
-
-    void IsotropicEval(const Eigen::Vector3f& pos, float& info, float* temp_scalars, float& sample_radius);
-    void AnisotropicEval(const Eigen::Vector3f& pos, float& info, float* temp_scalars, float& sample_radius);
 };
