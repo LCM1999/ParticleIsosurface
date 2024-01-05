@@ -41,6 +41,7 @@ float ISO_FACTOR = 1.9;
 // bool USE_CUDA = false;
 bool CALC_P_NORMAL = true;
 bool GEN_SPLASH = true;
+bool SINGLE_LAYER = false;
 
 void writeObjFile(Mesh &m, std::string fn)
 {
@@ -452,13 +453,15 @@ int main(int argc, char **argv)
         dataDirPath =
         // "E:/data/multiR/mr_csv";
         // "E:/data/vtk/csv";
-        "E:/data/car_render_test_data_2/Fluid";
-        // "E:/data/vtk/2a239e6f-fa76-4756-8b5f-390973215b30";
+        // "E:/data/car_render_test_data_2/Fluid";
+        "F:/data/vtk/2a239e6f-fa76-4756-8b5f-390973215b30";
+        // "F:/data";
         outPath = 
         // "E:/data/multiR/mr_csv/out";
         // "E:/data/vtk/csv/out";
-        "E:/data/car_render_test_data_2/Fluid/out";
-        // "E:/data/vtk/2a239e6f-fa76-4756-8b5f-390973215b30/out";
+        // "E:/data/car_render_test_data_2/Fluid/out";
+        "F:/data/vtk/2a239e6f-fa76-4756-8b5f-390973215b30/out";
+        // "F:/data/out";
         run(dataDirPath, outPath);
         break;
     }

@@ -44,18 +44,12 @@ inline void SurfReconstructor::loadRootBox()
 		if (p.z() < _BoundingBox[4]) _BoundingBox[4] = p.z();
 		if (p.z() > _BoundingBox[5]) _BoundingBox[5] = p.z();
 	}
-	// _BoundingBox[0] = (*std::min_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	// [&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.x() < b.x(); })).x();
-	// _BoundingBox[1] = (*std::max_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	// [&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.x() < b.x(); })).x();
-	// _BoundingBox[2] = (*std::min_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	// [&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.y() < b.y(); })).y();
-	// _BoundingBox[3] = (*std::max_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	// [&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.y() < b.y(); })).y();
-	// _BoundingBox[4] = (*std::min_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	// [&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.z() < b.z(); })).z();
-	// _BoundingBox[5] = (*std::max_element(_GlobalParticles.begin(), _GlobalParticles.end(), 
-	// [&] (Eigen::Vector3f& a, Eigen::Vector3f& b) { return a.z() < b.z(); })).z();
+	if (_BoundingBox[0] == _BoundingBox[1] ||
+		_BoundingBox[2] == _BoundingBox[3] ||
+		_BoundingBox[4] == _BoundingBox[5])
+	{
+		SINGLE_LAYER = true;
+	}
 }
 
 void SurfReconstructor::shrinkBox()
@@ -128,7 +122,7 @@ void SurfReconstructor::resizeRootBoxConstR()
 		_RootCenter[i] = center;
 	}
 	
-	_DEPTH_MIN = (_DEPTH_MAX - 2);	
+	_DEPTH_MIN = (_DEPTH_MAX - (SINGLE_LAYER ? 1 : 2));	
 }
 
 void SurfReconstructor::resizeRootBoxVarR()

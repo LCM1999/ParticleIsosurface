@@ -7,5 +7,6 @@ extern bool IS_CONST_RADIUS;
 extern bool USE_ANI;
 extern bool CALC_P_NORMAL;
 extern bool GEN_SPLASH;
+extern bool SINGLE_LAYER;
 
 

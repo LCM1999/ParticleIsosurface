@@ -96,7 +96,7 @@ void TNode::NodeSampling(
 		area += n.norm();
 	}
 
-	float field_curv = (area == 0) ? 0.0 : (norms.norm() / area);
+	float field_curv = (area == 0) ? 1.0 : (norms.norm() / area);
 	curv = std::min(curv, field_curv);
 }
 
