@@ -323,9 +323,6 @@ void Evaluator::CalcParticlesNormal()
         if (!CheckSplash(pIdx))
         {
             SingleEvalWithGrad(GlobalPoses->at(pIdx), tempScalar, PariclesNormals[pIdx]);
-            // PariclesNormals[pIdx][0] = tempGrad[0];
-            // PariclesNormals[pIdx][1] = tempGrad[1];
-            // PariclesNormals[pIdx][2] = tempGrad[2];
         }
     }
 }

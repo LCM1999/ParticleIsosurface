@@ -204,7 +204,7 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, unsigned char& empty
 		}
 		empty = all_splash;
 	}
-	curv = (area == 0) ? 0.0 : (norms.norm() / area);
+	curv = (area == 0) ? 1.0 : (norms.norm() / area);
 }
 
 void SurfReconstructor::beforeSampleEval(TNode* tnode, float& curv, float& min_radius, unsigned char& empty)

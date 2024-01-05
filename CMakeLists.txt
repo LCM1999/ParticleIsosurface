@@ -30,7 +30,7 @@ if(NOT MPI_FOUND)
 endif()
 
 # set(HDF5_PREFER_PARALLEL "ON")
-set(HDF5_DIR F:/hdf5-1.12.1/cmake/hdf5)
+set(HDF5_DIR E:/hdf5/HDF5-1.14.3-win64/cmake)
 find_package(HDF5 REQUIRED NAMES hdf5 COMPONENTS C static HL)
 if(NOT HDF5_FOUND)
    message(FATAL_ERROR "HDF5 not found!")
