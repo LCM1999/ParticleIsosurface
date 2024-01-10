@@ -453,15 +453,15 @@ int main(int argc, char **argv)
         dataDirPath =
         // "E:/data/multiR/mr_csv";
         // "E:/data/vtk/csv";
-        "E:/data/car_render_test_data_2/Fluid";
+        // "E:/data/3s/20231222-water";
         // "F:/data/vtk/2a239e6f-fa76-4756-8b5f-390973215b30";
-        // "F:/data";
+        "C:/Users/11379/Desktop/protein";
         outPath = 
         // "E:/data/multiR/mr_csv/out";
         // "E:/data/vtk/csv/out";
-        "E:/data/car_render_test_data_2/Fluid/out";
+        // "E:/data/3s/20231222-water/out";
         // "F:/data/vtk/2a239e6f-fa76-4756-8b5f-390973215b30/out";
-        // "F:/data/out";
+        "C:/Users/11379/Desktop/protein/out";
         run(dataDirPath, outPath);
         break;
     }

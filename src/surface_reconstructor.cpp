@@ -149,7 +149,7 @@ void SurfReconstructor::resizeRootBoxVarR()
 		_RootCenter[i] = center;
 	}
 
-	_DEPTH_MIN = int(ceil(log2(ceil(maxLen / maxR)))) - 1; //, _DEPTH_MAX - int(_DEPTH_MAX / 3));
+	_DEPTH_MIN = std::min(int(ceil(log2(ceil(maxLen / maxR)))) - 1); //, _DEPTH_MAX - int(_DEPTH_MAX / 3));
 }
 
 
@@ -319,8 +319,8 @@ void SurfReconstructor::genIsoOurs()
 		printf("Time generating polygons = %f\n", t_alldone - t_gen_mesh);
 		return;
 	}
-	int depth = 0;
-	float half = _OurRoot->half_length;
+	// int depth = 0;
+	// float half = _OurRoot->half_length;
 	float* sample_points = nullptr;
 	float* sample_grads = nullptr;
 	std::vector<float> cuvrs;
@@ -391,8 +391,8 @@ void SurfReconstructor::genIsoOurs()
 				}
 			}
 		}
-		depth++;
-		half/=2;
+		// depth++;
+		// half/=2;
 	}
 	delete[] sample_points;
 	delete[] sample_grads;
