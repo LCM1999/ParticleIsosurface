@@ -42,6 +42,11 @@ if(NOT EIGEN3_FOUND)
     message(FATAL_ERROR "Eigen3 not found!")
 endif()
 
+find_package(VTK REQUIRED)
+if(NOT VTK_FOUND)
+    message(FATAL_ERROR "VTK not found!")
+endif()
+
 ################################################################################
 # Target
 ################################################################################
@@ -80,6 +85,7 @@ target_include_directories(${PROJECT_NAME}
     ${MPI_CXX_INCLUDE_DIRS}
     ${HDF5_INCLUDE_DIR}
     ${EIGEN3_INCLUDE_DIR}
+    ${VTK_USE_FILE}
 )
 
 # cuda_add_library(node_calc_lib SHARED src/node_calc.cu)
@@ -87,6 +93,7 @@ target_include_directories(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME} 
     PUBLIC
     ${HDF5_C_STATIC_LIBRARY}
+    ${VTK_LIBRARIES}
     Eigen3::Eigen
     OpenMP::OpenMP_CXX
     pugixml

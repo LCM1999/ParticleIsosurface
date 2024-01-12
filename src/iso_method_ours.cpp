@@ -8,8 +8,6 @@
 #include "qefnorm.h"
 #include "evaluator.h"
 
-int tree_cells = 0;
-
 static float sign(unsigned int x)
 {
 	return x ? 1 : -1;
@@ -24,7 +22,7 @@ TNode::TNode(SurfReconstructor* surf_constructor, unsigned long long id)
 	this->id = id;
 }
 
-TNode::TNode(SurfReconstructor* surf_constructor, TNode* parent, Index i)
+TNode::TNode(SurfReconstructor* surf_constructor, std::shared_ptr<TNode> parent, Index i)
 {
 	constructor = surf_constructor;
 	depth = parent->depth + 1;
@@ -187,12 +185,4 @@ bool TNode::changeSignDMC(Eigen::Vector4f* verts)
 		sign(verts[0]) != sign(node);
 }
 
-void TNode::defoliate()
-{
-	for (int i = 0; i < 8; i++)
-	{
-		delete children[i];
-		children[i] = 0;
-	}
-}
 

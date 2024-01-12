@@ -451,17 +451,17 @@ int main(int argc, char **argv)
     case 1:
     default:
         dataDirPath =
-        // "E:/data/multiR/mr_csv";
+        "E:/data/multiR/mr_csv";
         // "E:/data/vtk/csv";
         // "E:/data/3s/20231222-water";
         // "F:/data/vtk/2a239e6f-fa76-4756-8b5f-390973215b30";
-        "C:/Users/11379/Desktop/protein";
+        // "C:/Users/11379/Desktop/protein";
         outPath = 
-        // "E:/data/multiR/mr_csv/out";
+        "E:/data/multiR/mr_csv/out";
         // "E:/data/vtk/csv/out";
         // "E:/data/3s/20231222-water/out";
         // "F:/data/vtk/2a239e6f-fa76-4756-8b5f-390973215b30/out";
-        "C:/Users/11379/Desktop/protein/out";
+        // "C:/Users/11379/Desktop/protein/out";
         run(dataDirPath, outPath);
         break;
     }

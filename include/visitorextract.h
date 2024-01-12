@@ -14,9 +14,12 @@ class Mesh;
 struct TraversalData
 {
 	TraversalData(){}
-	TraversalData(TNode *t);
+	TraversalData(std::shared_ptr<TNode>t) {
+		n = t;
+		depth = 0;
+	}
 
-	TNode *n; // node
+	std::shared_ptr<TNode>n; // node
 	char depth; 
 
 	void gen_trav(TraversalData &c, Index i);
@@ -292,7 +295,7 @@ static procedure table[256] =
 struct dual_grid
 {
 	procedure proc;
-	std::array<TNode*, 8> grid;
+	std::array<std::shared_ptr<TNode>, 8> grid;
 };
 
 struct dual_cell

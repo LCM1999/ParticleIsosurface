@@ -18,12 +18,6 @@ auto invlerp(T x1, T x2, T x)
 {
 	return (x - x1) / (x2 - x1);
 }
-
-TraversalData::TraversalData(TNode *t)
-{
-	n = t;
-	depth = 0;
-}
 	
 void TraversalData::gen_trav(TraversalData &c, Index i)
 {
@@ -239,7 +233,7 @@ bool VisitorExtract::on_vert(
 	if (a.n->is_leaf() && b.n->is_leaf() && c.n->is_leaf() && d.n->is_leaf() && aa.n->is_leaf() && ba.n->is_leaf() && ca.n->is_leaf() && da.n->is_leaf())
 	{
 		int index = 0;
-		std::array<TNode*, 8> n = { a.n, b.n, c.n, d.n, aa.n, ba.n, ca.n, da.n };
+		std::array<std::shared_ptr<TNode>, 8> n = { a.n, b.n, c.n, d.n, aa.n, ba.n, ca.n, da.n };
 		for (int i = 0; i < 8; i++)
 		{
 			if (sign(n[i]->node) > 0)
@@ -248,7 +242,7 @@ bool VisitorExtract::on_vert(
 			}
 		}
 
-		std::array<TNode*, 8> trans_vertices;
+		std::array<std::shared_ptr<TNode>, 8> trans_vertices;
 		const auto& proc = table[index];
 		for (int i = 0; i < 8; i++)
 		{

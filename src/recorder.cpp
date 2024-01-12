@@ -21,12 +21,12 @@ void Recorder::RecordProgress()
 	{
 		return;
 	}
-	TNode* root = constructor->getRoot();
+	std::shared_ptr<TNode> root = constructor->getRoot();
 
-	std::stack<TNode*> node_stack;
+	std::stack<std::shared_ptr<TNode>> node_stack;
 	node_stack.push(root);
-	std::vector<TNode*> leaves_and_empty;
-	TNode* temp_node;
+	std::vector<std::shared_ptr<TNode>> leaves_and_empty;
+	std::shared_ptr<TNode> temp_node;
 	std::string types = "", ids = "";
 	while (!node_stack.empty())
 	{
@@ -54,7 +54,7 @@ void Recorder::RecordProgress()
 	}
 	//fprintf(f, types.c_str());
 	fprintf(f, "\"pos_x\",\"pos_y\",\"pos_z\",\"v\"\n");
-	for (TNode* n : leaves_and_empty)
+	for (std::shared_ptr<TNode> n : leaves_and_empty)
 	{
 		fprintf(f, "%f,%f,%f,%f\n", n->node[0], n->node[1], n->node[2], n->node[3]);
 	}
@@ -63,7 +63,7 @@ void Recorder::RecordProgress()
 
 void Recorder::RecordParticles()
 {
-	Evaluator* evaluator = constructor->getEvaluator();
+	std::shared_ptr<Evaluator> evaluator = constructor->getEvaluator();
 	Eigen::Vector3i xyz;
 	FILE* f = fopen((_Output_Dir + "/rp_" + _Frame_Name + ".txt").c_str(), "w");
 	fprintf(f, "\"x\",\"y\",\"z\",\"g_x\",\"g_y\",\"g_z\",\"type\"\n");
@@ -88,11 +88,11 @@ void Recorder::RecordFeatures()
 	{
 		return;
 	}
-	TNode* root = constructor->getRoot();
-	std::stack<TNode*> node_stack;
+	std::shared_ptr<TNode> root = constructor->getRoot();
+	std::stack<std::shared_ptr<TNode>> node_stack;
 	node_stack.push(root);
-	std::vector<TNode*> leaves_and_empty;
-	TNode* temp_node;
+	std::vector<std::shared_ptr<TNode>> leaves_and_empty;
+	std::shared_ptr<TNode> temp_node;
 	std::string types = "", ids = "";
 	while (!node_stack.empty())
 	{
@@ -119,7 +119,7 @@ void Recorder::RecordFeatures()
 		}
 	}
 	fprintf(f, "\"x\",\"y\",\"z\",\"scalar\", \"type\"\n");
-	for (TNode* n : leaves_and_empty)
+	for (std::shared_ptr<TNode> n : leaves_and_empty)
 	{
 		fprintf(f, "%f,%f,%f,%f,%d\n", n->node[0], n->node[1], n->node[2], n->node[3], (n->type == LEAF ? 1 : 0));
 	}

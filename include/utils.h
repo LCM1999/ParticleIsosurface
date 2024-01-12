@@ -10,6 +10,8 @@ int sign(Eigen::Vector<T, 4> &x)
 	return x[3] > 0 ? 1 : -1;
 }
 
+void printMem();
+
 void parseString(std::vector<std::string> *commList, const std::string& input, std::string sep);
 
 void replaceAll(std::string &str, const std::string &olds, const std::string &news);

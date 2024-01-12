@@ -1,5 +1,15 @@
 #include "utils.h"
+#include <iostream>
+#include <Windows.h>
+#include <Psapi.h>
 
+void printMem() {
+	PROCESS_MEMORY_COUNTERS pmc;
+	if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+	{
+		std::cout << pmc.WorkingSetSize / 1024 / 1024 << "KB" << std::endl;
+	}
+}
 
 void parseString(std::vector<std::string> *commList, const std::string& input, std::string sep)
 {

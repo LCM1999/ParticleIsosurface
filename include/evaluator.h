@@ -14,8 +14,8 @@ class SurfReconstructor;
 class Evaluator
 {
 public:
-	Evaluator();
-	~Evaluator();
+	Evaluator() {};
+	~Evaluator() {};
 
     SurfReconstructor* constructor;
 	std::vector<Eigen::Vector3f>* GlobalPoses;

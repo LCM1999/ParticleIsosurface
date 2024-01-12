@@ -10,8 +10,6 @@
 #include "visitorextract.h"
 #include "traverse.h"
 
-#define DEFAULT_INF_FACTOR 4.0
-
 SurfReconstructor::SurfReconstructor(std::vector<Eigen::Vector3f>& particles, 
 std::vector<float>& radiuses, Mesh* mesh, 
 float radius, float iso_factor, float smooth_factor)
@@ -20,7 +18,6 @@ float radius, float iso_factor, float smooth_factor)
 	_GlobalParticlesNum = _GlobalParticles.size();
 	_GlobalRadiuses = radiuses;
 	_RADIUS = radius;
-	_NEIGHBOR_FACTOR = DEFAULT_INF_FACTOR;
 	_SMOOTH_FACTOR = smooth_factor;
 	_ISO_FACTOR = iso_factor;
 
@@ -149,11 +146,11 @@ void SurfReconstructor::resizeRootBoxVarR()
 		_RootCenter[i] = center;
 	}
 
-	_DEPTH_MIN = std::min(int(ceil(log2(ceil(maxLen / maxR)))) - 1); //, _DEPTH_MAX - int(_DEPTH_MAX / 3));
+	_DEPTH_MIN = std::min(int(ceil(log2(ceil(maxLen / maxR)))) - 1, _DEPTH_MAX-2); //, _DEPTH_MAX - int(_DEPTH_MAX / 3));
 }
 
 
-void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, unsigned char& empty, float& curv, float& min_radius)
+void SurfReconstructor::checkEmptyAndCalcCurv(std::shared_ptr<TNode> tnode, unsigned char& empty, float& curv, float& min_radius)
 {
 	Eigen::Vector3f norms(0, 0, 0);
 	float area = 0.0f;
@@ -207,33 +204,21 @@ void SurfReconstructor::checkEmptyAndCalcCurv(TNode* tnode, unsigned char& empty
 	curv = (area == 0) ? 1.0 : (norms.norm() / area);
 }
 
-void SurfReconstructor::beforeSampleEval(TNode* tnode, float& curv, float& min_radius, unsigned char& empty)
+void SurfReconstructor::beforeSampleEval(std::shared_ptr<TNode> tnode, float& curv, float& min_radius, unsigned char& empty)
 {
-	switch (tnode->type)
+
+	checkEmptyAndCalcCurv(tnode, empty, curv, min_radius);
+	if (empty)
 	{
-	case EMPTY:
-	case LEAF:
-	case INTERNAL:
+		// _evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3]);
+		tnode->node[3] = _ISO_VALUE;
+		tnode->type = EMPTY;
 		return;
-	case UNCERTAIN:
-	{
-		// evaluate QEF samples
-		checkEmptyAndCalcCurv(tnode, empty, curv, min_radius);
-		if (empty)
-		{
-			_evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3]);
-			tnode->type = EMPTY;
-			return;
-		}
-	}
-	break;
-	default:
-		break;
 	}
 }
 
 void SurfReconstructor::afterSampleEval(
-	TNode* tnode, float& curv, float& min_radius, 
+	std::shared_ptr<TNode> tnode, float& curv, float& min_radius, 
 	float* sample_points, float* sample_grads)
 {
 	bool isbig = (tnode->depth < _DEPTH_MIN);
@@ -280,7 +265,7 @@ void SurfReconstructor::genIsoOurs()
 	if (_STATE == 0)
 	{
 		printf("-= Calculating Tree Structure =-\n");
-		_OurRoot = new TNode(this, 0);
+		_OurRoot = std::make_shared<TNode>(this, 0);
 		_OurRoot->center << _RootCenter[0], _RootCenter[1], _RootCenter[2];
 		_OurRoot->node << _RootCenter[0], _RootCenter[1], _RootCenter[2], 0.0;
 		_OurRoot->half_length = _RootHalfLength;
@@ -295,6 +280,7 @@ void SurfReconstructor::genIsoOurs()
 		v.generate_mesh();
 		if (GEN_SPLASH)
 		{
+			printf("-= Generate Splash =-\n");
 			std::vector<Eigen::Vector3f> splash_pos;
 			std::vector<float> splash_radiuses;
 			for (int pIdx = 0; pIdx < getGlobalParticlesNum(); pIdx++)
@@ -326,7 +312,8 @@ void SurfReconstructor::genIsoOurs()
 	std::vector<float> cuvrs;
 	std::vector<float> min_raiduses;
 	std::vector<unsigned char> emptys;
-	WaitingStack.push_back(_OurRoot);
+	WaitingStack.push_back(&_OurRoot);
+	ProcessArray.resize(inProcessSize);
 	while (!WaitingStack.empty())
 	{
 		std::cout << WaitingStack.size() << std::endl;
@@ -348,7 +335,7 @@ void SurfReconstructor::genIsoOurs()
 				for (size_t i = 0; i < queue_flag; i++)
 				{
 					#pragma omp task
-						beforeSampleEval(ProcessArray[i], cuvrs[i], min_raiduses[i], emptys[i]);
+						beforeSampleEval(*ProcessArray[i], cuvrs[i], min_raiduses[i], emptys[i]);
 				}
 			}
 		}
@@ -364,6 +351,7 @@ void SurfReconstructor::genIsoOurs()
 		}
 		sample_points = new float[int(pow(getOverSampleQEF()+1, 3)) * 4 * queue_flag];
 		sample_grads = new float[int(pow(getOverSampleQEF()+1, 3)) * 3 * queue_flag];
+		//TODO: Sampling
 		#pragma omp parallel
 		{
 			#pragma omp single
@@ -374,7 +362,7 @@ void SurfReconstructor::genIsoOurs()
 					{
 						#pragma omp task
 							afterSampleEval(
-									ProcessArray[i], cuvrs[i], min_raiduses[i], 
+									*ProcessArray[i], cuvrs[i], min_raiduses[i], 
 									sample_points + int(i * pow(getOverSampleQEF()+1, 3) * 4), 
 									sample_grads + int(i * pow(getOverSampleQEF()+1, 3) * 3));
 					}
@@ -383,17 +371,18 @@ void SurfReconstructor::genIsoOurs()
 		}
 		for (size_t i = 0; i < queue_flag; i++)
 		{
-			if (ProcessArray[i]->type == INTERNAL) {
+			if ((*ProcessArray[i])->type == INTERNAL) {
 				for (Index t = 0; t.v < 8; t++)
 				{
-					ProcessArray[i]->children[t.v] = new TNode(this, ProcessArray[i], t);
-					WaitingStack.push_back(ProcessArray[i]->children[t.v]);
+					(*ProcessArray[i])->children[t.v] = std::make_shared<TNode>(this, *ProcessArray[i], t);
+					WaitingStack.push_back(&((*ProcessArray[i])->children[t.v]));
 				}
 			}
 		}
 		// depth++;
 		// half/=2;
 	}
+	ProcessArray.clear();
 	delete[] sample_points;
 	delete[] sample_grads;
 	float t_finish = get_time();
@@ -424,16 +413,16 @@ void SurfReconstructor::generalModeRun()
 	printf("-= Build Neighbor Searcher =-\n");
 	if (IS_CONST_RADIUS)
 	{
-    	_hashgrid = new HashGrid(&_GlobalParticles, _BoundingBox, _RADIUS, _NEIGHBOR_FACTOR);
+    	_hashgrid = std::make_shared<HashGrid>(&_GlobalParticles, _BoundingBox, _RADIUS, _NEIGHBOR_FACTOR);
 	} else {
-		_searcher = new MultiLevelSearcher(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, _NEIGHBOR_FACTOR);
+		_searcher = std::make_shared<MultiLevelSearcher>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, _NEIGHBOR_FACTOR);
 	}
     last_temp_time = temp_time;
     temp_time = get_time();
 	printf("   Build Neighbor Searcher Time = %f \n", temp_time - last_temp_time);
 
     printf("-= Initialize Evaluator =-\n");
-	_evaluator = new Evaluator(this, &_GlobalParticles, &_GlobalRadiuses, _RADIUS);
+	_evaluator = std::make_shared<Evaluator>(this, &_GlobalParticles, &_GlobalRadiuses, _RADIUS);
 	last_temp_time = temp_time;
 	temp_time = get_time();
 	printf("   Initialize Evaluator Time = %f \n", temp_time - last_temp_time);
@@ -463,6 +452,7 @@ void SurfReconstructor::generalModeRun()
 	}
 
 	genIsoOurs();
+	printMem();
 	genIsoOurs();
 
 	printf("-=  Total time= %f  =-\n", get_time() - time_all_start);
