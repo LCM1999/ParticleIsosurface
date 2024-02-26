@@ -10,16 +10,15 @@
 #include "visitorextract.h"
 #include "traverse.h"
 
-SurfReconstructor::SurfReconstructor(std::vector<Eigen::Vector3f>& particles, 
-std::vector<float>& radiuses, Mesh* mesh, 
-float radius, float iso_factor, float smooth_factor)
+SurfReconstructor::SurfReconstructor(
+	std::vector<Eigen::Vector3f>& particles, 
+	std::vector<float>& radiuses, Mesh* mesh, 
+	float radius)
 {
 	_GlobalParticles = particles;
 	_GlobalParticlesNum = _GlobalParticles.size();
 	_GlobalRadiuses = radiuses;
 	_RADIUS = radius;
-	_SMOOTH_FACTOR = smooth_factor;
-	_ISO_FACTOR = iso_factor;
 
 	WaitingStack.clear();
 
@@ -105,7 +104,7 @@ void SurfReconstructor::resizeRootBoxConstR()
 		(_BoundingBox[5] - _BoundingBox[4]) });
 	_DEPTH_MAX = int(ceil(log2(ceil(maxLen / r))));
 	resizeLen = pow(2, _DEPTH_MAX) * r;
-	while (resizeLen - maxLen < (_NEIGHBOR_FACTOR * _RADIUS * 2))
+	while (resizeLen - maxLen < (_evaluator->getNeighborFactor() * _RADIUS * 2))
 	{
 		_DEPTH_MAX++;
 		resizeLen = pow(2, _DEPTH_MAX) * r;
@@ -132,7 +131,7 @@ void SurfReconstructor::resizeRootBoxVarR()
 		(_BoundingBox[5] - _BoundingBox[4]) });
 	_DEPTH_MAX = int(ceil(log2(ceil(maxLen / minR))));
 	resizeLen = pow(2, _DEPTH_MAX) * minR;
-	while (resizeLen - maxLen < (_NEIGHBOR_FACTOR * maxR * 2))
+	while (resizeLen - maxLen < (_evaluator->getNeighborFactor() * maxR * 2))
 	{
 		_DEPTH_MAX++;
 		resizeLen = pow(2, _DEPTH_MAX) * minR;
@@ -154,6 +153,7 @@ void SurfReconstructor::checkEmptyAndCalcCurv(std::shared_ptr<TNode> tnode, unsi
 {
 	Eigen::Vector3f norms(0, 0, 0);
 	float area = 0.0f;
+	// int impact_num = 0;
 	std::vector<int> insides;
 	min_radius = IS_CONST_RADIUS ? _RADIUS : FLT_MAX;
 	const Eigen::Vector3f 
@@ -173,21 +173,32 @@ void SurfReconstructor::checkEmptyAndCalcCurv(std::shared_ptr<TNode> tnode, unsi
 		{
 			if (!_evaluator->CheckSplash(in))
 			{
-				if (_GlobalParticles[in].x() > (box1.x() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _SMOOTH_FACTOR)) && 
-					_GlobalParticles[in].x() < (box2.x() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _SMOOTH_FACTOR)) &&
-					_GlobalParticles[in].y() > (box1.y() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _SMOOTH_FACTOR)) && 
-					_GlobalParticles[in].y() < (box2.y() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _SMOOTH_FACTOR)) &&
-					_GlobalParticles[in].z() > (box1.z() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _SMOOTH_FACTOR)) && 
-					_GlobalParticles[in].z() < (box2.z() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _SMOOTH_FACTOR)))
+				if (_GlobalParticles[in].x() > (box1.x() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())) && 
+					_GlobalParticles[in].x() < (box2.x() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())) &&
+					_GlobalParticles[in].y() > (box1.y() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())) && 
+					_GlobalParticles[in].y() < (box2.y() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())) &&
+					_GlobalParticles[in].z() > (box1.z() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())) && 
+					_GlobalParticles[in].z() < (box2.z() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())))
 				{
 					if (CALC_P_NORMAL)
 					{
 						Eigen::Vector3f tempNorm = _evaluator->PariclesNormals[in];
-						if (tempNorm == Eigen::Vector3f(0, 0, 0))	{continue;}
+						// if (tempNorm == Eigen::Vector3f(0, 0, 0))	{continue;}
 						norms += tempNorm;
 						area += tempNorm.norm();
 					}
-					
+
+					// if (tnode->depth < _DEPTH_MIN)
+					// {
+					// 	empty = false;
+					// 	curv = 0.0f;
+					// 	if (!IS_CONST_RADIUS) 
+					// 	{
+					// 		min_radius = _searcher->getMinRadius();
+					// 	}	
+					// 	return;
+					// }
+
 					if (!IS_CONST_RADIUS)
 					{
 						if (min_radius > _GlobalRadiuses[in])
@@ -195,13 +206,19 @@ void SurfReconstructor::checkEmptyAndCalcCurv(std::shared_ptr<TNode> tnode, unsi
 							min_radius = _GlobalRadiuses[in];
 						}
 					}
+					// impact_num++;
 					all_splash = false;
 				}
 			}
 		}
 		empty = all_splash;
 	}
-	curv = (area == 0) ? 1.0 : (norms.norm() / area);
+	// if (impact_num < 25)
+	// {
+		// curv = 0;
+	// } else {
+		curv = (area == 0) ? 1.0 : (norms.norm() / area);
+	// }
 }
 
 void SurfReconstructor::beforeSampleEval(std::shared_ptr<TNode> tnode, float& curv, float& min_radius, unsigned char& empty)
@@ -211,7 +228,7 @@ void SurfReconstructor::beforeSampleEval(std::shared_ptr<TNode> tnode, float& cu
 	if (empty)
 	{
 		// _evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3]);
-		tnode->node[3] = _ISO_VALUE;
+		tnode->node[3] = _evaluator->getIsoValue();
 		tnode->type = EMPTY;
 		return;
 	}
@@ -233,23 +250,25 @@ void SurfReconstructor::afterSampleEval(
 	
 	// judge this node need calculate iso-surface
 	// check max/min sizes of cells
-	if ((cellsize - min_radius) < _TOLERANCE)
+	if ((cellsize - min_radius) < 1e-8)
 	{
 		// it's a leaf
 		tnode->type = LEAF;
-		tnode->NodeCalcNode(sample_points, sample_grads, cellsize);
+		_evaluator->SingleEval(tnode->node.head(3), tnode->node[3]);
+		// tnode->NodeCalcNode(sample_points, sample_grads, cellsize);
 		return;
 	}
 
 	// check curvature
-	if (isbig || (signchange && curv < _FLATNESS))
+	if (isbig || (signchange && curv < 0.995))//
 	{
 		tnode->type = INTERNAL;
 	}
 	else
 	{
 		tnode->type = LEAF;
-		tnode->NodeCalcNode(sample_points, sample_grads, cellsize);
+		// tnode->NodeCalcNode(sample_points, sample_grads, cellsize);
+		_evaluator->SingleEval(tnode->node.head(3), tnode->node[3]);
 	}
 }
 
@@ -390,12 +409,7 @@ void SurfReconstructor::genIsoOurs()
 	_STATE++;
 }
 
-void SurfReconstructor::Run()
-{
-	generalModeRun();
-}
-
-void SurfReconstructor::generalModeRun()
+void SurfReconstructor::Run(float iso_factor, float smooth_factor)
 {
 	printf("-= Run =-\n");
 	_OurRoot = nullptr;
@@ -413,16 +427,32 @@ void SurfReconstructor::generalModeRun()
 	printf("-= Build Neighbor Searcher =-\n");
 	if (IS_CONST_RADIUS)
 	{
-    	_hashgrid = std::make_shared<HashGrid>(&_GlobalParticles, _BoundingBox, _RADIUS, _NEIGHBOR_FACTOR);
+    	_hashgrid = std::make_shared<HashGrid>(&_GlobalParticles, _BoundingBox, _RADIUS, 4.0f);
 	} else {
-		_searcher = std::make_shared<MultiLevelSearcher>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, _NEIGHBOR_FACTOR);
+		_searcher = std::make_shared<MultiLevelSearcher>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
 	}
     last_temp_time = temp_time;
     temp_time = get_time();
 	printf("   Build Neighbor Searcher Time = %f \n", temp_time - last_temp_time);
 
     printf("-= Initialize Evaluator =-\n");
-	_evaluator = std::make_shared<Evaluator>(this, &_GlobalParticles, &_GlobalRadiuses, _RADIUS);
+	_evaluator = std::make_shared<Evaluator>(_hashgrid, _searcher, &_GlobalParticles, &_GlobalRadiuses, _RADIUS);
+	_evaluator->setSmoothFactor(smooth_factor);
+	_evaluator->setIsoFactor(iso_factor);
+	_evaluator->compute_Gs_xMeans();
+	// if (USE_POLY6)
+	// {
+	// 	if (IS_CONST_RADIUS)
+	// 	{
+	// 		_hashgrid.reset();
+	// 		_hashgrid = std::make_shared<HashGrid>(&_GlobalParticles, _BoundingBox, _RADIUS, 2.0f);
+	// 		_evaluator->_hashgrid = _hashgrid;
+	// 	} else {
+	// 		_searcher.reset();
+	// 		_searcher = std::make_shared<MultiLevelSearcher>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 2.0f);
+	// 		_evaluator->_searcher = _searcher;
+	// 	}
+	// }
 	last_temp_time = temp_time;
 	temp_time = get_time();
 	printf("   Initialize Evaluator Time = %f \n", temp_time - last_temp_time);
@@ -437,11 +467,12 @@ void SurfReconstructor::generalModeRun()
 	}
 	printf("   MAX_DEPTH = %d, MIN_DEPTH = %d\n", _DEPTH_MAX, _DEPTH_MIN);
 
-	_MAX_SCALAR = (IS_CONST_RADIUS ? _evaluator->CalculateMaxScalarConstR() : _evaluator->CalculateMaxScalarVarR());
-    printf("   Max Scalar Value = %f\n", _MAX_SCALAR);
+	IS_CONST_RADIUS ? _evaluator->CalculateMaxScalarConstR() : _evaluator->CalculateMaxScalarVarR();
+    printf("   Max Scalar Value = %f\n", _evaluator->getMaxScalar());
 	
-	_ISO_VALUE = (IS_CONST_RADIUS ? _evaluator->RecommendIsoValueConstR(_ISO_FACTOR) : _evaluator->RecommendIsoValueVarR(_ISO_FACTOR));
-    printf("   Recommend Iso Value = %f\n", _ISO_VALUE);
+	IS_CONST_RADIUS ? _evaluator->RecommendIsoValueConstR() : _evaluator->RecommendIsoValueVarR();
+    printf("   Recommend Iso Value = %f\n", _evaluator->getIsoValue());
+	// _evaluator->setIsoValue(0.4033877702884984e+30);
 	temp_time = get_time();
 	if (CALC_P_NORMAL)
 	{
@@ -451,10 +482,12 @@ void SurfReconstructor::generalModeRun()
 		printf("   Calculate Particals Normal Time = %f\n", temp_time - last_temp_time);
 	}
 
+	printMem();
 	genIsoOurs();
 	printMem();
 	genIsoOurs();
 
 	printf("-=  Total time= %f  =-\n", get_time() - time_all_start);
 }
+
 

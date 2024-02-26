@@ -8,5 +8,6 @@ extern bool USE_ANI;
 extern bool CALC_P_NORMAL;
 extern bool GEN_SPLASH;
 extern bool SINGLE_LAYER;
+extern bool USE_POLY6;
 
 

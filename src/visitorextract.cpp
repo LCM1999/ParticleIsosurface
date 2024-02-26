@@ -51,9 +51,8 @@ void VisitorExtract::calc_vertices()
 			if ( sign(v1.node) != sign(v2.node))
 			{
 				Eigen::Vector4f tmpv1 = v1.node, tmpv2 = v2.node, tmpv = Eigen::Vector4f::Zero();
-				float ratio;
-				while ((tmpv1 - tmpv2).head(3).norm() >
-				(IS_CONST_RADIUS ? constructor->getConstRadius(): constructor->getSearcher()->getMinRadius()) / 2)
+				float ratio, d = (tmpv1 - tmpv2).head(3).norm(), r = (IS_CONST_RADIUS ? constructor->getConstRadius(): constructor->getSearcher()->getMinRadius()) / 2;
+				while (d > r)
 				{
 					tmpv[0] =  (tmpv1[0] + tmpv2[0]) / 2;
 					tmpv[1] =  (tmpv1[1] + tmpv2[1]) / 2;
@@ -71,11 +70,12 @@ void VisitorExtract::calc_vertices()
 					} else {
 						break;
 					}
+					d /= 2;
 				}
 				ratio = invlerp(tmpv1[3], tmpv2[3], 0.0f);
-				if (ratio < constructor->getRatioTolerance())
+				if (ratio < 0.1)
 					tmpv = tmpv1;
-				else if (ratio > (1 - constructor->getRatioTolerance()))
+				else if (ratio > 0.9)
 					tmpv = tmpv2;
 				else
 					tmpv = lerp(tmpv1, tmpv2, ratio);

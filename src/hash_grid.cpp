@@ -8,7 +8,7 @@ HashGrid::HashGrid(std::vector<Eigen::Vector3f>* particles, float* bounding, flo
 	ParticlesNum = Particles->size();
 
 	Radius = radius;
-	CellSize = radius * inf_factor + 2 * radius;
+	CellSize = radius * inf_factor;	// + 2 * radius
 
 	int i = 0;
 	float length = 0.0;
@@ -43,7 +43,7 @@ HashGrid::HashGrid(std::vector<Eigen::Vector3f>* particles, std::vector<float>* 
 
 	RadiusId = radiusId;
 	Radius = radiuses->at(RadiusId);
-	CellSize = Radius * inf_factor + 2 * Radius;
+	CellSize = Radius * inf_factor;	// + 2 * Radius
 
 	int i = 0;
 	float length = 0.0;

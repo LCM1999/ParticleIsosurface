@@ -7,7 +7,7 @@ void printMem() {
 	PROCESS_MEMORY_COUNTERS pmc;
 	if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
 	{
-		std::cout << pmc.WorkingSetSize / 1024 / 1024 << "KB" << std::endl;
+		std::cout << float(pmc.WorkingSetSize) / 1024.0 / 1024.0 << "MB" << std::endl;
 	}
 }
 

@@ -13,6 +13,8 @@
 #include "surface_reconstructor.h"
 #include "rply.h"
 
+#include "marching.h"
+
 #ifdef _WIN32
 #include <windows.h>
 #include <io.h>
@@ -27,7 +29,6 @@ bool IS_CONST_RADIUS = false;
 bool USE_ANI = true;
 
 // variants for test
-short DATA_TYPE = 0;
 bool NEED_RECORD = false;
 int TARGET_FRAME = 0;
 // std::string PREFIX = "";
@@ -38,10 +39,13 @@ std::string OUTPUT_TYPE = "ply";
 float RADIUS = 0;
 float SMOOTH_FACTOR = 2.0;
 float ISO_FACTOR = 1.9;
+float ISO_VALUE = 0.0f;
 // bool USE_CUDA = false;
 bool CALC_P_NORMAL = true;
 bool GEN_SPLASH = true;
 bool SINGLE_LAYER = false;
+bool USE_OURS = true;
+bool USE_POLY6 = 0;
 
 void writeObjFile(Mesh &m, std::string fn)
 {
@@ -102,7 +106,6 @@ int writePlyFile(Mesh& m, std::string fn)
     {
         return 0;
     }
-    std::cout << "Output Done" << std::endl;
     return 1;
 }
 
@@ -122,10 +125,17 @@ void loadConfigJson(std::string dataPath)
     {
         inJSONFile >> readInJSON;
         inJSONFile.close();
-        DATA_TYPE = readInJSON.at("DATA_TYPE");
         if (readInJSON.contains("USE_ANI"))
         {
             USE_ANI = readInJSON.at("USE_ANI");
+        }
+        if (readInJSON.contains("USE_OURS"))
+        {
+            USE_OURS = readInJSON.at("USE_OURS");
+        }
+        if (readInJSON.contains("USE_POLY6"))
+        {
+            USE_POLY6 = readInJSON.at("USE_POLY6");
         }
         if (readInJSON.contains("CALC_P_NORMAL"))
         {
@@ -143,67 +153,54 @@ void loadConfigJson(std::string dataPath)
         {
             OUTPUT_TYPE = readInJSON.at("OUTPUT_TYPE");
         }
-        if (DATA_TYPE == 1) {
-            if (readInJSON.contains("TARGET_FRAME"))
-            {
-                TARGET_FRAME = readInJSON.at("TARGET_FRAME");
-            }
-            const auto filePath = readInJSON.at("DATA_FILE");
-            for (auto it = filePath.begin(); it != filePath.end(); it++)
-            {
-                if (TARGET_FRAME != 0) {
-                    if (TARGET_FRAME != int(std::distance(filePath.begin(), it))+1)
-                    {
-                        continue;
-                    }
-                }
-                DATA_PATHES.push_back(*it);
-            }
+        if (readInJSON.contains("SUFFIX"))
+        {
+            SUFFIX = readInJSON.at("SUFFIX");
+        }
+        if (SUFFIX.empty() || SUFFIX == "")
+        {
+            const std::string filePath = readInJSON.at("DATA_FILE");
+            std::string data_pathes = filePath;
+            parseString(&DATA_PATHES, data_pathes, ",");
         } else {
-            if (readInJSON.contains("SUFFIX"))
-            {
-                SUFFIX = readInJSON.at("SUFFIX");
-            }
-            if (SUFFIX.empty() || SUFFIX == "")
-            {
-                const std::string filePath = readInJSON.at("DATA_FILE");
-                std::string data_pathes = filePath;
-                parseString(&DATA_PATHES, data_pathes, ",");
-            } else {
 #ifdef _WIN32
-                intptr_t hFile;
-                struct _finddata_t fileInfo;
-                std::string p;
-                if ((hFile = _findfirst(p.assign(dataPath).append("/").append("*").append(SUFFIX).c_str(), &fileInfo)) != -1)
+            intptr_t hFile;
+            struct _finddata_t fileInfo;
+            std::string p;
+            if ((hFile = _findfirst(p.assign(dataPath).append("/").append("*").append(SUFFIX).c_str(), &fileInfo)) != -1)
+            {
+                do
                 {
-                    do
+                    if (!(fileInfo.attrib & _A_SUBDIR))
                     {
-                        if (!(fileInfo.attrib & _A_SUBDIR))
-                        {
-                            DATA_PATHES.push_back(std::string(fileInfo.name));
-                        }
-                    } while (_findnext(hFile, &fileInfo) == 0);
-                }   
+                        DATA_PATHES.push_back(std::string(fileInfo.name));
+                    }
+                } while (_findnext(hFile, &fileInfo) == 0);
+            }   
 #else
                 // TODO: In Linux
 #endif
-            }
-            if (readInJSON.contains("RADIUS"))
-            {
-                RADIUS = readInJSON.at("RADIUS");
-                IS_CONST_RADIUS = true;
-            } else {
-                IS_CONST_RADIUS = false;
-            }
-            if (readInJSON.contains("SMOOTH_FACTOR"))
-            {
-                SMOOTH_FACTOR = readInJSON.at("SMOOTH_FACTOR");
-            }
-            if (readInJSON.contains("ISO_FACTOR"))
-            {
-                ISO_FACTOR = readInJSON.at("ISO_FACTOR");
-            }
         }
+        if (readInJSON.contains("RADIUS"))
+        {
+            RADIUS = readInJSON.at("RADIUS");
+            IS_CONST_RADIUS = true;
+        } else {
+            IS_CONST_RADIUS = false;
+        }
+        if (readInJSON.contains("SMOOTH_FACTOR"))
+        {
+            SMOOTH_FACTOR = readInJSON.at("SMOOTH_FACTOR");
+        }
+        if (readInJSON.contains("ISO_FACTOR"))
+        {
+            ISO_FACTOR = readInJSON.at("ISO_FACTOR");
+        }
+        if (readInJSON.contains("ISO_VALUE"))
+        {
+            ISO_VALUE = readInJSON.at("ISO_VALUE");
+        }
+        
     }
     else
     {
@@ -326,9 +323,8 @@ bool readShonDyParticleData(const std::string &fileName,
     return true;
 }
 
-void run(std::string dataDirPath, std::string outPath)
+void runOurs(std::string dataDirPath, std::string outPath)
 {
-    loadConfigJson(dataDirPath);
     float frameStart = 0;
     int index = 1;
     std::vector<Eigen::Vector3f> particles;
@@ -341,27 +337,16 @@ void run(std::string dataDirPath, std::string outPath)
         std::string dataPath = dataDirPath + "/" + frame;
         frameStart = get_time();
 
-        switch (DATA_TYPE)
+        if (SUFFIX == "")
         {
-        case 0:
-            if (SUFFIX == "")
-            {
-                SUFFIX = std::filesystem::path(dataPath).filename().extension().string();
-            }
-            if (".csv" == SUFFIX) {
-                loadParticlesFromCSV(dataPath, particles, radiuses);
-                break;
-            } else if (".h5" == SUFFIX) {
-                readShonDyParticleData(dataPath, particles, radiuses);
-                break;
-            }
-        case 1:
-            readShonDyParticleData(dataPath, particles, radiuses);
-            break;
-        default:
-            printf("ERROR: Unknown DATA TYPE;");
-            exit(1);
+            SUFFIX = std::filesystem::path(dataPath).filename().extension().string();
         }
+        if (".csv" == SUFFIX) {
+            loadParticlesFromCSV(dataPath, particles, radiuses);
+        } else if (".h5" == SUFFIX) {
+            readShonDyParticleData(dataPath, particles, radiuses);
+        }
+
         if (!IS_CONST_RADIUS)
         {
             if (abs(*std::max_element(radiuses.begin(), radiuses.end()) - *std::min_element(radiuses.begin(), radiuses.end())) < 1e-7)
@@ -371,14 +356,14 @@ void run(std::string dataDirPath, std::string outPath)
             }
         }
         printf("Particles Number = %zd\n", particles.size());
-        SurfReconstructor* constructor = new SurfReconstructor(particles, radiuses, &mesh, RADIUS, ISO_FACTOR, SMOOTH_FACTOR);
+        SurfReconstructor* constructor = new SurfReconstructor(particles, radiuses, &mesh, RADIUS);
         Recorder recorder(dataDirPath, frame.substr(0, frame.size() - 4), constructor);
-        constructor->Run();
+        constructor->Run(ISO_FACTOR, SMOOTH_FACTOR);
         if (NEED_RECORD)
         {
             // recorder.RecordProgress();
             recorder.RecordParticles();
-            recorder.RecordFeatures();
+            // recorder.RecordFeatures();
         }
         std::string output_name = frame.substr(0, frame.find_last_of('.'));
         if (! std::filesystem::exists(outPath))
@@ -400,6 +385,7 @@ void run(std::string dataDirPath, std::string outPath)
                 writePlyFile(mesh,
                     outPath + "/" + output_name + ".ply");
             }  
+            std::cout << "Output Done" << std::endl;
         }
         catch(const std::exception& e)
         {
@@ -411,6 +397,47 @@ void run(std::string dataDirPath, std::string outPath)
         }
         index++;
         delete constructor;
+    }
+}
+
+void runUniform(std::string dataDirPath, std::string outPath)
+{
+    // float frameStart = 0;
+    int index = 1;
+    std::vector<Eigen::Vector3f> particles;
+    std::vector<float> radiuses;
+    for (const std::string frame : DATA_PATHES)
+    {
+        Mesh mesh(int(pow(10, 4)));
+        std::cout << "-=   Frame " << (TARGET_FRAME == 0 ? index : TARGET_FRAME) << " " << frame << "   =-"
+                  << std::endl;
+        std::string dataPath = dataDirPath + "/" + frame;
+        // frameStart = get_time();
+
+        if (SUFFIX == "")
+        {
+            SUFFIX = std::filesystem::path(dataPath).filename().extension().string();
+        }
+        if (".csv" == SUFFIX) {
+            loadParticlesFromCSV(dataPath, particles, radiuses);
+        } else if (".h5" == SUFFIX) {
+            readShonDyParticleData(dataPath, particles, radiuses);
+        }
+
+        if (!IS_CONST_RADIUS)
+        {
+            if (abs(*std::max_element(radiuses.begin(), radiuses.end()) - *std::min_element(radiuses.begin(), radiuses.end())) < 1e-7)
+            {
+                    IS_CONST_RADIUS = true;
+                    RADIUS = radiuses[0];
+            }
+        }
+        printf("Particles Number = %zd\n", particles.size());
+        std::string output_name = frame.substr(0, frame.find_last_of('.'));
+        UniformGrid* uniformGrid = IS_CONST_RADIUS ? new UniformGrid(particles, RADIUS) : new UniformGrid(particles, radiuses);
+        uniformGrid->Run(ISO_VALUE, output_name, outPath);
+        std::cout << "Output path: " << outPath + "/" + output_name + ".vti"<< std::endl;
+        std::cout << "Output Done" << std::endl;
     }
 }
 
@@ -440,29 +467,46 @@ int main(int argc, char **argv)
         outPath = std::string(argv[2]);
         std::cout << "Data dir: " << dataDirPath << std::endl;
         std::cout << "Out dir: " << outPath << std::endl;
-        run(dataDirPath, outPath);
+        runOurs(dataDirPath, outPath);
         break;
     case 2:
         dataDirPath = std::string(argv[1]);
         outPath = dataDirPath + "/out";
         std::cout << "Data dir: " << dataDirPath << std::endl;
-        run(dataDirPath, outPath);
+        runOurs(dataDirPath, outPath);
         break;
     case 1:
     default:
         dataDirPath =
         "E:/data/multiR/mr_csv";
-        // "E:/data/vtk/csv";
+        // "E:/data/geo";
         // "E:/data/3s/20231222-water";
-        // "F:/data/vtk/2a239e6f-fa76-4756-8b5f-390973215b30";
+        // "E:/data/damBreak3D-27steps";
+        // "E:/BaiduNetdiskDownload/MultiResolutionResults/damBreak3D";
+        // "E:/data/ring/csv";
+        // "E:/data/car_render_test_data_2/Fluid";
+        // "E:/data/oil_csv";
+        // "E:/data/test";
         // "C:/Users/11379/Desktop/protein";
         outPath = 
         "E:/data/multiR/mr_csv/out";
-        // "E:/data/vtk/csv/out";
+        // "E:/data/geo/out";
         // "E:/data/3s/20231222-water/out";
-        // "F:/data/vtk/2a239e6f-fa76-4756-8b5f-390973215b30/out";
+        // "E:/data/damBreak3D-27steps/out";
+        // "E:/BaiduNetdiskDownload/MultiResolutionResults/damBreak3D/out";
+        // "E:/data/ring/csv/out";
+        // "E:/data/car_render_test_data_2/Fluid/out";
+        // "E:/data/oil_csv/out";
+        // "E:/data/test/out";
         // "C:/Users/11379/Desktop/protein/out";
-        run(dataDirPath, outPath);
+        loadConfigJson(dataDirPath);
+        if (USE_OURS)
+        {
+            runOurs(dataDirPath, outPath);
+        } else {
+            runUniform(dataDirPath, outPath);
+        }
+        
         break;
     }
 
