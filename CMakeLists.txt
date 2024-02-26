@@ -29,16 +29,22 @@ if(NOT MPI_FOUND)
     message(FATAL_ERROR "MPI not found!")
 endif()
 
-# set(HDF5_PREFER_PARALLEL "ON")
 set(HDF5_DIR E:/hdf5/HDF5-1.14.3-win64/cmake)
-find_package(HDF5 REQUIRED NAMES hdf5 COMPONENTS C static HL)
-if(NOT HDF5_FOUND)
-   message(FATAL_ERROR "HDF5 not found!")
-endif()
+set(HDF5_PREFER_PARALLEL "ON")
+find_package(HDF5 REQUIRED COMPONENTS C HL)
+# find_package(HDF5 REQUIRED NAMES hdf5 COMPONENTS C static HL)
+if (NOT HDF5_FOUND)
+    message(FATAL_ERROR "HDF5 not found!")
+endif ()
 
 find_package(EIGEN3 REQUIRED)
 if(NOT EIGEN3_FOUND)
     message(FATAL_ERROR "Eigen3 not found!")
+endif()
+
+find_package(VTK REQUIRED)
+if(NOT VTK_FOUND)
+    message(FATAL_ERROR "VTK not found!")
 endif()
 
 ################################################################################
@@ -53,6 +59,7 @@ endif()
 add_executable(${PROJECT_NAME}
     src/iso_method_ours.cpp
     src/main.cpp
+    src/marching.cpp
     src/timer.cpp
     src/utils.cpp
     src/visitorextract.cpp
@@ -66,7 +73,10 @@ add_executable(${PROJECT_NAME}
     src/rply.c
 )
 
-include_directories(pugixml/src)
+include_directories(
+    pugixml/src
+    "${VTK_USE_FILE}"
+    )
 
 add_library(pugixml
     STATIC
@@ -77,7 +87,7 @@ target_include_directories(${PROJECT_NAME}
     PUBLIC
     include
     ${MPI_CXX_INCLUDE_DIRS}
-    ${HDF5_INCLUDE_DIR}
+    # ${HDF5_INCLUDE_DIR}
     ${EIGEN3_INCLUDE_DIR}
 )
 
@@ -86,7 +96,9 @@ target_include_directories(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME} 
     PUBLIC
     ${HDF5_C_STATIC_LIBRARY}
+    ${VTK_LIBRARIES}
     Eigen3::Eigen
     OpenMP::OpenMP_CXX
+    HDF5::HDF5
     pugixml
 )

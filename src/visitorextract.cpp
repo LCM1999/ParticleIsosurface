@@ -18,12 +18,6 @@ auto invlerp(T x1, T x2, T x)
 {
 	return (x - x1) / (x2 - x1);
 }
-
-TraversalData::TraversalData(TNode *t)
-{
-	n = t;
-	depth = 0;
-}
 	
 void TraversalData::gen_trav(TraversalData &c, Index i)
 {
@@ -57,9 +51,8 @@ void VisitorExtract::calc_vertices()
 			if ( sign(v1.node) != sign(v2.node))
 			{
 				Eigen::Vector4f tmpv1 = v1.node, tmpv2 = v2.node, tmpv = Eigen::Vector4f::Zero();
-				float ratio;
-				while ((tmpv1 - tmpv2).head(3).norm() >
-				(IS_CONST_RADIUS ? constructor->getConstRadius(): constructor->getSearcher()->getMinRadius()) / 2)
+				float ratio, d = (tmpv1 - tmpv2).head(3).norm(), r = (IS_CONST_RADIUS ? constructor->getConstRadius(): constructor->getSearcher()->getMinRadius()) / 2;
+				while (d > r)
 				{
 					tmpv[0] =  (tmpv1[0] + tmpv2[0]) / 2;
 					tmpv[1] =  (tmpv1[1] + tmpv2[1]) / 2;
@@ -77,11 +70,12 @@ void VisitorExtract::calc_vertices()
 					} else {
 						break;
 					}
+					d /= 2;
 				}
 				ratio = invlerp(tmpv1[3], tmpv2[3], 0.0f);
-				if (ratio < constructor->getRatioTolerance())
+				if (ratio < 0.1)
 					tmpv = tmpv1;
-				else if (ratio > (1 - constructor->getRatioTolerance()))
+				else if (ratio > 0.9)
 					tmpv = tmpv2;
 				else
 					tmpv = lerp(tmpv1, tmpv2, ratio);
@@ -239,7 +233,7 @@ bool VisitorExtract::on_vert(
 	if (a.n->is_leaf() && b.n->is_leaf() && c.n->is_leaf() && d.n->is_leaf() && aa.n->is_leaf() && ba.n->is_leaf() && ca.n->is_leaf() && da.n->is_leaf())
 	{
 		int index = 0;
-		std::array<TNode*, 8> n = { a.n, b.n, c.n, d.n, aa.n, ba.n, ca.n, da.n };
+		std::array<std::shared_ptr<TNode>, 8> n = { a.n, b.n, c.n, d.n, aa.n, ba.n, ca.n, da.n };
 		for (int i = 0; i < 8; i++)
 		{
 			if (sign(n[i]->node) > 0)
@@ -248,7 +242,7 @@ bool VisitorExtract::on_vert(
 			}
 		}
 
-		std::array<TNode*, 8> trans_vertices;
+		std::array<std::shared_ptr<TNode>, 8> trans_vertices;
 		const auto& proc = table[index];
 		for (int i = 0; i < 8; i++)
 		{

@@ -8,8 +8,6 @@
 #include "qefnorm.h"
 #include "evaluator.h"
 
-int tree_cells = 0;
-
 static float sign(unsigned int x)
 {
 	return x ? 1 : -1;
@@ -24,7 +22,7 @@ TNode::TNode(SurfReconstructor* surf_constructor, unsigned long long id)
 	this->id = id;
 }
 
-TNode::TNode(SurfReconstructor* surf_constructor, TNode* parent, Index i)
+TNode::TNode(SurfReconstructor* surf_constructor, std::shared_ptr<TNode> parent, Index i)
 {
 	constructor = surf_constructor;
 	depth = parent->depth + 1;
@@ -83,21 +81,21 @@ void TNode::NodeSampling(
 	bool origin_sign;
 	signchange = false;
 	constructor->getEvaluator()->GridEval(sample_points, sample_grads, cellsize, signchange, constructor->getOverSampleQEF(), false);
-	Eigen::Vector3f norms(0, 0, 0);
-	float area = 0;
-	for (int i = 0; i < pow(constructor->getOverSampleQEF() + 1, 3); i++)
-	{
-		Eigen::Vector3f n(
-			sample_grads[i * 3 + 0], 
-			sample_grads[i * 3 + 1], 
-			sample_grads[i * 3 + 2]);
-		// n.normalize();
-		norms += n;
-		area += n.norm();
-	}
+	// Eigen::Vector3f norms(0, 0, 0);
+	// float area = 0;
+	// for (int i = 0; i < pow(constructor->getOverSampleQEF() + 1, 3); i++)
+	// {
+	// 	Eigen::Vector3f n(
+	// 		sample_grads[i * 3 + 0], 
+	// 		sample_grads[i * 3 + 1], 
+	// 		sample_grads[i * 3 + 2]);
+	// 	// n.normalize();
+	// 	norms += n;
+	// 	area += n.norm();
+	// }
 
-	float field_curv = (area == 0) ? 1.0 : (norms.norm() / area);
-	curv = std::min(curv, field_curv);
+	// float field_curv = (area == 0) ? 1.0 : (norms.norm() / area);
+	// curv = std::min(curv, field_curv);
 }
 
 void TNode::NodeCalcNode(float* sample_points, float* sample_grads, float cellsize)
@@ -126,7 +124,7 @@ void TNode::NodeCalcNode(float* sample_points, float* sample_grads, float cellsi
 				pl[2] = sample_grads[node_index * 3 + 2];
 				pl[3] = -1;
 				pl[4] = -(p[0] * pl[0] + p[1] * pl[1] + p[2] * pl[2]) + sample_points[node_index * 4 + 3];
-				node_q.combineSelf(Vector5f(pl.cast<float>()).data());
+				node_q.combineSelf(Vector5f(pl).data());
 				node_plane_pts.push_back(p);
 				node_plane_norms.push_back(Eigen::Vector3f(pl[0], pl[1], pl[2]));
 			}
@@ -187,12 +185,4 @@ bool TNode::changeSignDMC(Eigen::Vector4f* verts)
 		sign(verts[0]) != sign(node);
 }
 
-void TNode::defoliate()
-{
-	for (int i = 0; i < 8; i++)
-	{
-		delete children[i];
-		children[i] = 0;
-	}
-}
 
