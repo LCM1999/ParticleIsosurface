@@ -2,12 +2,14 @@
 #include "hash_grid.h"
 #include "multi_level_researcher.h"
 #include "evaluator.h"
+#include <var.h>
 
 #include "vtkXMLImageDataWriter.h"
 #include "vtkPointData.h"
 #include "vtkFloatArray.h"
 #include "vtkImageData.h"
 #include "vtkNew.h"
+
 
 UniformGrid::UniformGrid(const std::vector<Eigen::Vector3f> &particles, const std::vector<float> &radiuses)
 {
@@ -146,7 +148,7 @@ void UniformGrid::Run(float iso_value, std::string filename, std::string filepat
     _Scalars.resize(dims[0] * dims[1] * dims[2]);
 	printf("   Dimensions = %d, %d, %d\n", dims[0], dims[1], dims[2]);
 
-	printMem();
+	// printMem();
 
 	printf("-= Grid Sampling =-\n");
     t.reset();
@@ -154,7 +156,7 @@ void UniformGrid::Run(float iso_value, std::string filename, std::string filepat
 	printf("   Grid Sampling Time = %f \n", t.elapsed());
 	printf("   All End Time 1 = %f \n", t_total.elapsed());
 
-	printMem();
+	// printMem();
 
     grid->SetDimensions(dims[0], dims[1], dims[2]);
     if (IS_CONST_RADIUS)

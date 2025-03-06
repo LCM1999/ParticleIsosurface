@@ -6,6 +6,7 @@
 #include <Eigen/Dense>
 #include "iso_common.h"
 #include "index.h"
+#include <memory>
 
 class SurfReconstructor;
 class TNode;

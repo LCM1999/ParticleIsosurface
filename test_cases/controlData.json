@@ -1,0 +1,6 @@
+{
+  "DATA_FILE": "dam.csv",
+  "CSV_TYPE": 0,
+  "NEED_RECORD": false,
+  "OUTPUT_PREFIX": "inlet_"
+}

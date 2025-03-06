@@ -1,5 +1,6 @@
 #include "iso_common.h"
 #include "hash_grid.h"
+#include <var.h>
 
 HashGrid::HashGrid(std::vector<Eigen::Vector3f>* particles, float* bounding, float radius, float inf_factor)
 {

@@ -1,6 +1,6 @@
 #include <set>
 #include "multi_level_researcher.h"
-
+#include <cfloat>
 #include "hash_grid.h"
 
 MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3f>* particles, float* bounding, std::vector<float>* radiuses, float inf_factor)

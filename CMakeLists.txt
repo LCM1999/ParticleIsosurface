@@ -5,18 +5,34 @@ project(Isosurface_smiplify CXX C)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 SET(COMPUTE_CAPABILITY 75)
-
+set(CUDA_STANDARD 11)
 
 set(PROJECT_NAME Isosurface_smiplify)
+
+
+include(CheckLanguage)
+check_language(CUDA)
+
+
+if(CMAKE_CUDA_COMPILER)
+    message("Rendertoolengine found cuda")
+    enable_language(CUDA)
+    find_package(CUDAToolkit)
+    # find_package(Thrust CONFIG)
+    set(CMAKE_CUDA_STANDARD 17)
+    message(STATUS "CUDA_TOOLKIT_ROOT_DIR: ${CUDA_TOOLKIT_ROOT_DIR}")
+    include_directories(${CUDA_INCLUDE_DIR})
+    include_directories(${CUDA_TOOLKIT_ROOT_DIR}/include)
+endif()
 
 ################################################################################
 # Find packages
 ################################################################################
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
 if( UNIX )
-    set(MPI_DIR /usr/lib/x86_64-linux-gnu/openmpi)
-    set(HDF5_DIR /home/lcm/h5/CMake-hdf5-1.14.2/build/HDF5-1.14.2-Linux/HDF_Group/HDF5/1.14.2/cmake)
-    set(EIGEN3_DIR /home/lcm/eigen/eigen-3.4.0/build)
+    # set(MPI_DIR /usr/lib/x86_64-linux-gnu/openmpi)
+    # set(HDF5_DIR /home/lcm/h5/CMake-hdf5-1.14.2/build/HDF5-1.14.2-Linux/HDF_Group/HDF5/1.14.2/cmake)
+    # set(EIGEN3_DIR /home/lcm/eigen/eigen-3.4.0/build)
 endif()
 
 find_package(OpenMP REQUIRED)
@@ -29,7 +45,7 @@ if(NOT MPI_FOUND)
     message(FATAL_ERROR "MPI not found!")
 endif()
 
-set(HDF5_DIR E:/hdf5/HDF5-1.14.3-win64/cmake)
+# set(HDF5_DIR E:/hdf5/HDF5-1.14.3-win64/cmake)
 set(HDF5_PREFER_PARALLEL "ON")
 find_package(HDF5 REQUIRED COMPONENTS C HL)
 # find_package(HDF5 REQUIRED NAMES hdf5 COMPONENTS C static HL)
@@ -37,7 +53,7 @@ if (NOT HDF5_FOUND)
     message(FATAL_ERROR "HDF5 not found!")
 endif ()
 
-find_package(EIGEN3 REQUIRED)
+find_package(Eigen3 REQUIRED)
 if(NOT EIGEN3_FOUND)
     message(FATAL_ERROR "Eigen3 not found!")
 endif()
@@ -56,20 +72,37 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     add_compile_options("-openmp:llvm")
 endif()
 
+file(GLOB ISO_HEADER_FILES
+    "${PROJECT_SOURCE_DIR}/include/*.h"
+    "${PROJECT_SOURCE_DIR}/include/*.hpp"
+    "${PROJECT_SOURCE_DIR}/include/*.cuh" 
+)
+
+file(GLOB ISO_SOURCE_FILES
+  "${PROJECT_SOURCE_DIR}/src/*.cpp"
+  "${PROJECT_SOURCE_DIR}/src/*.cu"
+  "${PROJECT_SOURCE_DIR}/src/*.c"
+)
+
+file(GLOB CSTONE_HEADER_FILES
+  "${PROJECT_SOURCE_DIR}/cstoneOctree/include/*.h"
+  "${PROJECT_SOURCE_DIR}/cstoneOctree/include/*.hpp"
+  "${PROJECT_SOURCE_DIR}/cstoneOctree/include/*.cuh"
+)
+
+file(GLOB CSTONEOCTREE_SOURCE_FILES
+  "${PROJECT_SOURCE_DIR}/cstoneOctree/src/*.c"
+  "${PROJECT_SOURCE_DIR}/cstoneOctree/src/*.cpp"
+  "${PROJECT_SOURCE_DIR}/cstoneOctree/src/*.cu"
+)
+
+set(ISO_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
+set(CSTONEOCTREE_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/cstoneOctree/include")
+
 add_executable(${PROJECT_NAME}
-    src/iso_method_ours.cpp
-    src/main.cpp
-    src/marching.cpp
-    src/utils.cpp
-    src/visitorextract.cpp
-    src/evaluator.cpp
-    src/hash_grid.cpp
-    src/surface_reconstructor.cpp
-    src/global.cpp
-    src/recorder.cpp
-    src/hdf5Utils.cpp
-    src/multi_level_reseacher.cpp
-    src/rply.c
+    main.cpp
+    ${ISO_SOURCE_FILES}
+    ${CSTONE_SOURCE_FILES}
 )
 
 include_directories(
@@ -84,9 +117,10 @@ add_library(pugixml
 
 target_include_directories(${PROJECT_NAME} 
     PUBLIC
-    include
+    ${ISO_INCLUDE_DIR}
+    ${CSTONEOCTREE_INCLUDE_DIR}
     ${MPI_CXX_INCLUDE_DIRS}
-    # ${HDF5_INCLUDE_DIR}
+    ${HDF5_INCLUDE_DIR}
     ${EIGEN3_INCLUDE_DIR}
 )
 
@@ -100,4 +134,10 @@ target_link_libraries(${PROJECT_NAME}
     OpenMP::OpenMP_CXX
     HDF5::HDF5
     pugixml
+    CUDA::cudart
+    ${CUDA_LIBRARIES}
 )
+
+
+# add unit_test
+add_subdirectory(unit_test)

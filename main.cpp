@@ -26,30 +26,31 @@
 #include "unistd.h"
 #endif
 
-int OMP_USE_DYNAMIC_THREADS = 0;
-int OMP_THREADS_NUM = 16;
+#include <var.h>
+// int OMP_USE_DYNAMIC_THREADS = 0;
+// int OMP_THREADS_NUM = 16;
 
-bool IS_CONST_RADIUS = false;
-bool USE_ANI = true;
+// bool IS_CONST_RADIUS = false;
+// bool USE_ANI = true;
 
-// variants for test
-bool NEED_RECORD = false;
-int TARGET_FRAME = 0;
-// std::string PREFIX = "";
-std::string SUFFIX = "";    // CSV, H5
-bool WITH_NORMAL;
-std::vector<std::string> DATA_PATHES;
-std::string OUTPUT_TYPE = "ply";
-float RADIUS = 0;
-float SMOOTH_FACTOR = 2.0;
-float ISO_FACTOR = 1.9;
-float ISO_VALUE = 0.0f;
-// bool USE_CUDA = false;
-bool CALC_P_NORMAL = true;
-bool GEN_SPLASH = true;
-bool SINGLE_LAYER = false;
-bool USE_OURS = true;
-bool USE_POLY6 = 0;
+// // variants for test
+// bool NEED_RECORD = false;
+// int TARGET_FRAME = 0;
+// // std::string PREFIX = "";
+// std::string SUFFIX = "";    // CSV, H5
+// bool WITH_NORMAL;
+// std::vector<std::string> DATA_PATHES;
+// std::string OUTPUT_TYPE = "ply";
+// float RADIUS = 0;
+// float SMOOTH_FACTOR = 2.0;
+// float ISO_FACTOR = 1.9;
+// float ISO_VALUE = 0.0f;
+// // bool USE_CUDA = false;
+// bool CALC_P_NORMAL = true;
+// bool GEN_SPLASH = true;
+// bool SINGLE_LAYER = false;
+// bool USE_OURS = true;
+// bool USE_POLY6 = 0;
 
 void writeObjFile(Mesh &m, std::string fn)
 {
@@ -71,7 +72,7 @@ int writePlyFile(Mesh& m, std::string fn)
     int num_vertices = int(m.verticesNum);
     int num_faces = int(m.trianglesNum);
     float version;
-    p_ply ply = ply_create(fn.c_str(), PLY_DEFAULT, NULL, 0, NULL);
+    p_ply ply = ply_create(fn.c_str(), PLY_ASCII, NULL, 0, NULL);  // PLY_ASCII PLY_DEFAULT
     if (!ply) 
         return 0;   
 
@@ -370,11 +371,13 @@ void runOurs(std::string dataDirPath, std::string outPath)
             // recorder.RecordFeatures();
         }
         std::string output_name = frame.substr(0, frame.find_last_of('.'));
-        if (! std::filesystem::exists(outPath))
+        std::cout << "Output path: " << outPath + "/" + output_name + "." + OUTPUT_TYPE<< std::endl; 
+        
+        if (!std::filesystem::exists(outPath))
         {
             std::filesystem::create_directories(outPath);
         }
-        std::cout << "Output path: " << outPath + "/" + output_name + "." + OUTPUT_TYPE<< std::endl;
+        
         try
         {
             if ("ply" == OUTPUT_TYPE || "PLY" == OUTPUT_TYPE)
@@ -595,7 +598,7 @@ int main(int argc, char **argv)
     case 1:
     default:
         dataDirPath =
-        "D:/data/multiR/mr_csv";
+        "/home/letian/Letian_Xie/work/ParticleIsosurface/test_cases";
         // "D:/data/inWater/particles";
         // "E:/data/geo";
         // "D:/data/3s/20231222-water";
@@ -618,14 +621,15 @@ int main(int argc, char **argv)
         // "E:/data/oil_csv/out";
         // "D:/data/test/out";
         // "C:/Users/11379/Desktop/protein/out";
+        outPath = "/home/letian/Letian_Xie/work/ParticleIsosurface/test_cases";
         loadConfigJson(dataDirPath);
-        testHashGrid(5000000, dataDirPath + "/" + DATA_PATHES[0]);
-        // if (USE_OURS)
-        // {
-        //     runOurs(dataDirPath, outPath);
-        // } else {
-        //     runUniform(dataDirPath, outPath);
-        // }
+        // testHashGrid(5000000, dataDirPath + "/" + DATA_PATHES[0]);
+        if (USE_OURS)
+        {
+            runOurs(dataDirPath, outPath);
+        } else {
+            runUniform(dataDirPath, outPath);
+        }
         
         break;
     }

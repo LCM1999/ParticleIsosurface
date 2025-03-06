@@ -9,6 +9,8 @@
 #include "global.h"
 #include "visitorextract.h"
 #include "traverse.h"
+#include "timer.h"
+#include <var.h>
 
 SurfReconstructor::SurfReconstructor(
 	std::vector<Eigen::Vector3f>& particles, 
@@ -118,7 +120,7 @@ void SurfReconstructor::resizeRootBoxConstR()
 		_RootCenter[i] = center;
 	}
 	
-	_DEPTH_MIN = (_DEPTH_MAX - (SINGLE_LAYER ? 1 : 3));	
+	_DEPTH_MIN = (_DEPTH_MAX - (SINGLE_LAYER ? 1 : 2));	
 }
 
 void SurfReconstructor::resizeRootBoxVarR()
@@ -145,7 +147,7 @@ void SurfReconstructor::resizeRootBoxVarR()
 		_RootCenter[i] = center;
 	}
 
-	_DEPTH_MIN = min(int(ceil(log2(ceil(maxLen / maxR)))) - 1, _DEPTH_MAX-2); //, _DEPTH_MAX - int(_DEPTH_MAX / 3));
+	_DEPTH_MIN = std::min(int(std::ceil(std::log2(std::ceil(maxLen / maxR)))) - 1, _DEPTH_MAX-2); //, _DEPTH_MAX - int(_DEPTH_MAX / 3));
 }
 
 
@@ -260,7 +262,7 @@ void SurfReconstructor::afterSampleEval(
 	}
 
 	// check curvature
-	if (isbig || (signchange && curv < 0.99))//
+	if (isbig || (signchange && curv < 0.995))//
 	{
 		tnode->type = INTERNAL;
 	}
@@ -274,7 +276,8 @@ void SurfReconstructor::afterSampleEval(
 
 void SurfReconstructor::genIsoOurs()
 {
-	timer t;
+    float t_start = get_time();
+
 	auto sign = [&](unsigned int x)
 	{
 		return x ? 1 : -1;
@@ -288,8 +291,8 @@ void SurfReconstructor::genIsoOurs()
 		_OurRoot->node << _RootCenter[0], _RootCenter[1], _RootCenter[2], 0.0;
 		_OurRoot->half_length = _RootHalfLength;
 	} else if (_STATE == 1) {
-		t.reset();
 		printf("-= Generate Surface =-\n");
+		float t_gen_mesh = get_time();
 		_OurMesh->tris.reserve(1000000);
 		VisitorExtract v(this, _OurMesh);
 		TraversalData td(_OurRoot);
@@ -319,7 +322,8 @@ void SurfReconstructor::genIsoOurs()
 				_OurMesh->AppendSplash_VarR(splash_pos, splash_radiuses);
 			}
 		}
-		printf("Time generating polygons = %f\n", t.elapsed());
+		float t_alldone = get_time();
+		printf("Time generating polygons = %f\n", t_alldone - t_gen_mesh);
 		return;
 	}
 	// int depth = 0;
@@ -402,7 +406,8 @@ void SurfReconstructor::genIsoOurs()
 	ProcessArray.clear();
 	delete[] sample_points;
 	delete[] sample_grads;
-	printf("Time generating tree = %f\n", t.elapsed());	
+	float t_finish = get_time();
+	printf("Time generating tree = %f\n", t_finish - t_start);	
 	_STATE++;
 }
 
@@ -413,10 +418,13 @@ void SurfReconstructor::Run(float iso_factor, float smooth_factor)
     _OurMesh->reset();
     _STATE = 0;
 
-	timer t_total, t;
+    float time_all_start = get_time();
+	float temp_time, last_temp_time;
 
 	printf("-= Box =-\n");
 	loadRootBox();
+
+	temp_time = get_time();
 
 	printf("-= Build Neighbor Searcher =-\n");
 	if (IS_CONST_RADIUS)
@@ -425,8 +433,9 @@ void SurfReconstructor::Run(float iso_factor, float smooth_factor)
 	} else {
 		_searcher = std::make_shared<MultiLevelSearcher>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
 	}
-	printf("   Build Neighbor Searcher Time = %f \n", t.elapsed());
-	t.reset();
+    last_temp_time = temp_time;
+    temp_time = get_time();
+	printf("   Build Neighbor Searcher Time = %f \n", temp_time - last_temp_time);
 
     printf("-= Initialize Evaluator =-\n");
 	_evaluator = std::make_shared<Evaluator>(_hashgrid, _searcher, &_GlobalParticles, &_GlobalRadiuses, _RADIUS);
@@ -446,8 +455,10 @@ void SurfReconstructor::Run(float iso_factor, float smooth_factor)
 	// 		_evaluator->_searcher = _searcher;
 	// 	}
 	// }
-	printf("   Initialize Evaluator Time = %f \n", t.elapsed());
-	t.reset();
+	last_temp_time = temp_time;
+	temp_time = get_time();
+	printf("   Initialize Evaluator Time = %f \n", temp_time - last_temp_time);
+	
 	printf("-= Resize Box =-\n");
 	// shrinkBox();
 	if (IS_CONST_RADIUS)
@@ -464,18 +475,21 @@ void SurfReconstructor::Run(float iso_factor, float smooth_factor)
 	IS_CONST_RADIUS ? _evaluator->RecommendIsoValueConstR() : _evaluator->RecommendIsoValueVarR();
     printf("   Recommend Iso Value = %f\n", _evaluator->getIsoValue());
 	// _evaluator->setIsoValue(0.4033877702884984e+30);
+	temp_time = get_time();
 	if (CALC_P_NORMAL)
 	{
 		_evaluator->CalcParticlesNormal();
-		printf("   Calculate Particals Normal Time = %f\n", t.elapsed());
+		last_temp_time = temp_time;
+		temp_time = get_time();
+		printf("   Calculate Particals Normal Time = %f\n", temp_time - last_temp_time);
 	}
 
-	printMem();
+	// printMem();
 	genIsoOurs();
-	printMem();
+	// printMem();
 	genIsoOurs();
 
-	printf("-=  Total time= %f  =-\n", t_total.elapsed());
+	printf("-=  Total time= %f  =-\n", get_time() - time_all_start);
 }
 
 

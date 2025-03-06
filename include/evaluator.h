@@ -8,7 +8,7 @@
 #include <vector>
 #include <Eigen/Dense>
 #include <Eigen/SVD>
-
+#include <memory>
 
 class Evaluator
 {

@@ -1,5 +1,7 @@
 #include "utils.h"
 #include <iostream>
+
+#ifdef _WIN32
 #include <Windows.h>
 #include <Psapi.h>
 
@@ -10,6 +12,8 @@ void printMem() {
 		std::cout << float(pmc.WorkingSetSize) / 1024.0 / 1024.0 << "MB" << std::endl;
 	}
 }
+
+#endif
 
 void parseString(std::vector<std::string> *commList, const std::string& input, std::string sep)
 {

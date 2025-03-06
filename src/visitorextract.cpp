@@ -4,6 +4,7 @@
 #include "iso_method_ours.h"
 #include "evaluator.h"
 #include "global.h"
+#include <var.h>
 
 #include <set>
 
