@@ -65,7 +65,7 @@ void Evaluator::SingleEval(const Eigen::Vector3f& pos, float& scalar)
     {
         _hashgrid->GetPIdxList(pos, neighbors);
     } else {
-        _searcher->GetNeighbors(pos, neighbors);
+        // _searcher->GetNeighbors(pos, neighbors);
     }
     Eigen::Vector3f diff;
     for (int pIdx : neighbors)
@@ -102,7 +102,7 @@ void Evaluator::SingleEvalWithGrad(const Eigen::Vector3f& pos, float& scalar, Ei
     {
         _hashgrid->GetPIdxList(pos, neighbors);
     } else {
-        _searcher->GetNeighbors(pos, neighbors);
+        // _searcher->GetNeighbors(pos, neighbors);
     }
     Eigen::Vector3f diff;
     for (int pIdx : neighbors)
@@ -667,7 +667,7 @@ void Evaluator::compute_Gs_xMeans()
         {
             _hashgrid->GetPIdxList((GlobalPoses->at(pIdx)), tempNeighbors);
         } else {
-            _searcher->GetNeighbors((GlobalPoses->at(pIdx)), tempNeighbors);
+            // _searcher->GetNeighbors((GlobalPoses->at(pIdx)), tempNeighbors);
         }
         if (tempNeighbors.size() <= 2)
         {
@@ -730,7 +730,7 @@ void Evaluator::compute_Gs_xMeans()
         {
             _hashgrid->GetPIdxList((GlobalPoses->at(pIdx)), tempNeighbors);
         } else {
-            _searcher->GetNeighbors((GlobalPoses->at(pIdx)), tempNeighbors);
+            // _searcher->GetNeighbors((GlobalPoses->at(pIdx)), tempNeighbors);
         }
 
 

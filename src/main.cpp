@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <omp.h>
 #include <regex>
+#include <random>
 
 #include "global.h"
 #include "hdf5Utils.hpp"
@@ -14,6 +15,9 @@
 #include "rply.h"
 
 #include "marching.h"
+#include "hash_grid.h"
+#include "multi_level_researcher.h"
+#include "timer.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -325,17 +329,17 @@ bool readShonDyParticleData(const std::string &fileName,
 
 void runOurs(std::string dataDirPath, std::string outPath)
 {
-    float frameStart = 0;
+    timer t;
     int index = 1;
     std::vector<Eigen::Vector3f> particles;
     std::vector<float> radiuses;
     for (const std::string frame : DATA_PATHES)
     {
+        t.reset();
         Mesh mesh(int(pow(10, 4)));
         std::cout << "-=   Frame " << (TARGET_FRAME == 0 ? index : TARGET_FRAME) << " " << frame << "   =-"
                   << std::endl;
         std::string dataPath = dataDirPath + "/" + frame;
-        frameStart = get_time();
 
         if (SUFFIX == "")
         {
@@ -402,7 +406,6 @@ void runOurs(std::string dataDirPath, std::string outPath)
 
 void runUniform(std::string dataDirPath, std::string outPath)
 {
-    // float frameStart = 0;
     int index = 1;
     std::vector<Eigen::Vector3f> particles;
     std::vector<float> radiuses;
@@ -412,7 +415,6 @@ void runUniform(std::string dataDirPath, std::string outPath)
         std::cout << "-=   Frame " << (TARGET_FRAME == 0 ? index : TARGET_FRAME) << " " << frame << "   =-"
                   << std::endl;
         std::string dataPath = dataDirPath + "/" + frame;
-        // frameStart = get_time();
 
         if (SUFFIX == "")
         {
@@ -439,6 +441,121 @@ void runUniform(std::string dataDirPath, std::string outPath)
         std::cout << "Output path: " << outPath + "/" + output_name + ".vti"<< std::endl;
         std::cout << "Output Done" << std::endl;
     }
+}
+
+Eigen::Vector3f getRandomPos(float* bounding, double rx, double ry, double rz)
+{
+    return Eigen::Vector3f(bounding[0] + (bounding[1] - bounding[0]) * rx, bounding[2] + (bounding[3] - bounding[2]) * ry, bounding[4] + (bounding[5] - bounding[4]) * rz);
+}
+
+void testHashGrid(int sampleNum, std::string dataPath)
+{
+    std::vector<Eigen::Vector3f> particles;
+    std::vector<float> radiuses;
+    if (SUFFIX == "")
+    {
+        SUFFIX = std::filesystem::path(dataPath).filename().extension().string();
+    }
+    if (".csv" == SUFFIX) {
+        loadParticlesFromCSV(dataPath, particles, radiuses);
+    } else if (".h5" == SUFFIX) {
+        readShonDyParticleData(dataPath, particles, radiuses);
+    }
+    
+    float maxRadius = *std::max_element(radiuses.begin(), radiuses.end()), minRadius = *std::min_element(radiuses.begin(), radiuses.end());
+
+    if (!IS_CONST_RADIUS)
+    {
+        if (abs(maxRadius - minRadius) < 1e-7)
+        {
+            IS_CONST_RADIUS = true;
+            RADIUS = radiuses[0];
+        }
+    }
+    printf("Particles Number = %zd\n", particles.size());
+    std::shared_ptr<HashGrid> _hashgrid;
+    std::shared_ptr<MultiLevelSearcher> _searcher;
+    float _BoundingBox[6] = {0.0f};
+    _BoundingBox[0] = _BoundingBox[2] = _BoundingBox[4] = FLT_MAX;
+	_BoundingBox[1] = _BoundingBox[3] = _BoundingBox[5] = -FLT_MAX;
+	for (const Eigen::Vector3f& p: particles)
+	{
+		if (p.x() < _BoundingBox[0]) _BoundingBox[0] = p.x();
+		if (p.x() > _BoundingBox[1]) _BoundingBox[1] = p.x();
+		if (p.y() < _BoundingBox[2]) _BoundingBox[2] = p.y();
+		if (p.y() > _BoundingBox[3]) _BoundingBox[3] = p.y();
+		if (p.z() < _BoundingBox[4]) _BoundingBox[4] = p.z();
+		if (p.z() > _BoundingBox[5]) _BoundingBox[5] = p.z();
+	}
+    IS_CONST_RADIUS = true;
+	_hashgrid.reset();
+	_hashgrid = std::make_shared<HashGrid>(&particles, _BoundingBox, maxRadius, 2.0f);
+
+    // random case
+    //TODO: generate random sample points
+    std::random_device r;
+    std::uniform_real_distribution<double> u;
+    std::default_random_engine e1(r());
+    // std::mt19937 g(r());
+    // std::vector<unsigned int> indexes;
+    // indexes.resize(particles.size());
+    // std::iota(indexes.begin(), indexes.end(), 0);
+    // std::shuffle(indexes.begin(), indexes.end(), g);
+    std::vector<Eigen::Vector3f> samples;
+    samples.resize(sampleNum);
+    #pragma omp parallel for
+    for (size_t i = 0; i < sampleNum; i++)
+    {
+        samples[i] = getRandomPos(_BoundingBox, u(e1), u(e1), u(e1));
+    }
+    std::vector<int> neighbors;
+    // std::vector<std::vector<int>> multiNeighbors;
+    Eigen::Vector3f diff;
+    unsigned int totalNeighborsNum = 0;
+    unsigned int realNeighborsNum = 0;
+    timer t;
+    for (auto& sample : samples)
+    {
+        neighbors.clear();
+        _hashgrid->GetPIdxList(sample, neighbors);
+        // totalNeighborsNum += neighbors.size();
+        // for (auto& j : neighbors)
+        // {
+        //     // if (indexes[i] == j) continue;
+        //     diff = particles[j] - sample;
+        //     if (diff.norm() < radiuses[j] * 2)
+        //     {
+        //         realNeighborsNum++;
+        //     }
+        // }
+    }
+    std::cout << "Single Hash Grid time cost: " << t.elapsed() << ", with " << sampleNum << " times search, Total find Neighbors: " << totalNeighborsNum << ", Real Neighbors: " << realNeighborsNum << std::endl;
+    IS_CONST_RADIUS = false;
+    _searcher.reset();
+	_searcher = std::make_shared<MultiLevelSearcher>(&particles, _BoundingBox, &radiuses, 2.0f);
+    totalNeighborsNum = 0;
+    realNeighborsNum = 0;
+    // multiNeighbors.resize(_searcher->getSearchers()->size());
+    t.reset();
+    for (auto& sample : samples)
+    {
+        neighbors.clear();
+        _searcher->GetNeighbors(sample, neighbors);
+        // for (auto& j : multiNeighbors)
+        // {
+        //     totalNeighborsNum += j.size();
+        //     for (auto& k : j)
+        //     {
+        //         // if (indexes[i] == k) continue;
+        //         diff = particles[k] - sample;
+        //         if (diff.norm() < radiuses[k] * 2)
+        //         {
+        //             realNeighborsNum++;
+        //         }
+        //     }
+        // }
+    }
+    std::cout << "Multi Hash Grid time cost: " << t.elapsed() << ", with " << sampleNum << " times search, Total find Neighbors: " << totalNeighborsNum << ", Real Neighbors: " << realNeighborsNum << std::endl;
 }
 
 int main(int argc, char **argv)
@@ -478,34 +595,37 @@ int main(int argc, char **argv)
     case 1:
     default:
         dataDirPath =
-        "E:/data/multiR/mr_csv";
+        "D:/data/multiR/mr_csv";
+        // "D:/data/inWater/particles";
         // "E:/data/geo";
-        // "E:/data/3s/20231222-water";
+        // "D:/data/3s/20231222-water";
+        // "D:/data/car_render_test_data_2/Fluid";
         // "E:/data/damBreak3D-27steps";
         // "E:/BaiduNetdiskDownload/MultiResolutionResults/damBreak3D";
         // "E:/data/ring/csv";
-        // "E:/data/car_render_test_data_2/Fluid";
         // "E:/data/oil_csv";
-        // "E:/data/test";
+        // "D:/data/test";
         // "C:/Users/11379/Desktop/protein";
-        outPath = 
-        "E:/data/multiR/mr_csv/out";
+        // outPath = 
+        // "D:/data/multiR/mr_csv";
+        // "D:/data/inWater/particles/out";
         // "E:/data/geo/out";
-        // "E:/data/3s/20231222-water/out";
+        // "D:/data/3s/20231222-water/out";
+        // "D:/data/car_render_test_data_2/Fluid/out";
         // "E:/data/damBreak3D-27steps/out";
         // "E:/BaiduNetdiskDownload/MultiResolutionResults/damBreak3D/out";
         // "E:/data/ring/csv/out";
-        // "E:/data/car_render_test_data_2/Fluid/out";
         // "E:/data/oil_csv/out";
-        // "E:/data/test/out";
+        // "D:/data/test/out";
         // "C:/Users/11379/Desktop/protein/out";
         loadConfigJson(dataDirPath);
-        if (USE_OURS)
-        {
-            runOurs(dataDirPath, outPath);
-        } else {
-            runUniform(dataDirPath, outPath);
-        }
+        testHashGrid(5000000, dataDirPath + "/" + DATA_PATHES[0]);
+        // if (USE_OURS)
+        // {
+        //     runOurs(dataDirPath, outPath);
+        // } else {
+        //     runUniform(dataDirPath, outPath);
+        // }
         
         break;
     }

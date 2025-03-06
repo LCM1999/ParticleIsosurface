@@ -20,7 +20,7 @@ private:
 
     float _NEIGHBOR_FACTOR = 4.0;
     float _SMOOTH_FACTOR = 2.0;
-    float _ISO_FACTOR = 0.0;
+    float _ISO_FACTOR = 1.9;
     float _ISO_VALUE = 0.0;
 
     float _MAX_SCALAR = -1.0;

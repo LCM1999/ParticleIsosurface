@@ -53,12 +53,17 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3f>* particles, 
     {
         if (sortedIndex[i].size() == 0) continue;
         float temp_bounding [6] = {0.0f};
-        temp_bounding[0] = bounding[0];
-        temp_bounding[1] = bounding[1];
-        temp_bounding[2] = bounding[2];
-        temp_bounding[3] = bounding[3];
-        temp_bounding[4] = bounding[4];
-        temp_bounding[5] = bounding[5];
+        temp_bounding[0] = temp_bounding[2] = temp_bounding[4] = FLT_MAX;
+        temp_bounding[1] = temp_bounding[3] = temp_bounding[5] = -FLT_MAX;
+        for (auto pI: sortedIndex[i])
+        {
+            if (particles->at(pI).x() < temp_bounding[0]) temp_bounding[0] = particles->at(pI).x();
+            if (particles->at(pI).x() > temp_bounding[1]) temp_bounding[1] = particles->at(pI).x();
+            if (particles->at(pI).y() < temp_bounding[2]) temp_bounding[2] = particles->at(pI).y();
+            if (particles->at(pI).y() > temp_bounding[3]) temp_bounding[3] = particles->at(pI).y();
+            if (particles->at(pI).z() < temp_bounding[4]) temp_bounding[4] = particles->at(pI).z();
+            if (particles->at(pI).z() > temp_bounding[5]) temp_bounding[5] = particles->at(pI).z();
+        }
         unsigned int binRadiusId = *std::max_element(sortedIndex[i].begin(), sortedIndex[i].end(), 
             [&](unsigned int& a, unsigned int& b) {
                 return radiuses->at(a) < radiuses->at(b);
@@ -73,21 +78,21 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3f>* particles, 
 
 void MultiLevelSearcher::GetNeighbors(const Eigen::Vector3f& pos, std::vector<int>& neighbors)
 {
-    std::vector<int> subNeighbors;
-    size_t sIndexId = 0, searcherId = 0;
-    for (sIndexId = 0; sIndexId < sortedIndex.size(); sIndexId++)
+    // std::vector<int> subNeighbors;
+    // size_t searcherId = 0;
+    for (size_t sIndexId = 0; sIndexId < sortedIndex.size(); sIndexId++)
     {
         if (sortedIndex[sIndexId].empty())
         {
             continue;
         }
-        subNeighbors.clear();
-        searchers[searcherId]->GetPIdxList(pos, subNeighbors);
-        for (size_t nId = 0; nId < subNeighbors.size(); nId++)
-        {
-            neighbors.push_back(sortedIndex[sIndexId][subNeighbors[nId]]);
-        }
-        searcherId++;
+        // subNeighbors.clear();
+        searchers[sIndexId]->GetPIdxList(pos, neighbors);
+        // for (size_t nId = 0; nId < subNeighbors.size(); nId++)
+        // {
+        //     neighbors.push_back(sortedIndex[sIndexId][subNeighbors[nId]]);
+        // }
+        // searcherId++;
     }
 }
 

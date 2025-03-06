@@ -90,38 +90,16 @@ void UniformGrid::gridSampling()
             _Scalars[i]
         );
     }
-    // exit(0);
-    // for (size_t x = 0; x <= steps[0]; x++)
-    // {
-    //     for (size_t y = 0; y <= steps[1]; y++)
-    //     {
-    //         for (size_t z = 0; z <= steps[2]; z++)
-    //         {
-    //             _evaluator->SingleEval(
-    //                 Eigen::Vector3f(
-    //                     float(steps[0] - x) / float(steps[0]) * minV[0] + float(x) / float(steps[0]) * maxV[0],
-    //                     float(steps[1] - y) / float(steps[1]) * minV[1] + float(y) / float(steps[1]) * maxV[1],
-    //                     float(steps[2] - z) / float(steps[2]) * minV[2] + float(z) / float(steps[2]) * maxV[2]),
-    //                 _Scalars[z * dims[0] * dims[1] + y * dims[0] + x]
-    //             );
-    //             // if (std::abs(_Scalars[z * dims[0] * dims[1] + y * dims[0] + x]) > _MAX_SCALAR)
-    //             // {
-    //             //     _MAX_SCALAR = _Scalars[z * dims[0] * dims[1] + y * dims[0] + x];
-    //             // }
-    //         }
-    //     }
-    // }
 }
 
 void UniformGrid::Run(float iso_value, std::string filename, std::string filepath) 
 {
-    float time_all_start = get_time(), time_all_end = 0;
+    timer t_total, t;
 	float temp_time, last_temp_time;
     vtkNew<vtkImageData> grid;
 
 	printf("-= Box =-\n");
     loadRootBox();
-	temp_time = get_time();
 
 	printf("-= Build Neighbor Searcher =-\n");
     if (IS_CONST_RADIUS)
@@ -130,18 +108,19 @@ void UniformGrid::Run(float iso_value, std::string filename, std::string filepat
     } else {
         _searcher = std::make_shared<MultiLevelSearcher>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
     }
-    last_temp_time = temp_time;
-    temp_time = get_time();
-	printf("   Build Neighbor Searcher Time = %f \n", temp_time - last_temp_time);
+	printf("   Build Neighbor Searcher Time = %f \n", t.elapsed());
+    t.reset();
 
     printf("-= Initialize Evaluator =-\n");
 	_evaluator = std::make_shared<Evaluator>(_hashgrid, _searcher, &_GlobalParticles, &_GlobalRadiuses, _RADIUS);
 	_evaluator->setSmoothFactor(2.0f);
-	_evaluator->setIsoValue(iso_value);
+	IS_CONST_RADIUS ? _evaluator->CalculateMaxScalarConstR() : _evaluator->CalculateMaxScalarVarR();
+    printf("   Max Scalar Value = %f\n", _evaluator->getMaxScalar());
+	
+	IS_CONST_RADIUS ? _evaluator->RecommendIsoValueConstR() : _evaluator->RecommendIsoValueVarR();
+    printf("   Recommend Iso Value = %f\n", _evaluator->getIsoValue());
 	_evaluator->compute_Gs_xMeans();
-	last_temp_time = temp_time;
-	temp_time = get_time();
-	printf("   Initialize Evaluator Time = %f \n", temp_time - last_temp_time);
+	printf("   Initialize Evaluator Time = %f \n", t.elapsed());
 
 	if (USE_POLY6 && USE_ANI)
 	{
@@ -170,13 +149,10 @@ void UniformGrid::Run(float iso_value, std::string filename, std::string filepat
 	printMem();
 
 	printf("-= Grid Sampling =-\n");
-	temp_time = get_time();
+    t.reset();
     gridSampling();
-	last_temp_time = temp_time;
-	temp_time = get_time();
-	printf("   Grid Sampling Time = %f \n", temp_time - last_temp_time);
-    time_all_end = get_time();
-	printf("   All End Time 1 = %f \n", time_all_end - time_all_start);
+	printf("   Grid Sampling Time = %f \n", t.elapsed());
+	printf("   All End Time 1 = %f \n", t_total.elapsed());
 
 	printMem();
 
@@ -206,6 +182,5 @@ void UniformGrid::Run(float iso_value, std::string filename, std::string filepat
     writer->SetFileName((filepath + "/" + filename + ".vti").c_str());
     writer->SetInputData(grid);
     writer->Write();
-    time_all_end = get_time();
-	printf("   All End Time 2 = %f \n", time_all_end - time_all_start);
+	printf("   All End Time 2 = %f \n", t_total.elapsed());
 }

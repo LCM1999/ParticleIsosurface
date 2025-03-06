@@ -3,7 +3,7 @@
 
 HashGrid::HashGrid(std::vector<Eigen::Vector3f>* particles, float* bounding, float radius, float inf_factor)
 {
-	assert(IS_CONST_RADIUS);
+	// assert(IS_CONST_RADIUS);
 	Particles = particles;
 	ParticlesNum = Particles->size();
 
@@ -151,7 +151,14 @@ void HashGrid::GetInCellList(const long long hash, std::vector<int>& pIdxList)
 		return;
 	}
 	for (int countIndex = startIndex; countIndex < endIndex; countIndex++)
-		pIdxList.push_back(IndexList[countIndex]);
+	{
+		if (IS_CONST_RADIUS)
+		{
+			pIdxList.push_back(IndexList[countIndex]);
+		} else {
+			pIdxList.push_back(PIndexes[IndexList[countIndex]]);
+		}
+	}
 }
 
 void HashGrid::GetInBoxParticles(
@@ -188,7 +195,7 @@ void HashGrid::GetInBoxParticles(
 
 void HashGrid::GetPIdxList(const Eigen::Vector3f& pos, std::vector<int>& pIdxList)
 {
-	pIdxList.clear();
+	// pIdxList.clear();
 	Eigen::Vector3i xyzIdx;
 	long long neighbor_hash;
 	CalcXYZIdx(pos, xyzIdx);

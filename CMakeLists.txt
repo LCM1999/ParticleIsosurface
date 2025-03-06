@@ -60,7 +60,6 @@ add_executable(${PROJECT_NAME}
     src/iso_method_ours.cpp
     src/main.cpp
     src/marching.cpp
-    src/timer.cpp
     src/utils.cpp
     src/visitorextract.cpp
     src/evaluator.cpp

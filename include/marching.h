@@ -54,6 +54,8 @@ public:
 
     void gridSampling();
 
+    void gridDIF();
+
     UniformGrid() {};
 
     UniformGrid(

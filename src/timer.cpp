@@ -3,13 +3,19 @@
 #ifdef _WIN32
 
 #include <windows.h>
-double get_time()
+struct timer
 {
-	LARGE_INTEGER t, f;
-	QueryPerformanceCounter(&t);
-	QueryPerformanceFrequency(&f);
-	return double(t.QuadPart)/double(f.QuadPart);
-}
+	LARGE_INTEGER start;
+	timer() { QueryPerformanceCounter(&start); }
+	double elapsed() const
+	{
+		LARGE_INTEGER end, freq;
+		QueryPerformanceCounter(&end);
+		QueryPerformanceFrequency(&freq);
+		return (end.QuadPart - start.QuadPart) / double(freq.QuadPart);
+	}
+	void reset() { QueryPerformanceCounter(&start); }
+};
 
 #else
 
