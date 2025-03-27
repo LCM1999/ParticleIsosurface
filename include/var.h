@@ -18,6 +18,8 @@ inline bool WITH_NORMAL;
 inline std::vector<std::string> DATA_PATHES;
 inline std::string OUTPUT_TYPE = "ply";
 inline float RADIUS = 0;
+inline float MAX_RADIUS = 0.0;
+inline float MIN_RADIUS = 0.0;
 inline float SMOOTH_FACTOR = 2.0;
 inline float ISO_FACTOR = 1.9;
 inline float ISO_VALUE = 0.0f;

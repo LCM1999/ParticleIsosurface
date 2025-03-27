@@ -22,6 +22,20 @@ struct Vec3
 
 	HOST_DEVICE Vec3(T x, T y, T z): x(x), y(y), z(z) {}
 
+    HOST_DEVICE T& operator[](int i) {
+        assert(i >= 0 && i < 3);
+        if (i == 0) return x;
+        if (i == 1) return y;
+        return z;
+    }
+
+    HOST_DEVICE const T& operator[](int i) const {
+        assert(i >= 0 && i < 3);
+        if (i == 0) return x;
+        if (i == 1) return y;
+        return z;
+    }
+
     HOST_DEVICE Vec3 operator+(const Vec3& other) const
     {
         return Vec3(x + other.x, y + other.y, z + other.z);
@@ -107,20 +121,20 @@ struct Vec3
 
 	HOST_DEVICE Vec3 operator/(const Vec3& other) const
     {
-        assert(other.x == 0 || other.y == 0 || other.z == 0);
+        assert(!(other.x == 0 || other.y == 0 || other.z == 0));
         return Vec3(x / other.x, y / other.y, z / other.z);
 	}
 
 
 	HOST_DEVICE Vec3 operator/(const T other) const
     {
-        assert(other == 0);
+        assert(other != 0);
         return Vec3(x / other, y / other, z / other);
 	}
 
 	HOST_DEVICE void operator/=(const Vec3& other)
     {
-        assert(other.x == 0 || other.y == 0 || other.z == 0);
+        assert(!(other.x == 0 || other.y == 0 || other.z == 0));
         x /= other.x;
         y /= other.y;
 		z /= other.z;
@@ -130,7 +144,7 @@ struct Vec3
 
     HOST_DEVICE void operator/=(const T other)
     {
-        assert(other == 0);
+        assert(other != 0);
         x /= other;
         y /= other;
 		z /= other;

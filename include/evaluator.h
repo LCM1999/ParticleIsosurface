@@ -8,8 +8,14 @@
 #include <vector>
 #include <Eigen/Dense>
 #include <Eigen/SVD>
-#include <memory>
 
+#include <memory>
+#include <box.h>
+#include <octree_func.h>
+#include <coord_struct.h>
+#include <var.h>
+
+using namespace cstoneOctree;
 class Evaluator
 {
 private:
@@ -42,6 +48,7 @@ private:
 	float AnisotropicInterpolate(const int pIdx, const Eigen::Vector3f diff);
     Eigen::Vector3f AnisotropicInterpolateGrad(const int pIdx, const Eigen::Vector3f diff);
     void compute_xMeans(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Eigen::Vector3f &xMean);
+    void compute_xMeansCPU(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Eigen::Vector3f &xMean);
     void compute_G_ours(int pIdx, Eigen::Vector3f xMean, std::vector<int> neighbors, Eigen::Matrix3f &G);
     void compute_G_Yus(int pIdx, Eigen::Vector3f xMean, std::vector<int> neighbors, Eigen::Matrix3f &G);
 	float wij(float d, float r);
@@ -79,8 +86,19 @@ public:
                 std::vector<float>* radiuses,
                 float radius);
 
+    Evaluator(std::vector<Vec3f>* global_particles,
+                std::vector<float>* radiuses,
+                OctreeNs octreeNs, 
+                Box box,
+                int ngmax
+                );
+
+    void SingleEvalCPU(Vec3f& pos, float& scalar);
 	void SingleEval(const Eigen::Vector3f& pos, float& scalar);
+    void SingleEvalWithGradCPU(int idx, float& scalar, Eigen::Vector3f& gradient);
     void SingleEvalWithGrad(const Eigen::Vector3f& pos, float& scalar, Eigen::Vector3f& gradient);
+    void GridEvalCPU(float* sample_points, float* field_gradients, float cellsize, 
+                                bool& signchange, int oversample, bool grad_normalize);
     void GridEval(
         float* sample_points, float* field_gradients, float cellsize, 
         bool& signchange, int oversample, bool grad_normalize = false);
@@ -91,8 +109,10 @@ public:
     void CalculateMaxScalarVarR();
     void RecommendIsoValueConstR();
     void RecommendIsoValueVarR();
+    void CalcParticlesNormalCPU();
     void CalcParticlesNormal();
 	void compute_Gs_xMeans();
+    void compute_Gs_xMeansCPU();
 
     inline float getNeighborFactor() {return _NEIGHBOR_FACTOR;}
     inline float getSmoothFactor() {return _SMOOTH_FACTOR;}
@@ -105,4 +125,10 @@ public:
     inline float getMinScalar() {return _MIN_SCALAR;}
     inline bool getUseXMean() {return _USE_XMEAN;}
     inline float getXMeanDelta() {return _XMEAN_DELTA;}
+
+    // variable need for cornerstone octree
+    std::vector<Vec3f>* _GlobalPoses;
+    OctreeNs _octreeNs;
+    Box _box;
+    int _ngmax;
 };

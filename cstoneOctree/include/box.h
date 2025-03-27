@@ -27,6 +27,7 @@ public:
                     inverseLengths_{1.0f / (xmax - xmin), 
                       1.0f / (ymax - ymin),
                       1.0f / (zmax - zmin)} {}
+    HOST_DEVICE Box() {}
 
     // Getter methods
     HOST_DEVICE  float xmin() const { return limits[0]; }

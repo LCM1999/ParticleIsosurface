@@ -30,7 +30,7 @@ message("cstoneoctree_source_files: ${CSTONEOCTREE_SOURCE_FILES}")
 set(CSTONEOCTREE_TEST cstone_octree_test.cpp)
 add_executable(cstone_octree_test 
                 ${CSTONEOCTREE_TEST}
-                ${ISO_SOURCE_FILES}
+                # ${ORIGINAL_SOURCE_FILES}
                 ${CSTONEOCTREE_SOURCE_FILES}
                 )
 
@@ -41,7 +41,7 @@ set_target_properties(cstone_octree_test PROPERTIES
 target_include_directories(cstone_octree_test 
                             PRIVATE 
                             ${HDF5_INCLUDE_DIR}
-                            ${ISO_INCLUDE_DIR}
+                            # ${ORIGINAL_INCLUDE_DIR}
                             ${CSTONEOCTREE_INCLUDE_DIR}
                             ${MPI_CXX_INCLUDE_DIRS}
                             ${EIGEN3_INCLUDE_DIR}
@@ -68,7 +68,7 @@ set(CSTONE_OCTREE_TEST_GPU cstone_octree_test_gpu.cu)
 
 add_executable(cstone_octree_test_gpu
                     ${CSTONE_OCTREE_TEST_GPU}                            
-                    ${ISO_SOURCE_FILES}
+                    # ${ORIGINAL_SOURCE_FILES}
                     ${CSTONEOCTREE_SOURCE_FILES}
                     )
 
@@ -79,7 +79,7 @@ set_target_properties(cstone_octree_test_gpu PROPERTIES CUDA_SEPARABLE_COMPILATI
 target_include_directories(cstone_octree_test_gpu 
                     PRIVATE 
                     ${HDF5_INCLUDE_DIR}
-                    ${ISO_INCLUDE_DIR}
+                    # ${ORIGINAL_INCLUDE_DIR}
                     ${CSTONEOCTREE_INCLUDE_DIR}
                     ${CSTONEOCTREE_HEADER_FILES}
                     ${MPI_CXX_INCLUDE_DIRS}

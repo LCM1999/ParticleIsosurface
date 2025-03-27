@@ -2,7 +2,7 @@
 
 namespace cstoneOctree{
 
-    void calMortonCodeCPU(std::vector<Vec3<float>>& coords, std::vector<uint64_t>& mortonCodes, const Box& box){
+    void calMortonCodeCPU(std::vector<Vec3f>& coords, std::vector<uint64_t>& mortonCodes, const Box& box){
         unsigned cubeLength = (1u << 21);
         for (size_t i = 0; i < coords.size(); ++i)
         {

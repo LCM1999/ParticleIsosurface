@@ -11,6 +11,16 @@
 #include "utils.h"
 #include "iso_common.h"
 
+// included packages for cornerstone octree 
+#include <box.h>
+#include <morton.h>
+#include <coord_struct.h>
+#include <calculator.h>
+#include <utils_helper.h>
+#include <octree_func.h>
+#include <bitset>
+#include <algorithm>
+
 class HashGrid;
 class MultiLevelSearcher;
 class Evaluator;
@@ -51,6 +61,15 @@ private:
     std::vector<std::shared_ptr<TNode>*> ProcessArray;
 
     int queue_flag;
+    
+    // variables for cornerstone octree methods
+    std::vector<Vec3f> _particles;
+    std::vector<uint64_t> _mortonCodes;
+    std::vector<uint64_t> _tree;
+    std::vector<uint64_t> _counts;
+    Box _box;
+    OctreeNs _octreeNs;
+
 protected:
     void loadRootBox();
 
@@ -77,6 +96,7 @@ public:
     ~SurfReconstructor() {}
 
     void Run(float iso_factor, float smooth_factor);
+    void RunCPU(float iso_factor, float smooth_factor);
 
     inline int getOverSampleQEF() {return _OVERSAMPLE_QEF;}
     inline float getBorder() {return _BORDER;}
@@ -90,6 +110,7 @@ public:
     inline float getConstRadius() {return _RADIUS;}
     inline int getSTATE() {return _STATE;}
     inline std::shared_ptr<TNode> getRoot() {return _OurRoot;}
+
 };
 
 #endif

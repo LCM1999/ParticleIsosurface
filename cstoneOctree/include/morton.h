@@ -57,7 +57,7 @@ HOST_DEVICE uint64_t sfc3D(float x, float y, float z, float xmin, float ymin, fl
 HOST_DEVICE uint64_t sfc3D(float x, float y, float z, const Box& box);
 
 
-void calMortonCodeCPU(std::vector<Vec3<float>>& coords, std::vector<uint64_t>& mortonCodes, const Box& box);
+void calMortonCodeCPU(std::vector<Vec3f>& coords, std::vector<uint64_t>& mortonCodes, const Box& box);
 
 __global__ void calMortonCodeGPUKenrel(Vec3f* coordsDevice, uint64_t* mortonCodesDevice, Box* box, int numParticles);
 

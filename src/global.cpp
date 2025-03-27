@@ -1,6 +1,6 @@
 #include "global.h"
 #include "iso_method_ours.h"
-
+#include <iostream>
 #include <sstream>
 
 Mesh::Mesh(const int mesh_precision)

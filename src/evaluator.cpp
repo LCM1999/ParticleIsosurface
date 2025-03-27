@@ -1,6 +1,7 @@
 #include <float.h>
 #include "evaluator.h"
 
+using namespace cstoneOctree;
 
 Evaluator::Evaluator(
     std::shared_ptr<HashGrid>& hashgrid,
@@ -57,6 +58,94 @@ Evaluator::Evaluator(
     }
 }
 
+// new evaluator constructor for conrnerstone octree
+Evaluator::Evaluator(
+    std::vector<Vec3f>* global_particles, 
+    std::vector<float>* radiuses, OctreeNs octreeNs, Box box, int ngmax)
+{
+    _ngmax = ngmax;
+    _box = box;
+    _octreeNs = octreeNs;
+	_GlobalPoses = global_particles;
+    GlobalRadius = radiuses;
+    _GlobalParticlesNum = global_particles->size();
+    if (!IS_CONST_RADIUS)
+    {
+        GlobalRadius2.resize(_GlobalParticlesNum);
+        GlobalRadius3.resize(_GlobalParticlesNum);
+        GlobalInflunce2.resize(_GlobalParticlesNum);
+        GlobalSigma.resize(_GlobalParticlesNum);
+#pragma omp parallel for
+        for (int i = 0; i < _GlobalParticlesNum; i++)
+        {
+            float smooth = GlobalRadius->at(i) * _SMOOTH_FACTOR;
+            GlobalRadius2[i] = pow(GlobalRadius->at(i), 2);
+            GlobalRadius3[i] = GlobalRadius->at(i) * GlobalRadius2[i];
+            GlobalInflunce2[i] = pow(smooth, 2);
+            GlobalSigma[i] = 1/pow(smooth, 6);   //(315 / (64 * pow(influnce, 9))) * inv_pi;
+        }
+    } else {
+        Radius = GlobalRadius->at(0);
+        Radius2 = Radius * Radius;
+        Radius3 = Radius * Radius2;
+        Influnce2 = pow(Radius * _SMOOTH_FACTOR, 2);
+        Sigma = 1 / pow(Radius * _SMOOTH_FACTOR, 6);    //(315 / (64 * pow(radius * _SMOOTH_FACTOR, 9))) * inv_pi;
+    }
+
+    if (!USE_POLY6)
+    {
+        _XMEAN_DELTA = 0.9;
+    }
+
+    if (CALC_P_NORMAL)
+    {
+        PariclesNormals.clear();
+        PariclesNormals.resize(_GlobalParticlesNum, Eigen::Vector3f(0, 0, 0)); 
+    }
+    
+    GlobalSplash.resize(_GlobalParticlesNum, 0);
+    GlobalSurface.resize(_GlobalParticlesNum, 0);
+    GlobalxMeans.resize(_GlobalParticlesNum);
+    if (USE_ANI)
+    {
+        GlobalGs.resize(_GlobalParticlesNum);
+        GlobalDeterminant.resize(_GlobalParticlesNum);
+    }
+}
+
+
+void Evaluator::SingleEvalCPU(Vec3f& pos, float& scalar)
+{
+	scalar = 0;
+    std::vector<int> neighbors(_ngmax); 
+    int numNeighbors;
+    numNeighbors = findInfluencedParticlesCPU(pos, MAX_RADIUS, _octreeNs, _box, _ngmax, neighbors.data());
+    // if (IS_CONST_RADIUS)
+    // {
+    //     _hashgrid->GetPIdxList(pos, neighbors);
+    // } else {
+    //     // _searcher->GetNeighbors(pos, neighbors);
+    // }
+    Eigen::Vector3f diff;
+    Eigen::Vector3f pos3f = Eigen::Vector3f(pos.x, pos.y, pos.z);
+    for (int pIdx : neighbors)
+    {
+        if (this->CheckSplash(pIdx))
+        {
+            continue;
+        }
+
+        diff = pos3f - GlobalxMeans[pIdx];
+        if (USE_ANI)
+        {
+            scalar += AnisotropicInterpolate(pIdx, diff);
+        } else {
+            scalar += IsotropicInterpolate(pIdx, diff.squaredNorm());
+        }
+    }
+    scalar = _ISO_VALUE - scalar;   //((scalar - _MIN_SCALAR) / _MAX_SCALAR * 255);
+}
+
 void Evaluator::SingleEval(const Eigen::Vector3f& pos, float& scalar)
 {
 	scalar = 0;
@@ -84,6 +173,40 @@ void Evaluator::SingleEval(const Eigen::Vector3f& pos, float& scalar)
         }
     }
     scalar = _ISO_VALUE - scalar;   //((scalar - _MIN_SCALAR) / _MAX_SCALAR * 255);
+}
+
+void Evaluator::SingleEvalWithGradCPU(int idx, float& scalar, Eigen::Vector3f& gradient){
+    if (_MAX_SCALAR >= 0)
+	{
+		scalar = 0;
+        if (!gradient.isZero())
+        {
+            gradient.setZero();
+        }
+	}
+
+    std::vector<int> neighbors(_ngmax);
+    int numNeighbors = findNeighborsCPU(idx, *_GlobalPoses, *GlobalRadius, _octreeNs, _box, _ngmax, neighbors.data());
+    Eigen::Vector3f pos = Eigen::Vector3f(_GlobalPoses->at(idx).x, _GlobalPoses->at(idx).y, _GlobalPoses->at(idx).z);
+    Eigen::Vector3f diff;
+    for (int pIdx : neighbors)
+    {
+        if (this->CheckSplash(pIdx))
+        {
+            continue;
+        }
+        diff = pos - GlobalxMeans[pIdx];
+        if (USE_ANI)
+        {
+            scalar += AnisotropicInterpolate(pIdx, diff);
+            gradient += AnisotropicInterpolateGrad(pIdx, diff);
+        } else {
+            scalar += IsotropicInterpolate(pIdx, diff.squaredNorm());
+            gradient += IsotropicInterpolateGrad(pIdx, diff.squaredNorm(), diff);
+        }
+    }
+    scalar = _ISO_VALUE - scalar;   //((scalar - _MIN_SCALAR) / _MAX_SCALAR * 255);
+
 }
 
 void Evaluator::SingleEvalWithGrad(const Eigen::Vector3f& pos, float& scalar, Eigen::Vector3f& gradient)
@@ -122,6 +245,95 @@ void Evaluator::SingleEvalWithGrad(const Eigen::Vector3f& pos, float& scalar, Ei
         }
     }
     scalar = _ISO_VALUE - scalar;   //((scalar - _MIN_SCALAR) / _MAX_SCALAR * 255);
+}
+
+void Evaluator::GridEvalCPU(
+    float* sample_points, float* field_gradients, float cellsize, 
+    bool& signchange, int oversample, bool grad_normalize)
+{
+    bool origin_sign;
+    float step = cellsize / oversample;
+    for (int i = 0; i < pow(oversample+1, 3); i++)
+    {
+        Vec3f pos = Vec3f(sample_points[i*4 + 0], sample_points[i*4 + 1], sample_points[i*4 + 2]);
+        SingleEvalCPU(
+            pos,
+            sample_points[i*4 + 3]
+        );
+
+        origin_sign = (sample_points[3] >= 0);
+        if (!signchange)
+        {
+            signchange = origin_sign ^ (sample_points[i*4 + 3] >= 0);
+        }
+    }
+    int index, next_idx, last_idx;
+    for (int z = 0; z <= oversample; z++)
+    {
+        for (int y = 0; y <= oversample; y++)
+        {
+            for (int x = 0; x <= oversample; x++)
+            {
+                index = (z * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + x);
+                Eigen::Vector3f gradient(0.0f, 0.0f, 0.0f);
+
+                next_idx = (z * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + (x + 1));
+                last_idx = (z * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + (x - 1));
+                if (x == 0)
+                {
+                    gradient[0] = (sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3]) / step;
+                }
+                else if (x == oversample)
+                {
+                    gradient[0] = (sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3]) / step;
+                }
+                else
+                {
+                    gradient[0] = (sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3]) / (step * 2);
+                }
+
+                next_idx = (z * (oversample + 1) * (oversample + 1) + (y + 1) * (oversample + 1) + x);
+                last_idx = (z * (oversample + 1) * (oversample + 1) + (y - 1) * (oversample + 1) + x);
+                if (y == 0)
+                {
+                    gradient[1] = (sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3]) / step;
+                }
+                else if (y == oversample)
+                {
+                    gradient[1] = (sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3]) / step;
+                }
+                else
+                {
+                    gradient[1] = (sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3]) / (step * 2);
+                }
+
+                next_idx = ((z + 1) * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + x);
+                last_idx = ((z - 1) * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + x);
+                if (z == 0)
+                {
+                    gradient[2] = (sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3]) / step;
+                }
+                else if (z == oversample)
+                {
+                    gradient[2] = (sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3]) / step;
+                }
+                else
+                {
+                    gradient[2] = (sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3]) / (step * 2);
+                }
+                if (grad_normalize)
+                {
+                    gradient.normalize();
+                    gradient[0] = std::isnan(gradient[0]) ? 0.0f : gradient[0];
+                    gradient[1] = std::isnan(gradient[1]) ? 0.0f : gradient[1];
+                    gradient[2] = std::isnan(gradient[2]) ? 0.0f : gradient[2];
+                }
+                field_gradients[index * 3 + 0] = gradient[0];
+                field_gradients[index * 3 + 1] = gradient[1];
+                field_gradients[index * 3 + 2] = gradient[2];
+            }
+        }
+    }
 }
 
 void Evaluator::GridEval(
@@ -360,6 +572,20 @@ void Evaluator::RecommendIsoValueVarR()
     _ISO_VALUE = recommend; //(recommend - _MIN_SCALAR) / _MAX_SCALAR * 255;
 }
 
+void Evaluator::CalcParticlesNormalCPU()
+{
+#pragma omp parallel for
+    for (int pIdx = 0; pIdx < _GlobalParticlesNum; pIdx++)
+    {
+        float tempScalar = 0;
+        Eigen::Vector3f tempGrad = Eigen::Vector3f::Zero();
+        if (!CheckSplash(pIdx))
+        {
+            SingleEvalWithGradCPU(pIdx, tempScalar, PariclesNormals[pIdx]);
+        }
+    }
+}
+
 void Evaluator::CalcParticlesNormal()
 {
 #pragma omp parallel for
@@ -461,6 +687,60 @@ inline Eigen::Vector3f Evaluator::AnisotropicInterpolateGrad(const int pIdx, con
         (IS_CONST_RADIUS ? Sigma : GlobalSigma[pIdx]), (GlobalGs[pIdx] * diff));
     return (GlobalDeterminant[pIdx] * grad);    //(IS_CONST_RADIUS ? Radius3 : GlobalRadius3[pIdx]) * 
 }
+
+
+inline void Evaluator::compute_xMeansCPU(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Eigen::Vector3f &xMean)
+{
+    Vec3f xMean_copy = Vec3f(xMean[0], xMean[1], xMean[2]);
+    float pR, pD2;
+    pR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx);
+    // pD = SmoothFactor * pR;
+    pD2 = IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx];
+    float nR, nD, nD2, nI, nI2, d, d2, wj, wSum = 0;
+    for (int nIdx : temp_neighbors)
+    {
+        if (nIdx == pIdx)
+            continue;
+        nR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(nIdx);
+        nD = _SMOOTH_FACTOR * nR * 1.6;
+        nD2 = nD * nD;
+        nI = nR * _NEIGHBOR_FACTOR;
+        nI2 = nI * nI;
+        d2 = (((_GlobalPoses->at(nIdx))) - ((_GlobalPoses->at(pIdx)))).squaredNorm();
+        if (d2 >= nI2)
+        {
+            continue;
+        }
+        d = sqrt(d2);
+        wj = wij(d, nI);
+        wSum += wj;
+        xMean_copy += ((_GlobalPoses->at(nIdx))) * wj;
+        neighbors.push_back(nIdx);
+        if (d2 <= std::max(pD2, nD2))
+        {
+            closer_neighbor++;
+        }
+    }
+    if (_USE_XMEAN && !USE_POLY6)
+    {
+        if (wSum > 0)
+        {
+            xMean_copy /= wSum;
+            xMean_copy = (_GlobalPoses->at(pIdx)) * (1 - _XMEAN_DELTA) + xMean_copy * _XMEAN_DELTA;
+        }
+        else
+        {
+            xMean_copy = (_GlobalPoses->at(pIdx));
+        }
+    }
+    else
+    {
+        xMean_copy = (_GlobalPoses->at(pIdx));
+    }
+    xMean = Eigen::Vector3f(xMean_copy.x, xMean_copy.y, xMean_copy.z);
+}
+
+
 
 inline void Evaluator::compute_xMeans(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Eigen::Vector3f &xMean)
 {
@@ -651,6 +931,78 @@ inline void Evaluator::compute_G_Yus(int pIdx, Eigen::Vector3f xMean, std::vecto
     G = (v * invSigma * u.transpose()) * scale;//* invH
     // float detC = cov.determinant();
     // float detG = G.determinant();
+}
+
+void Evaluator::compute_Gs_xMeansCPU(){
+    std::cout << "start compute_Gs_xMeansCPU " << std::endl;
+    // #pragma omp parallel for
+    for(int pIdx = 0; pIdx < _GlobalParticlesNum; pIdx++){
+        std::vector<int> tempNeighbors(_ngmax, 0);
+        std::vector<int> neighbors(_ngmax, 0);
+        int numNeighbors;
+        int closerNeigbors = 0;
+        Eigen::Vector3f xMean = Eigen::Vector3f::Zero();
+        Eigen::Matrix3f G = Eigen::Matrix3f::Zero();
+
+        // std::cout << "idx: " << pIdx << std::endl;
+        numNeighbors = findNeighborsCPU(pIdx, *_GlobalPoses, *GlobalRadius, _octreeNs, _box, _ngmax, tempNeighbors.data());
+        if (numNeighbors <= 2)
+        {
+            G = Eigen::DiagonalMatrix<float, 3>(1.0, 1.0, 1.0);
+            // GlobalSplash[pIdx] = true;
+            if (USE_ANI)
+            {
+                GlobalGs[pIdx] = Eigen::Matrix3f(G);
+                GlobalDeterminant[pIdx] = G.determinant();
+            }
+            GlobalxMeans[pIdx] = Eigen::Vector3f(_GlobalPoses->at(pIdx).x, _GlobalPoses->at(pIdx).y, _GlobalPoses->at(pIdx).z);
+            // GlobalxMeans[pIdx] = _GlobalPoses[pIdx];
+            continue;
+        } 
+
+        compute_xMeansCPU(pIdx, tempNeighbors, neighbors, closerNeigbors, xMean); 
+
+        if (neighbors.size() <= 2)
+        {
+            G = Eigen::DiagonalMatrix<float, 3>(1.0, 1.0, 1.0);
+            // GlobalSplash[pIdx] = true;
+            if (USE_ANI)
+            {
+                GlobalGs[pIdx] = Eigen::Matrix3f(G);
+                GlobalDeterminant[pIdx] = G.determinant();
+            }
+            GlobalxMeans[pIdx] = Eigen::Vector3f(xMean);
+            continue;
+        }
+
+        GlobalxMeans[pIdx] = Eigen::Vector3f(xMean);
+    }
+
+    #pragma omp parallel for
+    for (int pIdx = 0; pIdx < _GlobalParticlesNum; pIdx++)
+    {
+        if (CheckSplash(pIdx))
+        {
+            continue;
+        }
+        std::vector<int> tempNeighbors(_ngmax, 0);
+        Eigen::Matrix3f G = Eigen::Matrix3f::Identity();
+        int numNeighbors;
+        numNeighbors = findNeighborsCPU(pIdx, *_GlobalPoses, *GlobalRadius, _octreeNs, _box, _ngmax, tempNeighbors.data());
+
+        if (USE_ANI)
+        {
+            if (USE_POLY6)
+            {
+                compute_G_ours(pIdx, GlobalxMeans[pIdx], tempNeighbors, G);
+            } else {
+                compute_G_Yus(pIdx, GlobalxMeans[pIdx], tempNeighbors, G);
+            }
+            GlobalGs[pIdx] = Eigen::Matrix3f(G);
+            GlobalDeterminant[pIdx] = G.determinant();
+        }
+    }
+
 }
 
 void Evaluator::compute_Gs_xMeans()

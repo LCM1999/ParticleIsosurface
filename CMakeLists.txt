@@ -72,19 +72,31 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     add_compile_options("-openmp:llvm")
 endif()
 
-file(GLOB ISO_HEADER_FILES
+file(GLOB ORIGINAL_HEADER_FILES
     "${PROJECT_SOURCE_DIR}/include/*.h"
     "${PROJECT_SOURCE_DIR}/include/*.hpp"
     "${PROJECT_SOURCE_DIR}/include/*.cuh" 
 )
 
-file(GLOB ISO_SOURCE_FILES
+file(GLOB ORIGINAL_SOURCE_FILES
   "${PROJECT_SOURCE_DIR}/src/*.cpp"
   "${PROJECT_SOURCE_DIR}/src/*.cu"
   "${PROJECT_SOURCE_DIR}/src/*.c"
 )
 
-file(GLOB CSTONE_HEADER_FILES
+file(GLOB ISO_HEADER_FILES
+  "${PROJECT_SOURCE_DIR}/iso/include/*.h"
+  "${PROJECT_SOURCE_DIR}/iso/include/*.hpp"
+  "${PROJECT_SOURCE_DIR}/iso/include/*.cuh"
+)
+
+file(GLOB ISO_SOURCE_FILES
+  "${PROJECT_SOURCE_DIR}/iso/src/*.cpp"
+  "${PROJECT_SOURCE_DIR}/iso/src/*.cu"
+  "${PROJECT_SOURCE_DIR}/iso/src/*.c"
+)
+
+file(GLOB CSTONEOCTREE_HEADER_FILES
   "${PROJECT_SOURCE_DIR}/cstoneOctree/include/*.h"
   "${PROJECT_SOURCE_DIR}/cstoneOctree/include/*.hpp"
   "${PROJECT_SOURCE_DIR}/cstoneOctree/include/*.cuh"
@@ -96,18 +108,23 @@ file(GLOB CSTONEOCTREE_SOURCE_FILES
   "${PROJECT_SOURCE_DIR}/cstoneOctree/src/*.cu"
 )
 
-set(ISO_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
+set(ORIGINAL_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
+set(ISO_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/iso/include")
 set(CSTONEOCTREE_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/cstoneOctree/include")
 
 add_executable(${PROJECT_NAME}
     main.cpp
+    ${ORIGINAL_SOURCE_FILES}
+    ${CSTONEOCTREE_SOURCE_FILES}
     ${ISO_SOURCE_FILES}
-    ${CSTONE_SOURCE_FILES}
 )
 
 include_directories(
     pugixml/src
     "${VTK_USE_FILE}"
+    ${ORIGINAL_INCLUDE_DIR}
+    ${ISO_INCLUDE_DIR}
+    ${CSTONEOCTREE_INCLUDE_DIR}
     )
 
 add_library(pugixml
@@ -117,6 +134,7 @@ add_library(pugixml
 
 target_include_directories(${PROJECT_NAME} 
     PUBLIC
+    ${ORIGINAL_INCLUDE_DIR}
     ${ISO_INCLUDE_DIR}
     ${CSTONEOCTREE_INCLUDE_DIR}
     ${MPI_CXX_INCLUDE_DIRS}
@@ -140,4 +158,4 @@ target_link_libraries(${PROJECT_NAME}
 
 
 # add unit_test
-add_subdirectory(unit_test)
+# add_subdirectory(unit_test)

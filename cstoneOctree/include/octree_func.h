@@ -24,10 +24,31 @@ struct OctreeNs{
     const Vec3f* centers;
     const Vec3f* sizes;
 
+    HOST_DEVICE OctreeNs() {}
+
     HOST_DEVICE OctreeNs(const uint64_t* prefixes, const TreeNodeIndex* childOffsets, const TreeNodeIndex* internalToLeaf, const TreeNodeIndex* levelRange, const int* layout, const Vec3f* centers, const Vec3f* sizes)
         : prefixes(prefixes), childOffsets(childOffsets), internalToLeaf(internalToLeaf), levelRange(levelRange), layout(layout), centers(centers), sizes(sizes) {}
     
+};
 
+
+// a struct to store the octree information for isosurface extraction
+struct IsoOctreeNs{
+    const uint64_t* prefixes;
+    const TreeNodeIndex* childOffsets;
+    const TreeNodeIndex* leafToInternal;
+    const TreeNodeIndex* internalToLeaf;
+    const TreeNodeIndex* levelRange;
+
+    const float* scalars; // scalar value for each leaf node
+    const Vec3f* centers;
+    const Vec3f* sizes;
+
+    HOST_DEVICE IsoOctreeNs() {}
+
+    HOST_DEVICE IsoOctreeNs(const uint64_t* prefixes, const TreeNodeIndex* childOffsets, const TreeNodeIndex* leafToInternal, const TreeNodeIndex* internalToLeaf, const TreeNodeIndex* levelRange, const float* scalars, const Vec3f* centers, const Vec3f* sizes)
+        : prefixes(prefixes), childOffsets(childOffsets), leafToInternal(leafToInternal), internalToLeaf(internalToLeaf), levelRange(levelRange), scalars(scalars), centers(centers), sizes(sizes) {}
+    
 };
 
 // deep first traversal of the octree
@@ -162,9 +183,15 @@ void calculateNodeCentersAndSizesCPU(std::vector<uint64_t>& prefixes, std::vecto
 
 void calculateNodeCentersAndSizesCPU(std::vector<uint64_t>& prefixes, std::vector<Vec3f>& centers, std::vector<Vec3f>& sizes, Box& box, int idx);
 
-void findNeighborsCPU(std::vector<Vec3f> particles, std::vector<float>& radiuses, OctreeNs& octreeNs, Box& box, int ngmax, std::vector<int>& neighbors, std::vector<int>& numNeighbors);
+void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves, std::vector<Vec3f>& centers, std::vector<Vec3f>& sizes, Box& box);
 
-int findNeighborsCPU(int idx, std::vector<Vec3f> particles, std::vector<float>& radiuses, OctreeNs& octreeNs, Box& box, int ngmax, int* neighbors);
+void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves, std::vector<Vec3f>& centers, std::vector<Vec3f>& sizes, Box& box, int idx);
+
+void findNeighborsCPU(std::vector<Vec3f>& particles, std::vector<float>& radiuses, OctreeNs& octreeNs, Box& box, int ngmax, std::vector<int>& neighbors, std::vector<int>& numNeighbors);
+
+int findNeighborsCPU(int idx, std::vector<Vec3f>& particles, std::vector<float>& radiuses, OctreeNs& octreeNs, Box& box, int ngmax, int* neighbors);
+
+int findInfluencedParticlesCPU(Vec3f& sample_point, float max_radius, OctreeNs& octreeNs, Box& box, int ngmax, int* neighbors);
 
 
 // Below are implementation of octree generation functions in GPU

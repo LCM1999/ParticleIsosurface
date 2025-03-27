@@ -273,8 +273,8 @@ void traverse_node(V &v, T &td)
 	T c[8];
 	for (Index i = 0; i < 8; i++)
 	{
-		td.gen_trav(c[i], i);
-		traverse_node<TT,V,T>(v, c[i]);
+		td.gen_trav(c[i], i); // get the child node
+		traverse_node<TT,V,T>(v, c[i]); // traverse the child node
 	}
 
 	if (TT >= trav_face)

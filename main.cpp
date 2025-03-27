@@ -328,6 +328,99 @@ bool readShonDyParticleData(const std::string &fileName,
     return true;
 }
 
+// Execute the program using cornerstone octree method in CPU
+void runCPU(std::string dataDirPath, std::string outPath){
+    timer t;
+    int index = 1;
+    std::vector<Eigen::Vector3f> particles;
+    std::vector<float> radiuses;
+    for (const std::string frame : DATA_PATHES)
+    {
+        t.reset();
+        Mesh mesh(int(pow(10, 4)));
+        std::cout << "-=   Frame " << (TARGET_FRAME == 0 ? index : TARGET_FRAME) << " " << frame << "   =-"
+                  << std::endl;
+        std::string dataPath = dataDirPath + "/" + frame;
+
+        if (SUFFIX == "")
+        {
+            SUFFIX = std::filesystem::path(dataPath).filename().extension().string();
+        }
+        if (".csv" == SUFFIX) {
+            loadParticlesFromCSV(dataPath, particles, radiuses);
+        } else if (".h5" == SUFFIX) {
+            readShonDyParticleData(dataPath, particles, radiuses);
+        }
+
+        if (!IS_CONST_RADIUS)
+        {
+            if (abs(*std::max_element(radiuses.begin(), radiuses.end()) - *std::min_element(radiuses.begin(), radiuses.end())) < 1e-7)
+            {
+                    IS_CONST_RADIUS = true;
+                    RADIUS = radiuses[0];
+                    MAX_RADIUS = radiuses[0];
+                    MIN_RADIUS = radiuses[0];
+            }
+            else{
+                MAX_RADIUS = *std::max_element(radiuses.begin(), radiuses.end());
+                MIN_RADIUS = *std::min_element(radiuses.begin(), radiuses.end());
+            }
+        }
+        else{
+            RADIUS = radiuses[0];
+            MAX_RADIUS = RADIUS;
+            MIN_RADIUS = RADIUS;
+        }
+        printf("Particles Number = %zd\n", particles.size());
+        SurfReconstructor* constructor = new SurfReconstructor(particles, radiuses, &mesh, RADIUS);
+        Recorder recorder(dataDirPath, frame.substr(0, frame.size() - 4), constructor);
+        constructor->RunCPU(ISO_FACTOR, SMOOTH_FACTOR);
+
+
+        // if (NEED_RECORD)
+        // {
+        //     // recorder.RecordProgress();
+        //     recorder.RecordParticles();
+        //     // recorder.RecordFeatures();
+        // }
+        std::string output_name = frame.substr(0, frame.find_last_of('.'));
+        std::cout << "Output path: " << outPath + "/" + output_name + "." + OUTPUT_TYPE<< std::endl; 
+        
+        if (!std::filesystem::exists(outPath))
+        {
+            std::filesystem::create_directories(outPath);
+        }
+        
+        try
+        {
+            if ("ply" == OUTPUT_TYPE || "PLY" == OUTPUT_TYPE)
+            {
+                writePlyFile(mesh,
+                    outPath + "/" + output_name + ".ply");
+            } else if ("obj" == OUTPUT_TYPE || "OBJ" == OUTPUT_TYPE) 
+            {
+                writeObjFile(mesh,
+                    outPath + "/" + output_name + ".obj");    
+            } else {
+                writePlyFile(mesh,
+                    outPath + "/" + output_name + ".ply");
+            }  
+            std::cout << "Output Done" << std::endl;
+        }
+        catch(const std::exception& e)
+        {
+            std::cerr << e.what() << '\n';
+            std::cout << "Error happened during writing result." << std::endl;
+            std::cout << "Result output path: " << outPath + "/" + output_name + "." + OUTPUT_TYPE + ";" << std::endl;
+            std::cout << "In Memory Mesh : Vertices=" << mesh.verticesNum << ", Cells=" << mesh.trianglesNum << ";" << std::endl;
+            exit(1);
+        }
+        index++;
+        delete constructor;
+    }
+
+}
+
 void runOurs(std::string dataDirPath, std::string outPath)
 {
     timer t;
@@ -626,7 +719,8 @@ int main(int argc, char **argv)
         // testHashGrid(5000000, dataDirPath + "/" + DATA_PATHES[0]);
         if (USE_OURS)
         {
-            runOurs(dataDirPath, outPath);
+            // runOurs(dataDirPath, outPath);
+            runCPU(dataDirPath, outPath);
         } else {
             runUniform(dataDirPath, outPath);
         }

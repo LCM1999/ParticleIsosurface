@@ -294,7 +294,7 @@ void calculateNodeCentersAndSizesCPU(std::vector<uint64_t>& prefixes, std::vecto
 }
 
 /**
- * @brief Calculate each nodes's center position and sizes (node's length)
+ * @brief Calculate each nodes's center position and sizes (half of the node's length)
  * 
  * @param prefixes sfc keys combined with placeholder bits
  * @param centers to store center positions
@@ -316,23 +316,56 @@ void calculateNodeCentersAndSizesCPU(std::vector<uint64_t>& prefixes, std::vecto
     
 }
 
-void findNeighborsCPU(std::vector<Vec3f> particles, std::vector<float>& radiuses, OctreeNs& octreeNs, Box& box, int ngmax, std::vector<int>& neighbors, std::vector<int>& numNeighbors){
+
+void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves, std::vector<Vec3f>& centers, std::vector<Vec3f>& sizes, Box& box){
+    #pragma omp parallel for
+    for(int i = 0; i < leaves.size() - 1; i++){
+        calculateLeavesCentersAndSizesCPU(leaves, centers, sizes, box, i);
+    }
+}
+
+/**
+ * @brief Calculate each nodes's center position and sizes (half of the node's length) without prefixes
+ * 
+ * @param leaves octree leaf nodes
+ * @param centers to store center positions
+ * @param sizes to store node sizes (half of the node's length)
+ * @param box the big box that stores the whole space range information
+ * @param idx index
+ */
+void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves, std::vector<Vec3f>& centers, std::vector<Vec3f>& sizes, Box& box, int idx){
+    uint64_t curr = leaves[idx];
+
+    unsigned level = treeLevel(leaves[idx + 1] - curr);
+
+    constexpr int maxCoord = 1u << 21;
+    unsigned cubeLength = (1u << (21 - level));
+
+    Vec3<int> ivec = decodeMorton(curr);
+
+    IBox nodeBox(ivec.x, ivec.x + cubeLength, ivec.y, ivec.y + cubeLength, ivec.z, ivec.z + cubeLength);
+    cal::tie(centers[idx], sizes[idx]) = centerAndSizeCPU(nodeBox, box);
+    
+}
+
+
+void findNeighborsCPU(std::vector<Vec3f>& particles, std::vector<float>& radiuses, OctreeNs& octreeNs, Box& box, int ngmax, std::vector<int>& neighbors, std::vector<int>& numNeighbors){
     #pragma omp parallel for
     for(int i = 0; i < particles.size(); i++){
         numNeighbors[i] = findNeighborsCPU(i, particles, radiuses, octreeNs, box, ngmax, neighbors.data() + i * ngmax);
     }
 }
 
-int findNeighborsCPU(int idx, std::vector<Vec3f> particles, std::vector<float>& radiuses, OctreeNs& octreeNs, Box& box, int ngmax, int* neighbors){
+int findNeighborsCPU(int idx, std::vector<Vec3f>& particles, std::vector<float>& radiuses, OctreeNs& octreeNs, Box& box, int ngmax, int* neighbors){
     float x = particles[idx].x;
     float y = particles[idx].y;
     float z = particles[idx].z;
     Vec3f particle = particles[idx];
     float h = radiuses[idx];
+    float radiusSquare = 4 * std::pow(radiuses[idx], 2);
     int numNeighbors = 0;
 
-    float radiusSquare = 4.0 * h * h;
-
+    
     auto overlaps = [particle, radiusSquare, centers = octreeNs.centers, sizes = octreeNs.sizes, &box](int idx){
         auto nodeCenter = centers[idx];
         auto nodeSize = sizes[idx];
@@ -357,7 +390,51 @@ int findNeighborsCPU(int idx, std::vector<Vec3f> particles, std::vector<float>& 
             }
         }
 
+    };        
 
+    singleTraversal(octreeNs.childOffsets, overlaps, searchBox);
+    return numNeighbors;
+}
+
+
+
+/**
+ * @brief Find all particles in the tree nodes which are influenced by the current sample points 
+ *              (the tree node is chosen if the current sample points influences this node).
+ * 
+ * @param particle current sample point
+ * @param max_radius the global maximum radius
+ * @param octreeNs 
+ * @param box 
+ * @param ngmax 
+ * @param neighbors 
+ * @return int 
+ */
+
+int findInfluencedParticlesCPU(Vec3f& sample_point, float max_radius, OctreeNs& octreeNs, Box& box, int ngmax, int* neighbors){
+    float h = max_radius;
+    float radiusSquare = 4 * std::pow(h, 2);
+    int numNeighbors = 0;
+
+    
+    auto overlaps = [sample_point, radiusSquare, centers = octreeNs.centers, sizes = octreeNs.sizes, &box](int idx){
+        auto nodeCenter = centers[idx];
+        auto nodeSize = sizes[idx];
+        Vec3f min_distance = cal::minDistanceCPU(sample_point, nodeCenter, nodeSize);
+        float squared_distance = min_distance.x * min_distance.x + min_distance.y * min_distance.y + min_distance.z * min_distance.z;
+        return squared_distance < radiusSquare;
+    };
+
+    auto searchBox = [sample_point, radiusSquare, &octreeNs, ngmax, neighbors, &numNeighbors, &box](int i){
+        int leafIdx    = octreeNs.internalToLeaf[i];
+        int firstParticle = octreeNs.layout[leafIdx];
+        int lastParticle  = octreeNs.layout[leafIdx + 1];
+
+        for (int j = firstParticle; j < lastParticle; ++j)
+        {
+            if (numNeighbors < ngmax) { neighbors[numNeighbors] = j; }
+            numNeighbors++;
+        }
 
     };        
 
