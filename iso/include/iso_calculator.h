@@ -4,7 +4,7 @@
 namespace iso{
 
 template <class T>
-HOST_DEVICE inline int sign(T x){
+inline int sign(T x){
     return (x > 0) ? 1 : -1;
 }
 

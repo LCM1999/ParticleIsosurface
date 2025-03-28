@@ -130,5 +130,5 @@ public:
     std::vector<Vec3f>* _GlobalPoses;
     OctreeNs _octreeNs;
     Box _box;
-    int _ngmax;
+    const int _ngmax = 16;
 };

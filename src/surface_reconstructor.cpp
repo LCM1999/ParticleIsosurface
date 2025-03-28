@@ -341,6 +341,8 @@ void SurfReconstructor::genIsoOurs()
 	std::vector<unsigned char> emptys;
 	WaitingStack.push_back(&_OurRoot);
 	ProcessArray.resize(inProcessSize);
+	int count = 0;
+	int final_leaf_count = 0;
 	while (!WaitingStack.empty())
 	{
 		std::cout << WaitingStack.size() << std::endl;
@@ -405,10 +407,15 @@ void SurfReconstructor::genIsoOurs()
 					WaitingStack.push_back(&((*ProcessArray[i])->children[t.v]));
 				}
 			}
+			else{
+				final_leaf_count++;
+			}
 		}
 		// depth++;
 		// half/=2;
+		count++;
 	}
+	std::cout << "Final leaf count: " << final_leaf_count << std::endl;
 	ProcessArray.clear();
 	delete[] sample_points;
 	delete[] sample_grads;
@@ -430,7 +437,9 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 	printf("-= Run =-\n");
 	float time_all_start = get_time();
 	float temp_time, last_temp_time;
+
 	loadRootBox();
+
 
 	// ===========1.1 Re-assign particles to Vec3f type============
 	_particles.resize(_GlobalParticles.size());
@@ -439,11 +448,14 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 	}
 	_GlobalParticles.clear();
 	int particle_size = _particles.size();
-	float min_num = cal::min(_BoundingBox[0], cal::min(_BoundingBox[2], _BoundingBox[4]));
-	float max_num = cal::max(_BoundingBox[1], cal::max(_BoundingBox[3], _BoundingBox[5]));
-	std::cout << "The box min num: " << min_num << std::endl;
-	std::cout << "The box max num: " << max_num << std::endl;
-	Box box(min_num, max_num);
+
+	// float min_num = cal::min(_BoundingBox[0], cal::min(_BoundingBox[2], _BoundingBox[4]));
+	// float max_num = cal::max(_BoundingBox[1], cal::max(_BoundingBox[3], _BoundingBox[5]));
+	// std::cout << "The box min num: " << min_num << std::endl;
+	// std::cout << "The box max num: " << max_num << std::endl;
+	// Box box(min_num, max_num);
+	// --- Freeze the box only for this dam project test --- 
+	Box box(1.0526, 3.6126, -0.780035, 1.77996, -1.01442, 1.54558);
 	
 	// ============1.2 Calculate the morton code for each particle and sort the outputs===========
 	_mortonCodes.resize(particle_size);
@@ -620,15 +632,18 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 
 	// ----------- generating iso surface octree ---------
 	std::vector<uint64_t> iso_tree;
-	iso_tree.assign(_tree.begin(), _tree.end());
+	// iso_tree.assign(_tree.begin(), _tree.end());
+	iso_tree.resize(1 + 1);
+	cal::fill_data_cpu(iso_tree.data(), 1, 0);
+	cal::fill_data_cpu(iso_tree.data() + 1, 1, uint64_t(1) << 63);
 
 	int iso_count = 0;
 	std::vector<float> scalars; // used to store each leaf nodes' scalar value on dual vertices. important for isosurface generation
 	
 	while(1){
-		std::cout << "tree size in loop " << iso_count << ": " << iso_tree.size() << std::endl;
 		// ---- iso octree's info calculation ----
 		int iso_tree_size = iso_tree.size() - 1;
+		std::cout << "tree size in loop " << iso_count << ": " << iso_tree_size << std::endl;
 		std::vector<uint64_t> iso_prefixes(iso_tree_size);
 
 		// calculate prefixes for each node
@@ -653,7 +668,7 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 		scalars = std::vector<float>(iso_tree_size, 0.0); // Stores each tree nodes' scalar value on dual vertices
 		std::vector<uint64_t> iso_nodeOps(iso_tree.size(), 0); // Store the split decision for each node (the split decision is based on whether the node has isosurface)
 
-		#pragma omp parallel for
+		// #pragma omp parallel for
 		for(int i = 0; i < iso_tree_size; i++){
 			// begin beforeSampleEval
 			Vec3f center = iso_centers[i];
@@ -709,7 +724,6 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 
 			if(emptys[i]){
 				scalars[i] = _evaluator->getIsoValue();
-				// iso_values[i] = _evaluator->getIsoValue(); do not use
 				nodes_type[i] = 0;
 			}
 			// end beforeSampleEval
@@ -796,9 +810,10 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 				iso_nodeOps[i] = 1;
 			}	
 			else{
-				std::cout << "error in nodes_type, " << i << "th value is " << nodes_type[i] << std::endl;
+				// std::cout << "error in nodes_type, " << i << "th value is " << nodes_type[i] << std::endl;
 			}	
 		}
+		
 		uint64_t iso_allOpsSum = std::accumulate(iso_nodeOps.begin(), iso_nodeOps.end(), 0);
 		// exclusive_csan ops to get new octree indices
 		std::vector<uint64_t> iso_nodeOpsLayout(iso_nodeOps.size());
@@ -857,6 +872,8 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 	std::vector<Vec3f> iso_centers(iso_numNodes);
 	std::vector<Vec3f> iso_sizes(iso_numNodes);
 	calculateNodeCentersAndSizesCPU(iso_prefixes, iso_centers, iso_sizes, box);
+	std::cout << "iso centers[0]: " << iso_centers[0].x << ", " << iso_centers[0].y << ", " << iso_centers[0].z << std::endl;
+	std::cout << "iso size[0]: " << iso_sizes[0].x << ", " << iso_sizes[0].y << ", " << iso_sizes[0].z << std::endl;
 
     std::vector<int> iso_layout(iso_numLeafNodes + 1); // particle layout. This is not used in iso octree
 	IsoOctreeNs iso_octreeNs(iso_prefixes.data(), iso_childOffsets.data(), iso_leafToInternal.data(), iso_internalToLeaf.data(), iso_levelRange.data(), scalars.data(), iso_centers.data(), iso_sizes.data());
@@ -866,29 +883,29 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 	iso::traverse_node_CPU<iso::trav_vert, iso::ExtractManager>(extractManager, 0);
 	extractManager.cal_vertices_CPU();
 	extractManager.generate_mesh_CPU();
-	// if (GEN_SPLASH)
-	// {
-	// 	printf("-= Generate Splash =-\n");
-	// 	std::vector<Eigen::Vector3f> splash_pos;
-	// 	std::vector<float> splash_radiuses;
-	// 	for (int pIdx = 0; pIdx < getGlobalParticlesNum(); pIdx++)
-	// 	{
-	// 		if (_evaluator->CheckSplash(pIdx))
-	// 		{
-	// 			splash_pos.push_back(_GlobalParticles[pIdx]);
-	// 			if (!IS_CONST_RADIUS)
-	// 			{
-	// 				splash_radiuses.push_back(_GlobalRadiuses[pIdx]);
-	// 			}
-	// 		}
-	// 	}
-	// 	if (IS_CONST_RADIUS)
-	// 	{
-	// 		_OurMesh->AppendSplash_ConstR(splash_pos, _RADIUS);
-	// 	} else {
-	// 		_OurMesh->AppendSplash_VarR(splash_pos, splash_radiuses);
-	// 	}
-	// }
+	if (GEN_SPLASH)
+	{
+		printf("-= Generate Splash =-\n");
+		std::vector<Eigen::Vector3f> splash_pos;
+		std::vector<float> splash_radiuses;
+		for (int pIdx = 0; pIdx < getGlobalParticlesNum(); pIdx++)
+		{
+			if (_evaluator->CheckSplash(pIdx))
+			{
+				splash_pos.push_back(_GlobalParticles[pIdx]);
+				if (!IS_CONST_RADIUS)
+				{
+					splash_radiuses.push_back(_GlobalRadiuses[pIdx]);
+				}
+			}
+		}
+		if (IS_CONST_RADIUS)
+		{
+			_OurMesh->AppendSplash_ConstR(splash_pos, _RADIUS);
+		} else {
+			_OurMesh->AppendSplash_VarR(splash_pos, splash_radiuses);
+		}
+	}
 
 }
 

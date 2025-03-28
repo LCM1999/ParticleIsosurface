@@ -63,7 +63,7 @@ Evaluator::Evaluator(
     std::vector<Vec3f>* global_particles, 
     std::vector<float>* radiuses, OctreeNs octreeNs, Box box, int ngmax)
 {
-    _ngmax = ngmax;
+    // _ngmax = ngmax;
     _box = box;
     _octreeNs = octreeNs;
 	_GlobalPoses = global_particles;
@@ -117,7 +117,9 @@ Evaluator::Evaluator(
 void Evaluator::SingleEvalCPU(Vec3f& pos, float& scalar)
 {
 	scalar = 0;
-    std::vector<int> neighbors(_ngmax); 
+    int tmpnum = _ngmax;
+    std::vector<int> neighbors(tmpnum, 0); 
+
     int numNeighbors;
     numNeighbors = findInfluencedParticlesCPU(pos, MAX_RADIUS, _octreeNs, _box, _ngmax, neighbors.data());
     // if (IS_CONST_RADIUS)
@@ -126,6 +128,8 @@ void Evaluator::SingleEvalCPU(Vec3f& pos, float& scalar)
     // } else {
     //     // _searcher->GetNeighbors(pos, neighbors);
     // }
+    neighbors.resize(numNeighbors); 
+
     Eigen::Vector3f diff;
     Eigen::Vector3f pos3f = Eigen::Vector3f(pos.x, pos.y, pos.z);
     for (int pIdx : neighbors)
@@ -938,7 +942,7 @@ void Evaluator::compute_Gs_xMeansCPU(){
     // #pragma omp parallel for
     for(int pIdx = 0; pIdx < _GlobalParticlesNum; pIdx++){
         std::vector<int> tempNeighbors(_ngmax, 0);
-        std::vector<int> neighbors(_ngmax, 0);
+        std::vector<int> neighbors;
         int numNeighbors;
         int closerNeigbors = 0;
         Eigen::Vector3f xMean = Eigen::Vector3f::Zero();
@@ -946,7 +950,8 @@ void Evaluator::compute_Gs_xMeansCPU(){
 
         // std::cout << "idx: " << pIdx << std::endl;
         numNeighbors = findNeighborsCPU(pIdx, *_GlobalPoses, *GlobalRadius, _octreeNs, _box, _ngmax, tempNeighbors.data());
-        if (numNeighbors <= 2)
+        tempNeighbors.resize(numNeighbors); 
+        if (numNeighbors <= 1) // only has one neighbor particle
         {
             G = Eigen::DiagonalMatrix<float, 3>(1.0, 1.0, 1.0);
             // GlobalSplash[pIdx] = true;
@@ -962,7 +967,7 @@ void Evaluator::compute_Gs_xMeansCPU(){
 
         compute_xMeansCPU(pIdx, tempNeighbors, neighbors, closerNeigbors, xMean); 
 
-        if (neighbors.size() <= 2)
+        if (neighbors.size() <= 1)
         {
             G = Eigen::DiagonalMatrix<float, 3>(1.0, 1.0, 1.0);
             // GlobalSplash[pIdx] = true;

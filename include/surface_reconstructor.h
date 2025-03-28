@@ -34,8 +34,8 @@ private:
     // Global Parameters
     int _OVERSAMPLE_QEF = 2;
     float _BORDER = 0.0;//(1.0 / 16.0);
-    int _DEPTH_MAX = 6; // 7
-    int _DEPTH_MIN = 5; // 4
+    int _DEPTH_MAX = 8; // 7
+    int _DEPTH_MIN = 6; // 4
 
     std::shared_ptr<HashGrid> _hashgrid;
     std::shared_ptr<MultiLevelSearcher> _searcher;
