@@ -41,7 +41,7 @@ private:
     std::shared_ptr<MultiLevelSearcher> _searcher;
     std::shared_ptr<Evaluator> _evaluator;
 
-    std::vector<Eigen::Vector3f> _GlobalParticles;
+    std::vector<Vec3f> _GlobalParticles;
     std::vector<float> _GlobalRadiuses;
     float _RADIUS = 0;
     int _GlobalParticlesNum = 0;
@@ -67,8 +67,8 @@ private:
     std::vector<uint64_t> _mortonCodes;
     std::vector<uint64_t> _tree;
     std::vector<uint64_t> _counts;
-    Box _box;
-    OctreeNs _octreeNs;
+    cstoneOctree::Box _box;
+    cstoneOctree::OctreeNs _octreeNs;
 
 protected:
     void loadRootBox();
@@ -88,7 +88,7 @@ protected:
 public:
     SurfReconstructor() {}
     SurfReconstructor(
-        std::vector<Eigen::Vector3f>& particles,
+        std::vector<cstoneOctree::Vec3f>& particles,
         std::vector<float>& radiuses, 
         Mesh* mesh, 
         float radius);
@@ -105,7 +105,7 @@ public:
     inline std::shared_ptr<HashGrid> getHashGrid() {return _hashgrid;}
     inline std::shared_ptr<MultiLevelSearcher> getSearcher() {return _searcher;}
     inline std::shared_ptr<Evaluator> getEvaluator() {return _evaluator;}
-    inline std::vector<Eigen::Vector3f>* getGlobalParticles() {return &_GlobalParticles;}
+    inline std::vector<cstoneOctree::Vec3f>* getGlobalParticles() {return &_GlobalParticles;}
     inline int getGlobalParticlesNum() {return _GlobalParticlesNum;}
     inline float getConstRadius() {return _RADIUS;}
     inline int getSTATE() {return _STATE;}

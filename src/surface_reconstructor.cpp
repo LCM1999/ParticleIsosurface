@@ -20,7 +20,7 @@ using namespace cal;
 using namespace cstoneOctree;
 
 SurfReconstructor::SurfReconstructor(
-	std::vector<Eigen::Vector3f>& particles, 
+	std::vector<cstoneOctree::Vec3f>& particles,
 	std::vector<float>& radiuses, Mesh* mesh, 
 	float radius)
 {
@@ -40,14 +40,14 @@ inline void SurfReconstructor::loadRootBox()
 {
 	_BoundingBox[0] = _BoundingBox[2] = _BoundingBox[4] = FLT_MAX;
 	_BoundingBox[1] = _BoundingBox[3] = _BoundingBox[5] = -FLT_MAX;
-	for (const Eigen::Vector3f& p: _GlobalParticles)
+	for (const cstoneOctree::Vec3f& p: _GlobalParticles)
 	{
-		if (p.x() < _BoundingBox[0]) _BoundingBox[0] = p.x();
-		if (p.x() > _BoundingBox[1]) _BoundingBox[1] = p.x();
-		if (p.y() < _BoundingBox[2]) _BoundingBox[2] = p.y();
-		if (p.y() > _BoundingBox[3]) _BoundingBox[3] = p.y();
-		if (p.z() < _BoundingBox[4]) _BoundingBox[4] = p.z();
-		if (p.z() > _BoundingBox[5]) _BoundingBox[5] = p.z();
+		if (p.x < _BoundingBox[0]) _BoundingBox[0] = p.x;
+		if (p.x > _BoundingBox[1]) _BoundingBox[1] = p.x;
+		if (p.y < _BoundingBox[2]) _BoundingBox[2] = p.y;
+		if (p.y > _BoundingBox[3]) _BoundingBox[3] = p.y;
+		if (p.z < _BoundingBox[4]) _BoundingBox[4] = p.z;
+		if (p.z > _BoundingBox[5]) _BoundingBox[5] = p.z;
 	}
 	if (_BoundingBox[0] == _BoundingBox[1] ||
 		_BoundingBox[2] == _BoundingBox[3] ||
@@ -57,51 +57,51 @@ inline void SurfReconstructor::loadRootBox()
 	}
 }
 
-void SurfReconstructor::shrinkBox()
-{
-	std::vector<int> ids;
-	ids.resize(_GlobalParticlesNum);
-	for (size_t i = 0; i < _GlobalParticlesNum; i++)
-	{
-		ids[i] = i;
-	}
-	_BoundingBox[0] = _GlobalParticles[(*std::min_element(ids.begin(), ids.end(), 
-	[&] (const int& id1, const int& id2) {
-		if (getEvaluator()->CheckSplash(id1)) {	return false;	}
-		if (getEvaluator()->CheckSplash(id2)) {	return true;	}
-		return getGlobalParticles()->at(id1).x() < getGlobalParticles()->at(id2).x();
-		}))].x();
-	_BoundingBox[1] = _GlobalParticles[(*std::max_element(ids.begin(), ids.end(), 
-	[&] (const int& id1, const int& id2) {
-		if (getEvaluator()->CheckSplash(id2)) {	return false;	}
-		if (getEvaluator()->CheckSplash(id1)) {	return true;	}
-		return getGlobalParticles()->at(id1).x() < getGlobalParticles()->at(id2).x();
-		}))].x();
-	_BoundingBox[2] = _GlobalParticles[(*std::min_element(ids.begin(), ids.end(), 
-	[&] (const int& id1, const int& id2) {
-		if (getEvaluator()->CheckSplash(id1)) {	return false;	}
-		if (getEvaluator()->CheckSplash(id2)) {	return true;	}
-		return getGlobalParticles()->at(id1).y() < getGlobalParticles()->at(id2).y();
-		}))].y();
-	_BoundingBox[3] = _GlobalParticles[(*std::max_element(ids.begin(), ids.end(), 
-	[&] (const int& id1, const int& id2) {
-		if (getEvaluator()->CheckSplash(id2)) {	return false;	}
-		if (getEvaluator()->CheckSplash(id1)) {	return true;	}
-		return getGlobalParticles()->at(id1).y() < getGlobalParticles()->at(id2).y();
-		}))].y();
-	_BoundingBox[4] = _GlobalParticles[(*std::min_element(ids.begin(), ids.end(), 
-	[&] (const int& id1, const int& id2) {
-		if (getEvaluator()->CheckSplash(id1)) {	return false;	}
-		if (getEvaluator()->CheckSplash(id2)) {	return true;	}
-		return getGlobalParticles()->at(id1).z() < getGlobalParticles()->at(id2).z();
-		}))].z();
-	_BoundingBox[5] = _GlobalParticles[(*std::max_element(ids.begin(), ids.end(), 
-	[&] (const int& id1, const int& id2) {
-		if (getEvaluator()->CheckSplash(id2)) {	return false;	}
-		if (getEvaluator()->CheckSplash(id1)) {	return true;	}
-		return getGlobalParticles()->at(id1).z() < getGlobalParticles()->at(id2).z();
-		}))].z();
-}
+//void SurfReconstructor::shrinkBox()
+//{
+//	std::vector<int> ids;
+//	ids.resize(_GlobalParticlesNum);
+//	for (size_t i = 0; i < _GlobalParticlesNum; i++)
+//	{
+//		ids[i] = i;
+//	}
+//	_BoundingBox[0] = _GlobalParticles[(*std::min_element(ids.begin(), ids.end(), 
+//	[&] (const int& id1, const int& id2) {
+//		if (getEvaluator()->CheckSplash(id1)) {	return false;	}
+//		if (getEvaluator()->CheckSplash(id2)) {	return true;	}
+//		return getGlobalParticles()->at(id1).x < getGlobalParticles()->at(id2).x;
+//		}))].x;
+//	_BoundingBox[1] = _GlobalParticles[(*std::max_element(ids.begin(), ids.end(), 
+//	[&] (const int& id1, const int& id2) {
+//		if (getEvaluator()->CheckSplash(id2)) {	return false;	}
+//		if (getEvaluator()->CheckSplash(id1)) {	return true;	}
+//		return getGlobalParticles()->at(id1).x < getGlobalParticles()->at(id2).x;
+//		}))].x;
+//	_BoundingBox[2] = _GlobalParticles[(*std::min_element(ids.begin(), ids.end(), 
+//	[&] (const int& id1, const int& id2) {
+//		if (getEvaluator()->CheckSplash(id1)) {	return false;	}
+//		if (getEvaluator()->CheckSplash(id2)) {	return true;	}
+//		return getGlobalParticles()->at(id1).y() < getGlobalParticles()->at(id2).y();
+//		}))].y();
+//	_BoundingBox[3] = _GlobalParticles[(*std::max_element(ids.begin(), ids.end(), 
+//	[&] (const int& id1, const int& id2) {
+//		if (getEvaluator()->CheckSplash(id2)) {	return false;	}
+//		if (getEvaluator()->CheckSplash(id1)) {	return true;	}
+//		return getGlobalParticles()->at(id1).y() < getGlobalParticles()->at(id2).y();
+//		}))].y();
+//	_BoundingBox[4] = _GlobalParticles[(*std::min_element(ids.begin(), ids.end(), 
+//	[&] (const int& id1, const int& id2) {
+//		if (getEvaluator()->CheckSplash(id1)) {	return false;	}
+//		if (getEvaluator()->CheckSplash(id2)) {	return true;	}
+//		return getGlobalParticles()->at(id1).z() < getGlobalParticles()->at(id2).z();
+//		}))].z();
+//	_BoundingBox[5] = _GlobalParticles[(*std::max_element(ids.begin(), ids.end(), 
+//	[&] (const int& id1, const int& id2) {
+//		if (getEvaluator()->CheckSplash(id2)) {	return false;	}
+//		if (getEvaluator()->CheckSplash(id1)) {	return true;	}
+//		return getGlobalParticles()->at(id1).z() < getGlobalParticles()->at(id2).z();
+//		}))].z();
+//}
 
 void SurfReconstructor::resizeRootBoxConstR()
 {
@@ -159,14 +159,14 @@ void SurfReconstructor::resizeRootBoxVarR()
 
 void SurfReconstructor::checkEmptyAndCalcCurv(std::shared_ptr<TNode> tnode, unsigned char& empty, float& curv, float& min_radius)
 {
-	Eigen::Vector3f norms(0, 0, 0);
+	cstoneOctree::Vec3f norms(0, 0, 0);
 	float area = 0.0f;
 	// int impact_num = 0;
 	std::vector<int> insides;
 	min_radius = IS_CONST_RADIUS ? _RADIUS : FLT_MAX;
-	const Eigen::Vector3f 
-	box1 = tnode->center - Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length),
-	box2 = tnode->center + Eigen::Vector3f(tnode->half_length, tnode->half_length, tnode->half_length);
+	const cstoneOctree::Vec3f
+	box1 = tnode->center - cstoneOctree::Vec3f(tnode->half_length, tnode->half_length, tnode->half_length),
+	box2 = tnode->center + cstoneOctree::Vec3f(tnode->half_length, tnode->half_length, tnode->half_length);
 	if (IS_CONST_RADIUS)
 	{
 		_hashgrid->GetInBoxParticles(box1, box2, insides);
@@ -181,16 +181,16 @@ void SurfReconstructor::checkEmptyAndCalcCurv(std::shared_ptr<TNode> tnode, unsi
 		{
 			if (!_evaluator->CheckSplash(in))
 			{
-				if (_GlobalParticles[in].x() > (box1.x() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())) && 
-					_GlobalParticles[in].x() < (box2.x() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())) &&
-					_GlobalParticles[in].y() > (box1.y() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())) && 
-					_GlobalParticles[in].y() < (box2.y() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())) &&
-					_GlobalParticles[in].z() > (box1.z() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())) && 
-					_GlobalParticles[in].z() < (box2.z() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())))
+				if (_GlobalParticles[in].x > (box1.x - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())) && 
+					_GlobalParticles[in].x < (box2.x + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())) &&
+					_GlobalParticles[in].y > (box1.y - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())) && 
+					_GlobalParticles[in].y < (box2.y + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())) &&
+					_GlobalParticles[in].z > (box1.z - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())) && 
+					_GlobalParticles[in].z < (box2.z + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())))
 				{
 					if (CALC_P_NORMAL)
 					{
-						Eigen::Vector3f tempNorm = _evaluator->PariclesNormals[in];
+						cstoneOctree::Vec3f tempNorm = _evaluator->PariclesNormals[in];
 						// if (tempNorm == Eigen::Vector3f(0, 0, 0))	{continue;}
 						norms += tempNorm;
 						area += tempNorm.norm();
@@ -236,7 +236,7 @@ void SurfReconstructor::beforeSampleEval(std::shared_ptr<TNode> tnode, float& cu
 	if (empty)
 	{
 		// _evaluator->SingleEval((Eigen::Vector3f&)tnode->node, tnode->node[3]);
-		tnode->node[3] = _evaluator->getIsoValue();
+		tnode->nodeScalar = _evaluator->getIsoValue();
 		tnode->type = EMPTY;
 		return;
 	}
@@ -262,7 +262,7 @@ void SurfReconstructor::afterSampleEval(
 	{
 		// it's a leaf
 		tnode->type = LEAF;
-		_evaluator->SingleEval(tnode->node.head(3), tnode->node[3]);
+		_evaluator->SingleEval(tnode->center, tnode->nodeScalar);
 		// tnode->NodeCalcNode(sample_points, sample_grads, cellsize);
 		return;
 	}
@@ -276,7 +276,7 @@ void SurfReconstructor::afterSampleEval(
 	{
 		tnode->type = LEAF;
 		// tnode->NodeCalcNode(sample_points, sample_grads, cellsize);
-		_evaluator->SingleEval(tnode->node.head(3), tnode->node[3]);
+		_evaluator->SingleEval(tnode->center, tnode->nodeScalar);
 	}
 }
 
@@ -293,8 +293,9 @@ void SurfReconstructor::genIsoOurs()
 	{
 		printf("-= Calculating Tree Structure =-\n");
 		_OurRoot = std::make_shared<TNode>(this, 0);
-		_OurRoot->center << _RootCenter[0], _RootCenter[1], _RootCenter[2];
-		_OurRoot->node << _RootCenter[0], _RootCenter[1], _RootCenter[2], 0.0;
+		_OurRoot->center = cstoneOctree::Vec3f(_RootCenter[0], _RootCenter[1], _RootCenter[2]);
+		//_OurRoot->node << _RootCenter[0], _RootCenter[1], _RootCenter[2], 0.0;
+		_OurRoot->nodeScalar = 0.0;
 		_OurRoot->half_length = _RootHalfLength;
 	} else if (_STATE == 1) {
 		printf("-= Generate Surface =-\n");
@@ -308,7 +309,7 @@ void SurfReconstructor::genIsoOurs()
 		if (GEN_SPLASH)
 		{
 			printf("-= Generate Splash =-\n");
-			std::vector<Eigen::Vector3f> splash_pos;
+			std::vector<cstoneOctree::Vec3f> splash_pos;
 			std::vector<float> splash_radiuses;
 			for (int pIdx = 0; pIdx < getGlobalParticlesNum(); pIdx++)
 			{
@@ -444,7 +445,7 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 	// ===========1.1 Re-assign particles to Vec3f type============
 	_particles.resize(_GlobalParticles.size());
 	for(int i = 0; i < _GlobalParticles.size(); i++){
-		_particles[i] = Vec3f(_GlobalParticles[i].x(), _GlobalParticles[i].y(), _GlobalParticles[i].z());
+		_particles[i] = Vec3f(_GlobalParticles[i].x, _GlobalParticles[i].y, _GlobalParticles[i].z);
 	}
 	_GlobalParticles.clear();
 	int particle_size = _particles.size();
@@ -455,7 +456,7 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 	// std::cout << "The box max num: " << max_num << std::endl;
 	// Box box(min_num, max_num);
 	// --- Freeze the box only for this dam project test --- 
-	Box box(1.0526, 3.6126, -0.780035, 1.77996, -1.01442, 1.54558);
+	cstoneOctree::Box box(1.0526, 3.6126, -0.780035, 1.77996, -1.01442, 1.54558);
 	
 	// ============1.2 Calculate the morton code for each particle and sort the outputs===========
 	_mortonCodes.resize(particle_size);
@@ -487,9 +488,9 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 	rSorted.clear();
 	mortonCodesSorted.clear();
 
-	_GlobalParticles = std::vector<Eigen::Vector3f>(_particles.size());
+	_GlobalParticles = std::vector<cstoneOctree::Vec3f>(_particles.size());
 	for(int i = 0; i < _particles.size(); i++){
-		_GlobalParticles[i] = Eigen::Vector3f(_particles[i].x, _particles[i].y, _particles[i].z);
+		_GlobalParticles[i] = cstoneOctree::Vec3f(_particles[i].x, _particles[i].y, _particles[i].z);
 	}
 
 	_tree.resize(1 + 1);
@@ -599,7 +600,7 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 	_evaluator = std::make_shared<Evaluator>(&_particles, &_GlobalRadiuses, _octreeNs, _box, ngmax);
 	_evaluator->setSmoothFactor(smooth_factor);
 	_evaluator->setIsoFactor(iso_factor);
-	_evaluator->compute_Gs_xMeansCPU();
+	//_evaluator->compute_Gs_xMeansCPU();
 
 	last_temp_time = temp_time;
 	temp_time = get_time();
@@ -676,7 +677,7 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 			Vec3f box2 = center + Vec3f(iso_sizes[i].x, iso_sizes[i].y, iso_sizes[i].z);
 			std::vector<int> insideParticlesIdx;
 			// check empty and calculate curvature implentation below
-			Eigen::Vector3f norms(0, 0, 0);
+			cstoneOctree::Vec3f norms(0, 0, 0);
 			float area = 0.0f;
 			std::vector<int> insides;
 			min_radiuses[i] = IS_CONST_RADIUS ? _GlobalRadiuses[i] : FLT_MAX;
@@ -704,7 +705,7 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 							_particles[in].z < (box2.z + (_GlobalRadiuses[in] * _evaluator->getSmoothFactor()))){
 							
 							if (CALC_P_NORMAL){
-								Eigen::Vector3f tempNorm = _evaluator->PariclesNormals[in];
+								cstoneOctree::Vec3f tempNorm = _evaluator->PariclesNormals[in];
 								norms += tempNorm;
 								area += tempNorm.norm();
 							}
@@ -739,8 +740,8 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 
 				if(!is_big_node){
 					// GenerateSampling()
-					Eigen::Vector3f minV(iso_centers[i].x - iso_sizes[i].x, iso_centers[i].y - iso_sizes[i].y, iso_centers[i].z - iso_sizes[i].z);
-					Eigen::Vector3f maxV(iso_centers[i].x + iso_sizes[i].x, iso_centers[i].y + iso_sizes[i].y, iso_centers[i].z + iso_sizes[i].z);
+					cstoneOctree::Vec3f minV(iso_centers[i].x - iso_sizes[i].x, iso_centers[i].y - iso_sizes[i].y, iso_centers[i].z - iso_sizes[i].z);
+					cstoneOctree::Vec3f maxV(iso_centers[i].x + iso_sizes[i].x, iso_centers[i].y + iso_sizes[i].y, iso_centers[i].z + iso_sizes[i].z);
 
 					for (int z = 0; z <= getOverSampleQEF(); z++)
 					{
@@ -886,7 +887,7 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 	if (GEN_SPLASH)
 	{
 		printf("-= Generate Splash =-\n");
-		std::vector<Eigen::Vector3f> splash_pos;
+		std::vector<cstoneOctree::Vec3f> splash_pos;
 		std::vector<float> splash_radiuses;
 		for (int pIdx = 0; pIdx < getGlobalParticlesNum(); pIdx++)
 		{
@@ -939,7 +940,7 @@ void SurfReconstructor::Run(float iso_factor, float smooth_factor)
 	_evaluator = std::make_shared<Evaluator>(_hashgrid, _searcher, &_GlobalParticles, &_GlobalRadiuses, _RADIUS);
 	_evaluator->setSmoothFactor(smooth_factor);
 	_evaluator->setIsoFactor(iso_factor);
-	_evaluator->compute_Gs_xMeans();
+	//_evaluator->compute_Gs_xMeans();
 	// if (USE_POLY6)
 	// {
 	// 	if (IS_CONST_RADIUS)

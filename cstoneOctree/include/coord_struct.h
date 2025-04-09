@@ -2,9 +2,9 @@
 
 #include <iostream>
 #include <vector>
-#include <Eigen/Dense>
-#include <Eigen/Geometry>
-#include <Eigen/Core>
+//#include <Eigen/Dense>
+//#include <Eigen/Geometry>
+//#include <Eigen/Core>
 #include <cuda_def.h>
 #include <cuda_runtime.h>
 
@@ -197,6 +197,7 @@ struct Vec3
 };
 
 using Vec3f = Vec3<float>;
+using Vec3i = Vec3<int>;
 
 // struct Vec3f
 // {
@@ -452,13 +453,13 @@ struct Mat3f
         data[8] = i;
     }
 
-    HOST_DEVICE Mat3f(const Eigen::Matrix3f &mat)
-	{
-        for (size_t i = 0; i < 9; i++)
-        {
-            data[i] = mat.data()[i];
-		}
-    }
+ //   HOST_DEVICE Mat3f(const Eigen::Matrix3f &mat)
+	//{
+ //       for (size_t i = 0; i < 9; i++)
+ //       {
+ //           data[i] = mat.data()[i];
+	//	}
+ //   }
 
     HOST_DEVICE Mat3f operator+(const Mat3f& other) const
     {
@@ -537,21 +538,21 @@ struct Mat3f
         return *this;
     }
 
-    HOST_DEVICE Mat3f& operator=(const Eigen::Matrix3f mat)
-    {
-		for (size_t i = 0; i < 9; i++)
-		{
-            data[i] = mat.data()[i];
-		}
-        return *this;
-    } 
+ //   HOST_DEVICE Mat3f& operator=(const Eigen::Matrix3f mat)
+ //   {
+	//	for (size_t i = 0; i < 9; i++)
+	//	{
+ //           data[i] = mat.data()[i];
+	//	}
+ //       return *this;
+ //   } 
 
-	HOST_DEVICE Eigen::Matrix3f toEigen() const
-    {
-        Eigen::Matrix3f r;
-        r << data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8];
-        return r;
-    }
+	//HOST_DEVICE Eigen::Matrix3f toEigen() const
+ //   {
+ //       Eigen::Matrix3f r;
+ //       r << data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8];
+ //       return r;
+ //   }
 
 };
 

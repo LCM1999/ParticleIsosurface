@@ -3,7 +3,7 @@
 #include <cfloat>
 #include "hash_grid.h"
 
-MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3f>* particles, float* bounding, std::vector<float>* radiuses, float inf_factor)
+MultiLevelSearcher::MultiLevelSearcher(std::vector<cstoneOctree::Vec3f>* particles, float* bounding, std::vector<float>* radiuses, float inf_factor)
 {
     // std::vector<std::vector<Eigen::Vector3f>> sortedParticles;
     maxRadius = *std::max_element(radiuses->begin(), radiuses->end()) * 1.01;
@@ -57,12 +57,12 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3f>* particles, 
         temp_bounding[1] = temp_bounding[3] = temp_bounding[5] = -FLT_MAX;
         for (auto pI: sortedIndex[i])
         {
-            if (particles->at(pI).x() < temp_bounding[0]) temp_bounding[0] = particles->at(pI).x();
-            if (particles->at(pI).x() > temp_bounding[1]) temp_bounding[1] = particles->at(pI).x();
-            if (particles->at(pI).y() < temp_bounding[2]) temp_bounding[2] = particles->at(pI).y();
-            if (particles->at(pI).y() > temp_bounding[3]) temp_bounding[3] = particles->at(pI).y();
-            if (particles->at(pI).z() < temp_bounding[4]) temp_bounding[4] = particles->at(pI).z();
-            if (particles->at(pI).z() > temp_bounding[5]) temp_bounding[5] = particles->at(pI).z();
+            if (particles->at(pI).x < temp_bounding[0]) temp_bounding[0] = particles->at(pI).x;
+            if (particles->at(pI).x > temp_bounding[1]) temp_bounding[1] = particles->at(pI).x;
+            if (particles->at(pI).y < temp_bounding[2]) temp_bounding[2] = particles->at(pI).y;
+            if (particles->at(pI).y > temp_bounding[3]) temp_bounding[3] = particles->at(pI).y;
+            if (particles->at(pI).z < temp_bounding[4]) temp_bounding[4] = particles->at(pI).z;
+            if (particles->at(pI).z > temp_bounding[5]) temp_bounding[5] = particles->at(pI).z;
         }
         unsigned int binRadiusId = *std::max_element(sortedIndex[i].begin(), sortedIndex[i].end(), 
             [&](unsigned int& a, unsigned int& b) {
@@ -76,7 +76,7 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<Eigen::Vector3f>* particles, 
     printf("   Seachers level: %d.\n", searchers.size());
 }
 
-void MultiLevelSearcher::GetNeighbors(const Eigen::Vector3f& pos, std::vector<int>& neighbors)
+void MultiLevelSearcher::GetNeighbors(const cstoneOctree::Vec3f& pos, std::vector<int>& neighbors)
 {
     // std::vector<int> subNeighbors;
     // size_t searcherId = 0;
@@ -96,7 +96,7 @@ void MultiLevelSearcher::GetNeighbors(const Eigen::Vector3f& pos, std::vector<in
     }
 }
 
-void MultiLevelSearcher::GetInBoxParticles(const Eigen::Vector3f& box1, const Eigen::Vector3f& box2, std::vector<int>& insides)
+void MultiLevelSearcher::GetInBoxParticles(const cstoneOctree::Vec3f& box1, const cstoneOctree::Vec3f& box2, std::vector<int>& insides)
 {
     std::vector<int> subInsides;
     size_t sIndexId = 0, searcherId = 0;

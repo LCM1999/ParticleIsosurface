@@ -5,6 +5,7 @@
 #include <vector>
 #include <string.h>
 #include <memory>
+#include <coord_struct.h>
 
 #include "timer.h"
 #include "utils.h"
@@ -34,7 +35,7 @@ public:
     std::shared_ptr<MultiLevelSearcher> _searcher;
     std::shared_ptr<Evaluator> _evaluator;
 
-    std::vector<Eigen::Vector3f> _GlobalParticles;
+    std::vector<cstoneOctree::Vec3f> _GlobalParticles;
     std::vector<float> _GlobalRadiuses;
 
     float _RADIUS = 0;
@@ -44,7 +45,7 @@ public:
     int steps[3] = {0};
 
     std::vector<float> _Scalars;
-    std::vector<Eigen::Vector3f> _gradients;
+    std::vector<cstoneOctree::Vec3f> _gradients;
     
     void loadRootBox() ;
 
@@ -59,11 +60,11 @@ public:
     UniformGrid() {};
 
     UniformGrid(
-        const std::vector<Eigen::Vector3f>& particles,
+        const std::vector<cstoneOctree::Vec3f>& particles,
         const std::vector<float>& radiuses);
 
     UniformGrid(
-        const std::vector<Eigen::Vector3f>& particles,
+        const std::vector<cstoneOctree::Vec3f>& particles,
         float radius);
 
     ~UniformGrid() {};

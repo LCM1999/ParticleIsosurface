@@ -3,7 +3,8 @@
 #include <iostream>
 #include <vector>
 #include <map>
-#include <Eigen/Dense>
+#include <coord_struct.h>
+//#include <Eigen/Dense>
 #include "iso_common.h"
 
 class HashGrid
@@ -13,12 +14,12 @@ public:
 	~HashGrid() {};
 
 	/* Constructor for const radius*/
-	HashGrid(std::vector<Eigen::Vector3f>* particles, float* bounding, float radius, float inf_factor);
+	HashGrid(std::vector<cstoneOctree::Vec3f>* particles, float* bounding, float radius, float inf_factor);
 	/* Constructor for variable radius*/
-	HashGrid(std::vector<Eigen::Vector3f>* particles, std::vector<float>* radiuses, 
+	HashGrid(std::vector<cstoneOctree::Vec3f>* particles, std::vector<float>* radiuses,
 		std::vector<unsigned int>& pIndexes, float* bounding, unsigned int radiusId, float inf_factor);
 
-	std::vector<Eigen::Vector3f>* Particles;
+	std::vector<cstoneOctree::Vec3f>* Particles;
 	std::vector<unsigned int> PIndexes;
 	unsigned int ParticlesNum;
 	unsigned int RadiusId;
@@ -31,11 +32,11 @@ public:
 	std::vector<int> IndexList;
 	std::map<long long, int> StartList;
 	std::map<long long, int> EndList;
-	void GetPIdxList(const Eigen::Vector3f& pos, std::vector<int>& pIdxList);
-	void CalcXYZIdx(const Eigen::Vector3f& pos, Eigen::Vector3i& xyzIdx);
-	long long CalcCellHash(const Eigen::Vector3i& xyzIdx);
+	void GetPIdxList(const cstoneOctree::Vec3f& pos, std::vector<int>& pIdxList);
+	void CalcXYZIdx(const cstoneOctree::Vec3f& pos, cstoneOctree::Vec3i& xyzIdx);
+	long long CalcCellHash(const cstoneOctree::Vec3i& xyzIdx);
 	void GetInCellList(const long long hash, std::vector<int>& pIdxList);
-    void GetInBoxParticles(Eigen::Vector3f box1, Eigen::Vector3f box2, std::vector<int>& insides);
+    void GetInBoxParticles(cstoneOctree::Vec3f box1, cstoneOctree::Vec3f box2, std::vector<int>& insides);
 	// void FindParticlesNeighbor(const int& pIdx, std::vector<int>& pIdxList);
 private:
 	void BuildTable();

@@ -4,13 +4,13 @@
 #include <omp.h>
 #include <regex>
 #include <random>
+#include <vector>
 
 #include "global.h"
 #include "hdf5Utils.hpp"
 #include "iso_common.h"
 #include "iso_method_ours.h"
 #include "json.hpp"
-#include "recorder.h"
 #include "surface_reconstructor.h"
 #include "rply.h"
 
@@ -27,30 +27,29 @@
 #endif
 
 #include <var.h>
-// int OMP_USE_DYNAMIC_THREADS = 0;
-// int OMP_THREADS_NUM = 16;
-
-// bool IS_CONST_RADIUS = false;
-// bool USE_ANI = true;
-
-// // variants for test
-// bool NEED_RECORD = false;
-// int TARGET_FRAME = 0;
-// // std::string PREFIX = "";
-// std::string SUFFIX = "";    // CSV, H5
-// bool WITH_NORMAL;
-// std::vector<std::string> DATA_PATHES;
-// std::string OUTPUT_TYPE = "ply";
-// float RADIUS = 0;
-// float SMOOTH_FACTOR = 2.0;
-// float ISO_FACTOR = 1.9;
-// float ISO_VALUE = 0.0f;
-// // bool USE_CUDA = false;
-// bool CALC_P_NORMAL = true;
-// bool GEN_SPLASH = true;
-// bool SINGLE_LAYER = false;
-// bool USE_OURS = true;
-// bool USE_POLY6 = 0;
+ int OMP_USE_DYNAMIC_THREADS = 0;
+ int OMP_THREADS_NUM = 16;
+ bool IS_CONST_RADIUS = false;
+ bool USE_ANI = true;
+ // variants for test
+ bool NEED_RECORD = false;
+ int TARGET_FRAME = 0;
+ // std::string PREFIX = "";
+ std::string SUFFIX = "";    // CSV, H5
+ std::vector<std::string> DATA_PATHES;
+ std::string OUTPUT_TYPE = "ply";
+ float RADIUS = 0;
+ float MAX_RADIUS = 0;
+ float MIN_RADIUS = 0;
+ float SMOOTH_FACTOR = 2.0;
+ float ISO_FACTOR = 1.9;
+ float ISO_VALUE = 0.0f;
+ // bool USE_CUDA = false;
+ bool CALC_P_NORMAL = true;
+ bool GEN_SPLASH = true;
+ bool SINGLE_LAYER = false;
+ bool USE_OURS = true;
+ bool USE_POLY6 = 0;
 
 void writeObjFile(Mesh &m, std::string fn)
 {
@@ -84,19 +83,14 @@ int writePlyFile(Mesh& m, std::string fn)
     ply_add_element(ply, "face", num_faces);
     ply_add_list_property(ply, "vertex_indices", PLY_UCHAR, PLY_INT);
 
-    if (WITH_NORMAL)
-    {
-        //TODO
-    }
-
     if (!ply_write_header(ply))
         return 0;
 
     for (size_t i = 0; i < num_vertices; i++)
     {
-        ply_write(ply, m.vertices[i].v[0]);
-        ply_write(ply, m.vertices[i].v[1]);
-        ply_write(ply, m.vertices[i].v[2]);
+        ply_write(ply, m.vertices[i].x);
+        ply_write(ply, m.vertices[i].y);
+        ply_write(ply, m.vertices[i].z);
     }
     
     for (size_t i = 0; i < num_faces; i++)
@@ -133,6 +127,10 @@ void loadConfigJson(std::string dataPath)
         if (readInJSON.contains("USE_ANI"))
         {
             USE_ANI = readInJSON.at("USE_ANI");
+            if (USE_ANI)
+            {
+#define USE_ANI 1
+            }
         }
         if (readInJSON.contains("USE_OURS"))
         {
@@ -158,34 +156,34 @@ void loadConfigJson(std::string dataPath)
         {
             OUTPUT_TYPE = readInJSON.at("OUTPUT_TYPE");
         }
-        if (readInJSON.contains("SUFFIX"))
-        {
-            SUFFIX = readInJSON.at("SUFFIX");
-        }
-        if (SUFFIX.empty() || SUFFIX == "")
-        {
-            const std::string filePath = readInJSON.at("DATA_FILE");
-            std::string data_pathes = filePath;
-            parseString(&DATA_PATHES, data_pathes, ",");
-        } else {
-#ifdef _WIN32
-            intptr_t hFile;
-            struct _finddata_t fileInfo;
-            std::string p;
-            if ((hFile = _findfirst(p.assign(dataPath).append("/").append("*").append(SUFFIX).c_str(), &fileInfo)) != -1)
-            {
-                do
-                {
-                    if (!(fileInfo.attrib & _A_SUBDIR))
-                    {
-                        DATA_PATHES.push_back(std::string(fileInfo.name));
-                    }
-                } while (_findnext(hFile, &fileInfo) == 0);
-            }   
-#else
-                // TODO: In Linux
-#endif
-        }
+//        if (readInJSON.contains("SUFFIX"))
+//        {
+//            SUFFIX = readInJSON.at("SUFFIX");
+//        }
+//        if (SUFFIX.empty() || SUFFIX == "")
+//        {
+//            const std::string filePath = readInJSON.at("DATA_FILE");
+//            std::string data_pathes = filePath;
+//            parseString(&DATA_PATHES, data_pathes, ",");
+//        } else {
+//#ifdef _WIN32
+//            intptr_t hFile;
+//            _finddata_t fileInfo;
+//            std::string p;
+//            if ((hFile = _findfirst(p.assign(dataPath).append("/").append("*").append(SUFFIX).c_str(), &fileInfo)) != -1)
+//            {
+//                do
+//                {
+//                    if (!(fileInfo.attrib & _A_SUBDIR))
+//                    {
+//                        DATA_PATHES.push_back(std::string(fileInfo.name));
+//                    }
+//                } while (_findnext(hFile, &fileInfo) == 0);
+//            }   
+//#else
+//                // TODO: In Linux
+//#endif
+//        }
         if (readInJSON.contains("RADIUS"))
         {
             RADIUS = readInJSON.at("RADIUS");
@@ -214,7 +212,7 @@ void loadConfigJson(std::string dataPath)
 }
 
 void loadParticlesFromCSV(std::string &csvPath,
-                          std::vector<Eigen::Vector3f> &particles,
+                          std::vector<Vec3f> &particles,
                           std::vector<float> &radiuses)
 {
     std::ifstream ifn;
@@ -270,7 +268,7 @@ void loadParticlesFromCSV(std::string &csvPath,
     {
         elements.clear();
         parseStringToElements(&elements, line, ",");
-        particles.push_back(Eigen::Vector3f(elements[xIdx], elements[yIdx], elements[zIdx]));
+        particles.push_back(Vec3f(elements[xIdx], elements[yIdx], elements[zIdx]));
         if (!IS_CONST_RADIUS)
         {
             radiuses.push_back(elements[radiusIdx]);
@@ -280,7 +278,7 @@ void loadParticlesFromCSV(std::string &csvPath,
 }
 
 bool readShonDyParticleData(const std::string &fileName,
-                            std::vector<Eigen::Vector3f> &positions,
+                            std::vector<Vec3f> &positions,
                             std::vector<float>& radiuses)
 {
     if (!std::filesystem::exists(fileName))
@@ -316,7 +314,7 @@ bool readShonDyParticleData(const std::string &fileName,
     for (int i = 0; i < numberOfNodes; i++)
     {
         positions[i] =
-            Eigen::Vector3f(nodes[3 * i], nodes[3 * i + 1], nodes[3 * i + 2]);
+            Vec3f(nodes[3 * i], nodes[3 * i + 1], nodes[3 * i + 2]);
         if (!IS_CONST_RADIUS)
         {
             radiuses[i] = radiusesdouble[i];
@@ -332,7 +330,7 @@ bool readShonDyParticleData(const std::string &fileName,
 void runCPU(std::string dataDirPath, std::string outPath){
     timer t;
     int index = 1;
-    std::vector<Eigen::Vector3f> particles;
+    std::vector<Vec3f> particles;
     std::vector<float> radiuses;
     for (const std::string frame : DATA_PATHES)
     {
@@ -373,7 +371,6 @@ void runCPU(std::string dataDirPath, std::string outPath){
         }
         printf("Particles Number = %zd\n", particles.size());
         SurfReconstructor* constructor = new SurfReconstructor(particles, radiuses, &mesh, RADIUS);
-        Recorder recorder(dataDirPath, frame.substr(0, frame.size() - 4), constructor);
         constructor->RunCPU(ISO_FACTOR, SMOOTH_FACTOR);
 
 
@@ -425,7 +422,7 @@ void runOurs(std::string dataDirPath, std::string outPath)
 {
     timer t;
     int index = 1;
-    std::vector<Eigen::Vector3f> particles;
+    std::vector<Vec3f> particles;
     std::vector<float> radiuses;
     for (const std::string frame : DATA_PATHES)
     {
@@ -455,14 +452,7 @@ void runOurs(std::string dataDirPath, std::string outPath)
         }
         printf("Particles Number = %zd\n", particles.size());
         SurfReconstructor* constructor = new SurfReconstructor(particles, radiuses, &mesh, RADIUS);
-        Recorder recorder(dataDirPath, frame.substr(0, frame.size() - 4), constructor);
         constructor->Run(ISO_FACTOR, SMOOTH_FACTOR);
-        if (NEED_RECORD)
-        {
-            // recorder.RecordProgress();
-            recorder.RecordParticles();
-            // recorder.RecordFeatures();
-        }
         std::string output_name = frame.substr(0, frame.find_last_of('.'));
         std::cout << "Output path: " << outPath + "/" + output_name + "." + OUTPUT_TYPE<< std::endl; 
         
@@ -503,7 +493,7 @@ void runOurs(std::string dataDirPath, std::string outPath)
 void runUniform(std::string dataDirPath, std::string outPath)
 {
     int index = 1;
-    std::vector<Eigen::Vector3f> particles;
+    std::vector<cstoneOctree::Vec3f> particles;
     std::vector<float> radiuses;
     for (const std::string frame : DATA_PATHES)
     {
@@ -539,14 +529,14 @@ void runUniform(std::string dataDirPath, std::string outPath)
     }
 }
 
-Eigen::Vector3f getRandomPos(float* bounding, double rx, double ry, double rz)
+cstoneOctree::Vec3f getRandomPos(float* bounding, double rx, double ry, double rz)
 {
-    return Eigen::Vector3f(bounding[0] + (bounding[1] - bounding[0]) * rx, bounding[2] + (bounding[3] - bounding[2]) * ry, bounding[4] + (bounding[5] - bounding[4]) * rz);
+    return cstoneOctree::Vec3f(bounding[0] + (bounding[1] - bounding[0]) * rx, bounding[2] + (bounding[3] - bounding[2]) * ry, bounding[4] + (bounding[5] - bounding[4]) * rz);
 }
 
 void testHashGrid(int sampleNum, std::string dataPath)
 {
-    std::vector<Eigen::Vector3f> particles;
+    std::vector<cstoneOctree::Vec3f> particles;
     std::vector<float> radiuses;
     if (SUFFIX == "")
     {
@@ -574,14 +564,14 @@ void testHashGrid(int sampleNum, std::string dataPath)
     float _BoundingBox[6] = {0.0f};
     _BoundingBox[0] = _BoundingBox[2] = _BoundingBox[4] = FLT_MAX;
 	_BoundingBox[1] = _BoundingBox[3] = _BoundingBox[5] = -FLT_MAX;
-	for (const Eigen::Vector3f& p: particles)
+	for (const cstoneOctree::Vec3f& p: particles)
 	{
-		if (p.x() < _BoundingBox[0]) _BoundingBox[0] = p.x();
-		if (p.x() > _BoundingBox[1]) _BoundingBox[1] = p.x();
-		if (p.y() < _BoundingBox[2]) _BoundingBox[2] = p.y();
-		if (p.y() > _BoundingBox[3]) _BoundingBox[3] = p.y();
-		if (p.z() < _BoundingBox[4]) _BoundingBox[4] = p.z();
-		if (p.z() > _BoundingBox[5]) _BoundingBox[5] = p.z();
+		if (p.x < _BoundingBox[0]) _BoundingBox[0] = p.x;
+		if (p.x > _BoundingBox[1]) _BoundingBox[1] = p.x;
+		if (p.y < _BoundingBox[2]) _BoundingBox[2] = p.y;
+		if (p.y > _BoundingBox[3]) _BoundingBox[3] = p.y;
+		if (p.z < _BoundingBox[4]) _BoundingBox[4] = p.z;
+		if (p.z > _BoundingBox[5]) _BoundingBox[5] = p.z;
 	}
     IS_CONST_RADIUS = true;
 	_hashgrid.reset();
@@ -597,7 +587,7 @@ void testHashGrid(int sampleNum, std::string dataPath)
     // indexes.resize(particles.size());
     // std::iota(indexes.begin(), indexes.end(), 0);
     // std::shuffle(indexes.begin(), indexes.end(), g);
-    std::vector<Eigen::Vector3f> samples;
+    std::vector<cstoneOctree::Vec3f> samples;
     samples.resize(sampleNum);
     #pragma omp parallel for
     for (size_t i = 0; i < sampleNum; i++)
@@ -606,7 +596,7 @@ void testHashGrid(int sampleNum, std::string dataPath)
     }
     std::vector<int> neighbors;
     // std::vector<std::vector<int>> multiNeighbors;
-    Eigen::Vector3f diff;
+    cstoneOctree::Vec3f diff;
     unsigned int totalNeighborsNum = 0;
     unsigned int realNeighborsNum = 0;
     timer t;
@@ -717,13 +707,13 @@ int main(int argc, char **argv)
         outPath = "/home/letian/Letian_Xie/work/ParticleIsosurface/test_cases";
         loadConfigJson(dataDirPath);
         // testHashGrid(5000000, dataDirPath + "/" + DATA_PATHES[0]);
-        if (USE_OURS)
-        {
+        //if (USE_OURS)
+        //{
             // runOurs(dataDirPath, outPath);
             runCPU(dataDirPath, outPath);
-        } else {
-            runUniform(dataDirPath, outPath);
-        }
+        //} else {
+        //    runUniform(dataDirPath, outPath);
+        //}
         
         break;
     }

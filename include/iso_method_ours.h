@@ -1,26 +1,27 @@
 #pragma once
 
 #include <float.h>
-#include <Eigen/Dense>
+//#include <Eigen/Dense>
 #include "utils.h"
 #include "index.h"
 #include <math.h>
 #include <memory>
+#include <coord_struct.h>
 
 class SurfReconstructor;
 
-typedef Eigen::Vector<float, 5> Vector5f;
-typedef Eigen::Vector<float, 5> Vector5f;
-typedef Eigen::Vector<float, 6> Vector6f;
-typedef Eigen::Vector<float, 6> Vector6f;
-typedef Eigen::Vector<float, 7> Vector7f;
-typedef Eigen::Vector<float, 7> Vector7f;
-typedef Eigen::Matrix<float, 5, 5> Matrix5f;
-typedef Eigen::Matrix<float, 5, 5> Matrix5f;
-typedef Eigen::Matrix<float, 6, 6> Matrix6f;
-typedef Eigen::Matrix<float, 6, 6> Matrix6f;
-typedef Eigen::Matrix<float, 7, 7> Matrix7f;
-typedef Eigen::Matrix<float, 7, 7> Matrix7f;
+//typedef Eigen::Vector<float, 5> Vector5f;
+//typedef Eigen::Vector<float, 5> Vector5f;
+//typedef Eigen::Vector<float, 6> Vector6f;
+//typedef Eigen::Vector<float, 6> Vector6f;
+//typedef Eigen::Vector<float, 7> Vector7f;
+//typedef Eigen::Vector<float, 7> Vector7f;
+//typedef Eigen::Matrix<float, 5, 5> Matrix5f;
+//typedef Eigen::Matrix<float, 5, 5> Matrix5f;
+//typedef Eigen::Matrix<float, 6, 6> Matrix6f;
+//typedef Eigen::Matrix<float, 6, 6> Matrix6f;
+//typedef Eigen::Matrix<float, 7, 7> Matrix7f;
+//typedef Eigen::Matrix<float, 7, 7> Matrix7f;
 
 const char EMPTY = 0;
 const char INTERNAL = 1;
@@ -39,9 +40,10 @@ struct TNode
 
 	SurfReconstructor* constructor;
 
-	Eigen::Vector3f center;
+	cstoneOctree::Vec3f center;
 	float half_length;
-	Eigen::Vector4f node = Eigen::Vector4f::Zero();
+	//Eigen::Vector4f node = Eigen::Vector4f::Zero();
+	float nodeScalar = 0;
 
 	char depth = 0;
 	char type;
@@ -49,7 +51,7 @@ struct TNode
 
 	std::array<std::shared_ptr<TNode>, 8> children;
 
-	bool changeSignDMC(Eigen::Vector4f* verts);
+	//bool changeSignDMC(Eigen::Vector4f* verts);
 
 	// void defoliate();
 
@@ -64,8 +66,8 @@ struct TNode
 		return t * t;
 	}
 
-	float calcErrorDMC(
-		Eigen::Vector4f p, float* verts, float* verts_grad, const int oversample);
+	//float calcErrorDMC(
+	//	Eigen::Vector4f p, float* verts, float* verts_grad, const int oversample);
 
 	void GenerateSampling(float* sample_points);
 

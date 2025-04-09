@@ -11,14 +11,14 @@
 #include "vtkNew.h"
 
 
-UniformGrid::UniformGrid(const std::vector<Eigen::Vector3f> &particles, const std::vector<float> &radiuses)
+UniformGrid::UniformGrid(const std::vector<cstoneOctree::Vec3f> &particles, const std::vector<float> &radiuses)
 {
     _GlobalParticles = particles;
 	_GlobalParticlesNum = _GlobalParticles.size();
 	_GlobalRadiuses = radiuses;
 }
 
-UniformGrid::UniformGrid(const std::vector<Eigen::Vector3f> &particles, float radius)
+UniformGrid::UniformGrid(const std::vector<cstoneOctree::Vec3f> &particles, float radius)
 {
     _GlobalParticles = particles;
 	_GlobalParticlesNum = _GlobalParticles.size();
@@ -29,14 +29,14 @@ void UniformGrid::loadRootBox()
 {
 	_BoundingBox[0] = _BoundingBox[2] = _BoundingBox[4] = FLT_MAX;
 	_BoundingBox[1] = _BoundingBox[3] = _BoundingBox[5] = -FLT_MAX;
-	for (const Eigen::Vector3f& p: _GlobalParticles)
+	for (const cstoneOctree::Vec3f& p: _GlobalParticles)
 	{
-		if (p.x() < _BoundingBox[0]) _BoundingBox[0] = p.x();
-		if (p.x() > _BoundingBox[1]) _BoundingBox[1] = p.x();
-		if (p.y() < _BoundingBox[2]) _BoundingBox[2] = p.y();
-		if (p.y() > _BoundingBox[3]) _BoundingBox[3] = p.y();
-		if (p.z() < _BoundingBox[4]) _BoundingBox[4] = p.z();
-		if (p.z() > _BoundingBox[5]) _BoundingBox[5] = p.z();
+		if (p.x < _BoundingBox[0]) _BoundingBox[0] = p.x;
+		if (p.x > _BoundingBox[1]) _BoundingBox[1] = p.x;
+		if (p.y < _BoundingBox[2]) _BoundingBox[2] = p.y;
+		if (p.y > _BoundingBox[3]) _BoundingBox[3] = p.y;
+		if (p.z < _BoundingBox[4]) _BoundingBox[4] = p.z;
+		if (p.z > _BoundingBox[5]) _BoundingBox[5] = p.z;
 	}
 }
 
@@ -73,8 +73,8 @@ void UniformGrid::resizeRootBoxVarR()
 
 void UniformGrid::gridSampling()
 {
-    Eigen::Vector3f minV(_BoundingBox[0], _BoundingBox[2], _BoundingBox[4]);
-    Eigen::Vector3f maxV(_BoundingBox[1], _BoundingBox[3], _BoundingBox[5]);
+    cstoneOctree::Vec3f minV(_BoundingBox[0], _BoundingBox[2], _BoundingBox[4]);
+    cstoneOctree::Vec3f maxV(_BoundingBox[1], _BoundingBox[3], _BoundingBox[5]);
 
 #pragma omp parallel for
     for (size_t i = 0; i < _Scalars.size(); i++)    //
@@ -85,7 +85,7 @@ void UniformGrid::gridSampling()
         x = (i % (dims[0] * dims[1])) % dims[0];
         // std::cout << i << ", " << x << ", " << y << ", " << z <<std::endl;
         _evaluator->SingleEval(
-            Eigen::Vector3f(
+            cstoneOctree::Vec3f(
                 float(steps[0] - x) / float(steps[0]) * minV[0] + float(x) / float(steps[0]) * maxV[0],
                 float(steps[1] - y) / float(steps[1]) * minV[1] + float(y) / float(steps[1]) * maxV[1],
                 float(steps[2] - z) / float(steps[2]) * minV[2] + float(z) / float(steps[2]) * maxV[2]),
@@ -121,7 +121,7 @@ void UniformGrid::Run(float iso_value, std::string filename, std::string filepat
 	
 	IS_CONST_RADIUS ? _evaluator->RecommendIsoValueConstR() : _evaluator->RecommendIsoValueVarR();
     printf("   Recommend Iso Value = %f\n", _evaluator->getIsoValue());
-	_evaluator->compute_Gs_xMeans();
+	//_evaluator->compute_Gs_xMeans();
 	printf("   Initialize Evaluator Time = %f \n", t.elapsed());
 
 	if (USE_POLY6 && USE_ANI)

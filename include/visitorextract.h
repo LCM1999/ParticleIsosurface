@@ -3,7 +3,8 @@
 #include <vector>
 #include <array>
 #include <algorithm>
-#include <Eigen/Dense>
+#include "coord_struct.h"
+//#include <Eigen/Dense>
 #include "iso_common.h"
 #include "index.h"
 #include <memory>
@@ -301,7 +302,7 @@ struct dual_grid
 
 struct dual_cell
 {
-	std::array<Eigen::Vector3f, 12> vertices;
+	std::array<cstoneOctree::Vec3f, 12> vertices;
 	std::vector<std::array<int, 3>> faces;
 };
 

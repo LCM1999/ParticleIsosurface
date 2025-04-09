@@ -1,7 +1,8 @@
 #pragma once
 
 #include <vector>
-#include <Eigen/Dense>
+//#include <Eigen/Dense>
+#include <coord_struct.h>
 
 class HashGrid;
 
@@ -16,7 +17,7 @@ private:
 	unsigned int particlesNum;
 
 public:
-    MultiLevelSearcher(std::vector<Eigen::Vector3f>* particles, float* bounding, std::vector<float>* radiuses, float inf_factor);
+    MultiLevelSearcher(std::vector<cstoneOctree::Vec3f>* particles, float* bounding, std::vector<float>* radiuses, float inf_factor);
     MultiLevelSearcher() {};
     ~MultiLevelSearcher() {
         for (size_t i = 0; i < searchers.size(); i++)
@@ -33,6 +34,6 @@ public:
     inline float getAvgRadius() {return avgRadius;}
     inline float getParticlesNum() {return particlesNum;}
 
-    void GetNeighbors(const Eigen::Vector3f& pos, std::vector<int>& neighbors);
-    void GetInBoxParticles(const Eigen::Vector3f& box1, const Eigen::Vector3f& box2, std::vector<int>& insides);
+    void GetNeighbors(const cstoneOctree::Vec3f& pos, std::vector<int>& neighbors);
+    void GetInBoxParticles(const cstoneOctree::Vec3f& box1, const cstoneOctree::Vec3f& box2, std::vector<int>& insides);
 };

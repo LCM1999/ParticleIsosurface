@@ -2,7 +2,7 @@
 
 #include <iostream>
 #include <random>
-// #include "cuda_runtime.h"
+ #include "cuda_runtime.h"
 
 
 #ifdef __CUDACC__ 

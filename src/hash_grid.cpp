@@ -2,7 +2,7 @@
 #include "hash_grid.h"
 #include <var.h>
 
-HashGrid::HashGrid(std::vector<Eigen::Vector3f>* particles, float* bounding, float radius, float inf_factor)
+HashGrid::HashGrid(std::vector<cstoneOctree::Vec3f>* particles, float* bounding, float radius, float inf_factor)
 {
 	// assert(IS_CONST_RADIUS);
 	Particles = particles;
@@ -34,10 +34,9 @@ HashGrid::HashGrid(std::vector<Eigen::Vector3f>* particles, float* bounding, flo
 	HashList.clear();
 }
 
-HashGrid::HashGrid(std::vector<Eigen::Vector3f>* particles, std::vector<float>* radiuses, 
+HashGrid::HashGrid(std::vector<cstoneOctree::Vec3f>* particles, std::vector<float>* radiuses,
 	std::vector<unsigned int>& pIndexes, float* bounding, unsigned int radiusId, float inf_factor)
 {
-	assert(!IS_CONST_RADIUS);
 	Particles = particles;
 	PIndexes.assign(pIndexes.begin(), pIndexes.end());
 	ParticlesNum = PIndexes.size();
@@ -87,7 +86,7 @@ inline void HashGrid::BuildTable()
 
 inline void HashGrid::CalcHashList()
 {
-	Eigen::Vector3i xyzIdx;
+	cstoneOctree::Vec3i xyzIdx;
 	for (size_t index = 0; index < ParticlesNum; index++)
 	{
 		if (IS_CONST_RADIUS)
@@ -122,14 +121,14 @@ inline void HashGrid::FindStartEnd()
 	}
 }
 
-void HashGrid::CalcXYZIdx(const Eigen::Vector3f& pos, Eigen::Vector3i& xyzIdx)
+void HashGrid::CalcXYZIdx(const cstoneOctree::Vec3f& pos, cstoneOctree::Vec3i& xyzIdx)
 {
 	xyzIdx.setZero();
 	for (int i = 0; i < 3; i++)
 		xyzIdx[i] = int((pos[i] - Bounding[i * 2]) / CellSize);
 }
 
-long long HashGrid::CalcCellHash(const Eigen::Vector3i& xyzIdx)
+long long HashGrid::CalcCellHash(const cstoneOctree::Vec3i& xyzIdx)
 {
 	if (xyzIdx[0] < 0 || xyzIdx[0] >= XYZCellNum[0] ||
 		xyzIdx[1] < 0 || xyzIdx[1] >= XYZCellNum[1] ||
@@ -163,10 +162,10 @@ void HashGrid::GetInCellList(const long long hash, std::vector<int>& pIdxList)
 }
 
 void HashGrid::GetInBoxParticles(
-	Eigen::Vector3f box1, Eigen::Vector3f box2, 
+	cstoneOctree::Vec3f box1, cstoneOctree::Vec3f box2,
 	std::vector<int>& insides)
 {
-	Eigen::Vector3i minXyzIdx, maxXyzIdx;
+	cstoneOctree::Vec3i minXyzIdx, maxXyzIdx;
 	for (size_t i = 0; i < 3; i++)
 	{
 		box1[i] = std::max(box1[i], Bounding[2*i]);
@@ -177,13 +176,13 @@ void HashGrid::GetInBoxParticles(
 
 	int bad_temp_hash = 0;
 	long long temp_hash;
-	for (int x = (minXyzIdx.x()-1); x <= (maxXyzIdx.x()+1); x++)
+	for (int x = (minXyzIdx.x-1); x <= (maxXyzIdx.x+1); x++)
     {
-        for (int y = (minXyzIdx.y()-1); y <= (maxXyzIdx.y()+1); y++)
+        for (int y = (minXyzIdx.y-1); y <= (maxXyzIdx.y+1); y++)
         {
-            for (int z = (minXyzIdx.z()-1); z <= (maxXyzIdx.z()+1); z++)
+            for (int z = (minXyzIdx.z-1); z <= (maxXyzIdx.z+1); z++)
             {
-                temp_hash = CalcCellHash(Eigen::Vector3i(x, y, z));
+                temp_hash = CalcCellHash(cstoneOctree::Vec3i(x, y, z));
                 if (temp_hash < 0) {
 					bad_temp_hash++;
 					continue;
@@ -194,10 +193,10 @@ void HashGrid::GetInBoxParticles(
     }
 }
 
-void HashGrid::GetPIdxList(const Eigen::Vector3f& pos, std::vector<int>& pIdxList)
+void HashGrid::GetPIdxList(const cstoneOctree::Vec3f& pos, std::vector<int>& pIdxList)
 {
 	// pIdxList.clear();
-	Eigen::Vector3i xyzIdx;
+	cstoneOctree::Vec3i xyzIdx;
 	long long neighbor_hash;
 	CalcXYZIdx(pos, xyzIdx);
 	for (int z = -1; z <= 1; z++)
@@ -206,7 +205,7 @@ void HashGrid::GetPIdxList(const Eigen::Vector3f& pos, std::vector<int>& pIdxLis
 		{
 			for (int x = -1; x <= 1; x++)
 			{
-				neighbor_hash = CalcCellHash((xyzIdx + Eigen::Vector3i(x, y, z)));
+				neighbor_hash = CalcCellHash((xyzIdx + cstoneOctree::Vec3i(x, y, z)));
 				if (neighbor_hash < 0) {continue;}
 				GetInCellList(neighbor_hash, pIdxList);
 			}

@@ -8,7 +8,7 @@ SET(COMPUTE_CAPABILITY 75)
 set(CUDA_STANDARD 11)
 
 set(PROJECT_NAME Isosurface_smiplify)
-
+set(CMAKE_CUDA_ARCHITECTURES ${COMPUTE_CAPABILITY})
 
 include(CheckLanguage)
 check_language(CUDA)
@@ -16,13 +16,15 @@ check_language(CUDA)
 
 if(CMAKE_CUDA_COMPILER)
     message("Rendertoolengine found cuda")
+    set(CUDA_TOOLKIT_ROOT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.6")
     enable_language(CUDA)
-    find_package(CUDAToolkit)
+    find_package(CUDAToolkit REQUIRED)
     # find_package(Thrust CONFIG)
     set(CMAKE_CUDA_STANDARD 17)
     message(STATUS "CUDA_TOOLKIT_ROOT_DIR: ${CUDA_TOOLKIT_ROOT_DIR}")
     include_directories(${CUDA_INCLUDE_DIR})
     include_directories(${CUDA_TOOLKIT_ROOT_DIR}/include)
+    add_compile_definitions(__CUDACC__)  # 强制定义宏
 endif()
 
 ################################################################################
@@ -53,10 +55,10 @@ if (NOT HDF5_FOUND)
     message(FATAL_ERROR "HDF5 not found!")
 endif ()
 
-find_package(Eigen3 REQUIRED)
-if(NOT EIGEN3_FOUND)
-    message(FATAL_ERROR "Eigen3 not found!")
-endif()
+#find_package(Eigen3 REQUIRED)
+#if(NOT EIGEN3_FOUND)
+#    message(FATAL_ERROR "Eigen3 not found!")
+#endif()
 
 find_package(VTK REQUIRED)
 if(NOT VTK_FOUND)
@@ -139,7 +141,7 @@ target_include_directories(${PROJECT_NAME}
     ${CSTONEOCTREE_INCLUDE_DIR}
     ${MPI_CXX_INCLUDE_DIRS}
     ${HDF5_INCLUDE_DIR}
-    ${EIGEN3_INCLUDE_DIR}
+    #${EIGEN3_INCLUDE_DIR}
 )
 
 # cuda_add_library(node_calc_lib SHARED src/node_calc.cu)
@@ -148,7 +150,7 @@ target_link_libraries(${PROJECT_NAME}
     PUBLIC
     ${HDF5_C_STATIC_LIBRARY}
     ${VTK_LIBRARIES}
-    Eigen3::Eigen
+    #Eigen3::Eigen
     OpenMP::OpenMP_CXX
     HDF5::HDF5
     pugixml

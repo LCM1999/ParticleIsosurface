@@ -7,44 +7,45 @@
 #include <iterator>
 #include <algorithm>
 #include <assert.h>
-#include <Eigen/Dense>
+//#include <Eigen/Dense>
+#include <coord_struct.h>
 #include "rply.h"
 
 struct TNode;
 
-template<class T>
-struct vect3
-{
-	T v[3];
-
-	vect3() {}
-
-	vect3(T a, T b, T c) {
-		v[0] = a;
-		v[1] = b;
-		v[2] = c;
-	}
-
-	vect3(Eigen::Matrix<T, 3, 1> e)
-	{
-		v[0] = e[0];
-		v[1] = e[1];
-		v[2] = e[2];
-	}
-
-	T &operator[](const int i)
-	{
-		assert(i >= 0 && i < 3);
-		return v[i];
-	}
-
-	bool operator<(const vect3 &a) const 
-	{
-		return std::lexicographical_compare(v, v+3, a.v, a.v+3);
-	}
-};
-
-typedef vect3<float> Vertex;
+//template<class T>
+//struct vect3
+//{
+//	T v[3];
+//
+//	vect3() {}
+//
+//	vect3(T a, T b, T c) {
+//		v[0] = a;
+//		v[1] = b;
+//		v[2] = c;
+//	}
+//
+//	vect3(Eigen::Matrix<T, 3, 1> e)
+//	{
+//		v[0] = e[0];
+//		v[1] = e[1];
+//		v[2] = e[2];
+//	}
+//
+//	T &operator[](const int i)
+//	{
+//		assert(i >= 0 && i < 3);
+//		return v[i];
+//	}
+//
+//	bool operator<(const vect3 &a) const 
+//	{
+//		return std::lexicographical_compare(v, v+3, a.v, a.v+3);
+//	}
+//};
+//
+//typedef vect3<float> Vertex;
 
 struct Triangle
 {
@@ -89,9 +90,9 @@ public:
 	Mesh(int mesh_precision = 1e4);
 	~Mesh(){};
     int MESH_PRECISION;
-	std::vector<Eigen::Vector3f> IcosaTable;
+	std::vector<cstoneOctree::Vec3f> IcosaTable;
 	std::map<std::string, int> vertices_map;
-	std::vector<Vertex> vertices;
+	std::vector<cstoneOctree::Vec3f> vertices;
 	std::map<std::string, int> tris_map;
 	std::vector<Triangle> tris;
 	unsigned int verticesNum = 0;
@@ -99,9 +100,9 @@ public:
 	const int theta = 5;
 	const int phi = 5;
 
-	int insert_vert(unsigned long long id1, unsigned long long id2, const Eigen::Vector3f& p);
-	vect3<long long> vect3f2vect3i(vect3<float>& a);
-	vect3<float> vect3i2vect3f(vect3<int>& a);
+	int insert_vert(unsigned long long id1, unsigned long long id2, const cstoneOctree::Vec3f& p);
+	//vect3<long long> vect3f2vect3i(vect3<float>& a);
+	//vect3<float> vect3i2vect3f(vect3<int>& a);
 	void insert_tri(int t0, int t1, int t2);
 	void reset();
 
@@ -110,6 +111,6 @@ public:
 	//std::vector<Eigen::Vector3f> norms;
 
 	void BuildIcosaTable();
-	void AppendSplash_ConstR(std::vector<Eigen::Vector3f>& splash_particles, const float radius);
-	void AppendSplash_VarR(std::vector<Eigen::Vector3f>& splash_particles, std::vector<float>& splash_radius);
+	void AppendSplash_ConstR(std::vector<cstoneOctree::Vec3f>& splash_particles, const float radius);
+	void AppendSplash_VarR(std::vector<cstoneOctree::Vec3f>& splash_particles, std::vector<float>& splash_radius);
 };

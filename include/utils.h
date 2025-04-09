@@ -1,13 +1,12 @@
 #pragma once
 #include <vector>
-#include <string.h>
-#include <Eigen/Dense>
+#include <string>
+//#include <Eigen/Dense>
 
 
-template <class T>
-int sign(Eigen::Vector<T, 4> &x)
+int sign(const float &x)
 {
-	return x[3] > 0 ? 1 : -1;
+	return x > 0 ? 1 : -1;
 }
 
 void printMem();

@@ -10,7 +10,7 @@ Mesh::Mesh(const int mesh_precision)
 	BuildIcosaTable();
 }
 
-int Mesh::insert_vert(unsigned long long id1, unsigned long long id2, const Eigen::Vector3f& p)
+int Mesh::insert_vert(unsigned long long id1, unsigned long long id2, const cstoneOctree::Vec3f& p)
 {
 	// vect3<float> tp(p);
 	// vect3<long long> tmp = vect3f2vect3i(tp);
@@ -71,7 +71,7 @@ void Mesh::BuildIcosaTable()
 	float hAngle1 = -PI / 2 - H_ANGLE / 2;  // start from -126 deg at 1st row
 	float hAngle2 = -PI / 2;				// start from -90 deg at 2nd row
 
-	IcosaTable[0] = Eigen::Vector3f(0, 0, 1);
+	IcosaTable[0] = cstoneOctree::Vec3f(0, 0, 1);
 	int i1, i2;
 
 	for (size_t i = 1; i <= 5; i++)
@@ -81,27 +81,27 @@ void Mesh::BuildIcosaTable()
 		z = std::sin(V_ANGLE);
 		xy = std::cos(V_ANGLE);
 
-		IcosaTable[i1] = Eigen::Vector3f(xy * cos(hAngle1), xy * sin(hAngle1), z);
-		IcosaTable[i2] = Eigen::Vector3f(xy * cos(hAngle2), xy * sin(hAngle2), -z);
+		IcosaTable[i1] = cstoneOctree::Vec3f(xy * cos(hAngle1), xy * sin(hAngle1), z);
+		IcosaTable[i2] = cstoneOctree::Vec3f(xy * cos(hAngle2), xy * sin(hAngle2), -z);
 
 		hAngle1 += H_ANGLE;
 		hAngle2 += H_ANGLE;
 	}
 
-	IcosaTable[11] = Eigen::Vector3f(0, 0, -1);	
+	IcosaTable[11] = cstoneOctree::Vec3f(0, 0, -1);
 }
 
-void Mesh::AppendSplash_ConstR(std::vector<Eigen::Vector3f>& splash_particles, const float radius)
+void Mesh::AppendSplash_ConstR(std::vector<cstoneOctree::Vec3f>& splash_particles, const float radius)
 {
 	std::vector<int> tmp_vec_indices;
-	for (const Eigen::Vector3f& pos : splash_particles)
+	for (const cstoneOctree::Vec3f& pos : splash_particles)
 	{
 		tmp_vec_indices.clear();
 		tmp_vec_indices.resize(12);
 		for (size_t i = 0; i < 12; i++)
 		{
 			verticesNum++;
-			vertices.push_back(Vertex(pos + IcosaTable[i] * radius));
+			vertices.push_back(cstoneOctree::Vec3f(pos + IcosaTable[i] * radius));
 			tmp_vec_indices[i] = verticesNum;
 		}
 		for (size_t i = 0; i < 5; i++)
@@ -114,7 +114,7 @@ void Mesh::AppendSplash_ConstR(std::vector<Eigen::Vector3f>& splash_particles, c
 	}
 }
 
-void Mesh::AppendSplash_VarR(std::vector<Eigen::Vector3f>& splash_particles, std::vector<float>& splash_radius)
+void Mesh::AppendSplash_VarR(std::vector<cstoneOctree::Vec3f>& splash_particles, std::vector<float>& splash_radius)
 {
 	std::vector<int> tmp_vec_indices;
 	for (int spi = 0; spi < splash_particles.size(); spi++)
@@ -124,7 +124,7 @@ void Mesh::AppendSplash_VarR(std::vector<Eigen::Vector3f>& splash_particles, std
 		for (size_t i = 0; i < 12; i++)
 		{
 			verticesNum++;
-			vertices.push_back(Vertex(splash_particles[spi] + IcosaTable[i] * splash_radius[spi]));
+			vertices.push_back(cstoneOctree::Vec3f(splash_particles[spi] + IcosaTable[i] * splash_radius[spi]));
 			tmp_vec_indices[i] = verticesNum;
 		}
 		for (size_t i = 0; i < 5; i++)

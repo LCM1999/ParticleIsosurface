@@ -49,38 +49,43 @@ void VisitorExtract::calc_vertices()
 			auto& v1 = *dual_grids[i].grid[v_index1];
 			auto& v2 = *dual_grids[i].grid[v_index2];
 			
-			if ( sign(v1.node) != sign(v2.node))
+			if ( sign(v1.nodeScalar) != sign(v2.nodeScalar))
 			{
-				Eigen::Vector4f tmpv1 = v1.node, tmpv2 = v2.node, tmpv = Eigen::Vector4f::Zero();
-				float ratio, d = (tmpv1 - tmpv2).head(3).norm(), r = (IS_CONST_RADIUS ? constructor->getConstRadius(): constructor->getSearcher()->getMinRadius()) / 2;
+				cstoneOctree::Vec3f tmpv1 = v1.center, tmpv2 = v2.center, tmpv(0, 0, 0);
+				float v1s = v1.nodeScalar, v2s = v2.nodeScalar, tvs = 0;
+				float ratio, d = (tmpv1 - tmpv2).norm(), r = (IS_CONST_RADIUS ? constructor->getConstRadius(): constructor->getSearcher()->getMinRadius()) / 2;
 				while (d > r)
 				{
 					tmpv[0] =  (tmpv1[0] + tmpv2[0]) / 2;
 					tmpv[1] =  (tmpv1[1] + tmpv2[1]) / 2;
 					tmpv[2] =  (tmpv1[2] + tmpv2[2]) / 2;
-					constructor->getEvaluator()->SingleEval(tmpv.head(3), tmpv[3]);
-					if (sign(tmpv) == sign(tmpv1))
+					constructor->getEvaluator()->SingleEval(tmpv, tvs);
+					if (sign(tvs) == sign(v1s))
 					{
 						tmpv1 = tmpv;
+						v1s = tvs;
 						tmpv.setZero();
+						tvs = 0;
 					}
-					else if (sign(tmpv) == sign(tmpv2))
+					else if (sign(tvs) == sign(v2s))
 					{
 						tmpv2 = tmpv;
+						v2s = tvs;
 						tmpv.setZero();
+						tvs = 0;
 					} else {
 						break;
 					}
 					d /= 2;
 				}
-				ratio = invlerp(tmpv1[3], tmpv2[3], 0.0f);
+				ratio = invlerp(v1s, v2s, 0.0f);
 				if (ratio < 0.1)
 					tmpv = tmpv1;
 				else if (ratio > 0.9)
 					tmpv = tmpv2;
 				else
 					tmpv = lerp(tmpv1, tmpv2, ratio);
-				dual_cells[i].vertices[e_index] = tmpv.head(3);
+				dual_cells[i].vertices[e_index] = tmpv;
 			}
 		};
 		
@@ -237,7 +242,7 @@ bool VisitorExtract::on_vert(
 		std::array<std::shared_ptr<TNode>, 8> n = { a.n, b.n, c.n, d.n, aa.n, ba.n, ca.n, da.n };
 		for (int i = 0; i < 8; i++)
 		{
-			if (sign(n[i]->node) > 0)
+			if (sign(n[i]->nodeScalar) > 0)
 			{
 				index += 1 << i;
 			}

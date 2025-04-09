@@ -6,8 +6,8 @@
 #include <assert.h>
 #include <iostream>
 #include <vector>
-#include <Eigen/Dense>
-#include <Eigen/SVD>
+//#include <Eigen/Dense>
+//#include <Eigen/SVD>
 
 #include <memory>
 #include <box.h>
@@ -40,17 +40,18 @@ private:
     float poly6_kernel(float d2, float h2, float sigma);
     float Bspline_kernel(float ratio, float sigma);
     float Gaussian_kernel(float ratio2, float sigma);
-    Eigen::Vector3f poly6_gradient_kernel(float d2, float h2, float sigma, Eigen::Vector3f diff);
+    Vec3f poly6_gradient_kernel(float d2, float h2, float sigma, Vec3f diff);
+#if USE_ANI
     Eigen::Vector3f Bspline_gradient_kernel(float ratio, float sigma, Eigen::Vector3f diff);
-
-	float IsotropicInterpolate(const int pIdx, const float d);
-    Eigen::Vector3f IsotropicInterpolateGrad(const int pIdx, const float d2, const Eigen::Vector3f diff);
 	float AnisotropicInterpolate(const int pIdx, const Eigen::Vector3f diff);
     Eigen::Vector3f AnisotropicInterpolateGrad(const int pIdx, const Eigen::Vector3f diff);
     void compute_xMeans(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Eigen::Vector3f &xMean);
     void compute_xMeansCPU(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Eigen::Vector3f &xMean);
     void compute_G_ours(int pIdx, Eigen::Vector3f xMean, std::vector<int> neighbors, Eigen::Matrix3f &G);
     void compute_G_Yus(int pIdx, Eigen::Vector3f xMean, std::vector<int> neighbors, Eigen::Matrix3f &G);
+#endif // USE_ANI
+    Vec3f IsotropicInterpolateGrad(const int pIdx, const float d2, const Vec3f diff);
+	float IsotropicInterpolate(const int pIdx, const float d);
 	float wij(float d, float r);
 
 public:
@@ -60,7 +61,7 @@ public:
     std::shared_ptr<HashGrid> _hashgrid;
     std::shared_ptr<MultiLevelSearcher> _searcher;
 
-	std::vector<Eigen::Vector3f>* GlobalPoses;
+	std::vector<Vec3f>* GlobalPoses;
     int _GlobalParticlesNum = 0;
     std::vector<float>* GlobalRadius;
     std::vector<float> GlobalRadius2;
@@ -75,14 +76,17 @@ public:
     float Sigma = 0;
     std::vector<bool> GlobalSplash;
     std::vector<bool> GlobalSurface;
-    std::vector<Eigen::Vector3f> PariclesNormals;
+    std::vector<Vec3f> PariclesNormals;
+#if USE_ANI
 	std::vector<Eigen::Vector3f> GlobalxMeans;
     std::vector<Eigen::Matrix3f> GlobalGs;
     std::vector<float> GlobalDeterminant;
-
+	void compute_Gs_xMeans();
+    void compute_Gs_xMeansCPU();
+#endif // USE_ANI
 	Evaluator(  std::shared_ptr<HashGrid>& hashgrid,
                 std::shared_ptr<MultiLevelSearcher>& searcher,
-                std::vector<Eigen::Vector3f>* global_particles, 
+                std::vector<Vec3f>* global_particles, 
                 std::vector<float>* radiuses,
                 float radius);
 
@@ -94,9 +98,9 @@ public:
                 );
 
     void SingleEvalCPU(Vec3f& pos, float& scalar);
-	void SingleEval(const Eigen::Vector3f& pos, float& scalar);
-    void SingleEvalWithGradCPU(int idx, float& scalar, Eigen::Vector3f& gradient);
-    void SingleEvalWithGrad(const Eigen::Vector3f& pos, float& scalar, Eigen::Vector3f& gradient);
+	void SingleEval(const Vec3f& pos, float& scalar);
+    void SingleEvalWithGradCPU(int idx, float& scalar, Vec3f& gradient);
+    void SingleEvalWithGrad(const Vec3f& pos, float& scalar, Vec3f& gradient);
     void GridEvalCPU(float* sample_points, float* field_gradients, float cellsize, 
                                 bool& signchange, int oversample, bool grad_normalize);
     void GridEval(
@@ -111,8 +115,6 @@ public:
     void RecommendIsoValueVarR();
     void CalcParticlesNormalCPU();
     void CalcParticlesNormal();
-	void compute_Gs_xMeans();
-    void compute_Gs_xMeansCPU();
 
     inline float getNeighborFactor() {return _NEIGHBOR_FACTOR;}
     inline float getSmoothFactor() {return _SMOOTH_FACTOR;}
