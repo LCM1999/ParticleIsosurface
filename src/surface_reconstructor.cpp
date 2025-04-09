@@ -177,6 +177,7 @@ void SurfReconstructor::checkEmptyAndCalcCurv(std::shared_ptr<TNode> tnode, unsi
 	if (!empty)
 	{
 		bool all_splash = true;
+		int match_count = 0;
 		for (const int& in: insides)
 		{
 			if (!_evaluator->CheckSplash(in))
@@ -188,6 +189,7 @@ void SurfReconstructor::checkEmptyAndCalcCurv(std::shared_ptr<TNode> tnode, unsi
 					_GlobalParticles[in].z() > (box1.z() - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())) && 
 					_GlobalParticles[in].z() < (box2.z() + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())))
 				{
+					match_count++;
 					if (CALC_P_NORMAL)
 					{
 						Eigen::Vector3f tempNorm = _evaluator->PariclesNormals[in];
@@ -357,14 +359,27 @@ void SurfReconstructor::genIsoOurs()
 		cuvrs.resize(queue_flag);
 		min_raiduses.resize(queue_flag);
 		emptys.resize(queue_flag);
-		#pragma omp parallel
+
+		// #pragma omp parallel
 		{
-			#pragma omp single
+			// #pragma omp single
 			{
 				for (size_t i = 0; i < queue_flag; i++)
 				{
-					#pragma omp task
-						beforeSampleEval(*ProcessArray[i], cuvrs[i], min_raiduses[i], emptys[i]);
+					// ------- grab the chosen node -------
+					Eigen::Vector3f center = (*ProcessArray[i])->center;
+					// if(count == 4){
+					// 	int center_0 = std::round(center[0] * 100.0f);
+					// 	int center_1 = std::round(center[1] * 100.0f);
+					// 	int center_2 = std::round(center[2] * 100.0f);
+					// 	// if(center_0 == 193 && center_1 == -6 && center_2 == 3){	
+					// 	if(center_0 == 145 && center_1 == 58 && center_2 == 19){	
+					// 		std::cout << "find the chosen node" << std::endl;
+					// 	}
+					// }
+					// #pragma omp task
+					static bool write = false;
+					beforeSampleEval(*ProcessArray[i], cuvrs[i], min_raiduses[i], emptys[i]);
 				}
 			}
 		}
@@ -381,15 +396,15 @@ void SurfReconstructor::genIsoOurs()
 		sample_points = new float[int(pow(getOverSampleQEF()+1, 3)) * 4 * queue_flag];
 		sample_grads = new float[int(pow(getOverSampleQEF()+1, 3)) * 3 * queue_flag];
 		//TODO: Sampling
-		#pragma omp parallel
+		// #pragma omp parallel
 		{
-			#pragma omp single
+			// #pragma omp single
 			{
 				for (size_t i = 0; i < queue_flag; i++)
 				{
 					if (!emptys[i])
 					{
-						#pragma omp task
+						// #pragma omp task
 							afterSampleEval(
 									*ProcessArray[i], cuvrs[i], min_raiduses[i], 
 									sample_points + int(i * pow(getOverSampleQEF()+1, 3) * 4), 
@@ -406,6 +421,9 @@ void SurfReconstructor::genIsoOurs()
 					(*ProcessArray[i])->children[t.v] = std::make_shared<TNode>(this, *ProcessArray[i], t);
 					WaitingStack.push_back(&((*ProcessArray[i])->children[t.v]));
 				}
+				// if(count == 4){
+				// 	printf("The split node: %.2f %.2f %.2f\n", (*ProcessArray[i])->center[0], (*ProcessArray[i])->center[1], (*ProcessArray[i])->center[2]);
+				// }
 			}
 			else{
 				final_leaf_count++;
@@ -449,11 +467,6 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 	_GlobalParticles.clear();
 	int particle_size = _particles.size();
 
-	// float min_num = cal::min(_BoundingBox[0], cal::min(_BoundingBox[2], _BoundingBox[4]));
-	// float max_num = cal::max(_BoundingBox[1], cal::max(_BoundingBox[3], _BoundingBox[5]));
-	// std::cout << "The box min num: " << min_num << std::endl;
-	// std::cout << "The box max num: " << max_num << std::endl;
-	// Box box(min_num, max_num);
 	// --- Freeze the box only for this dam project test --- 
 	Box box(1.0526, 3.6126, -0.780035, 1.77996, -1.01442, 1.54558);
 	
@@ -491,6 +504,20 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 	for(int i = 0; i < _particles.size(); i++){
 		_GlobalParticles[i] = Eigen::Vector3f(_particles[i].x, _particles[i].y, _particles[i].z);
 	}
+
+
+	if (IS_CONST_RADIUS)
+	{
+    	_hashgrid = std::make_shared<HashGrid>(&_GlobalParticles, _BoundingBox, _RADIUS, 4.0f);
+	} else {
+		_searcher = std::make_shared<MultiLevelSearcher>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
+	}
+    printf("-= Initialize Evaluator =-\n");
+	_evaluator = std::make_shared<Evaluator>(_hashgrid, _searcher, &_GlobalParticles, &_GlobalRadiuses, _RADIUS);
+	_evaluator->setSmoothFactor(smooth_factor);
+	_evaluator->setIsoFactor(iso_factor);
+	_evaluator->compute_Gs_xMeans();
+
 
 	_tree.resize(1 + 1);
 	cal::fill_data_cpu(_tree.data(), 1, 0);
@@ -644,15 +671,11 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 		// ---- iso octree's info calculation ----
 		int iso_tree_size = iso_tree.size() - 1;
 		std::cout << "tree size in loop " << iso_count << ": " << iso_tree_size << std::endl;
-		std::vector<uint64_t> iso_prefixes(iso_tree_size);
 
-		// calculate prefixes for each node
-		// for(int i = 0; i < iso_tree_size; i++){
-		// 	uint64_t curr_key = iso_tree[i];
-		// 	if(!isPowerOf8(iso_tree[i + 1] - curr_key)) printf("The index %d is not the power of 8\n", i);
-    	// 	unsigned curr_level = treeLevel(iso_tree[i + 1] - curr_key);
-    	// 	iso_prefixes[i] = encodePlaceholderBit(curr_key, 3 * curr_level);	
-		// }
+		// calculate the number of leaf nodes in the deepest level for each loop
+		int deepest_tree_num = 0;
+
+
 		std::vector<Vec3f> iso_centers(iso_tree_size);
 		std::vector<Vec3f> iso_sizes(iso_tree_size);
 		calculateLeavesCentersAndSizesCPU(iso_tree, iso_centers, iso_sizes, box);
@@ -664,17 +687,34 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 		std::vector<float> min_radiuses(iso_tree_size);	
 		std::vector<unsigned char> emptys(iso_tree_size);
 		// std::vector<float> iso_values(iso_tree_size);
-		std::vector<int> nodes_type(iso_tree_size, 1);
+		std::vector<int> nodes_type(iso_tree_size, 0);
 		scalars = std::vector<float>(iso_tree_size, 0.0); // Stores each tree nodes' scalar value on dual vertices
 		std::vector<uint64_t> iso_nodeOps(iso_tree.size(), 0); // Store the split decision for each node (the split decision is based on whether the node has isosurface)
 
-		// #pragma omp parallel for
+
+		// ------- grab the chosen node -------
+		// for(int i = 0; i < iso_tree_size; i++){
+		// 	if(iso_count == 4){
+		// 		Vec3f center = iso_centers[i];
+		// 		int center_0 = std::round(center[0] * 100.0f);
+		// 		int center_1 = std::round(center[1] * 100.0f);
+		// 		int center_2 = std::round(center[2] * 100.0f);
+		// 		if(center_0 == 193 && center_1 == -6 && center_2 == 3){	
+		// 		// if(center_0 == 145 && center_1 == 58 && center_2 == 19){	
+		// 			std::cout << "find the chosen node" << std::endl;
+		// 			std::cout << "the chosen node's index: " << i << std::endl;
+		// 		}
+		// 	}
+		// }
+		
+
+		#pragma omp parallel for
 		for(int i = 0; i < iso_tree_size; i++){
 			// begin beforeSampleEval
 			Vec3f center = iso_centers[i];
 			Vec3f box1 = center - Vec3f(iso_sizes[i].x, iso_sizes[i].y, iso_sizes[i].z);
 			Vec3f box2 = center + Vec3f(iso_sizes[i].x, iso_sizes[i].y, iso_sizes[i].z);
-			std::vector<int> insideParticlesIdx;
+			std::vector<int> insideParticlesIdx(1000);
 			// check empty and calculate curvature implentation below
 			Eigen::Vector3f norms(0, 0, 0);
 			float area = 0.0f;
@@ -687,9 +727,23 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 			auto rangeEnd = cal::lower_bound(_mortonCodes.data(), _mortonCodes.data() + mortonCodesSize, nodeEndVal);
 			int index_start = std::distance(_mortonCodes.data(), rangeStart);
 			int index_end = std::distance(_mortonCodes.data(), rangeEnd);
-			for(int index = index_start; index < index_end; index++){
-				insideParticlesIdx.push_back(index);
+			if(iso_count == 4 && i == 33){
+				std::cout << "center: " << iso_centers[i].x << " " << iso_centers[i].y << " " << iso_centers[i].z << std::endl;
+				std::cout << "begin bounding: " << iso_centers[i].x - iso_sizes[i].x << " " << iso_centers[i].y - iso_sizes[i].y << " " << iso_centers[i].z - iso_sizes[i].z << std::endl;
+				std::cout << "end bounding: " << iso_centers[i].x + iso_sizes[i].x << " " << iso_centers[i].y + iso_sizes[i].y << " " << iso_centers[i].z + iso_sizes[i].z << std::endl;
+				std::cout << "begin next leaf's bounding: " << iso_centers[i + 1].x - iso_sizes[i + 1].x << " " << iso_centers[i + 1].y - iso_sizes[i + 1].y << " " << iso_centers[i + 1].z - iso_sizes[i + 1].z << std::endl;
+				int level = treeLevel(nodeEndVal - nodeStartVal);
+				std::cout << "level: " << level << std::endl;
+				int particles_num = rangeEnd - rangeStart;
+				std::cout << "the number of particles in this node: " << particles_num << std::endl;
 			}
+			// std::vector<int> potentialParticles(1000);
+			Eigen::Vector3f box1_eigen(box1.x, box1.y, box1.z);
+			Eigen::Vector3f box2_eigen(box2.x, box2.y, box2.z);
+			_hashgrid->GetInBoxParticles(box1_eigen, box2_eigen, insideParticlesIdx);
+			// float max_influence_radius = iso_sizes[i].x + min_radiuses[i] * 4;
+			// int num_of_particles = findInfluencedParticlesCPU(iso_centers[i], max_influence_radius, octreeNs, box, 1000, insideParticlesIdx.data());
+			// insideParticlesIdx.resize(num_of_particles);
 			emptys[i] = insideParticlesIdx.empty();
 
 			if(!emptys[i]){
@@ -813,6 +867,18 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 				// std::cout << "error in nodes_type, " << i << "th value is " << nodes_type[i] << std::endl;
 			}	
 		}
+		// print iso_count == 4 deepest level's leaf nodes
+		// if(iso_count == 4){
+		// 	for(int i = 0; i < iso_tree_size; i++){
+		// 		uint64_t curr_key = iso_tree[i];
+		// 		uint64_t next_key = iso_tree[i + 1];
+		// 		int tree_level = treeLevel(next_key - curr_key);
+		// 		if(tree_level == iso_count){
+		// 			printf("The split node: %.2f %.2f %.2f\n", iso_centers[i].x, iso_centers[i].y, iso_centers[i].z);
+		// 		}
+		// 	}
+		// }
+
 		
 		uint64_t iso_allOpsSum = std::accumulate(iso_nodeOps.begin(), iso_nodeOps.end(), 0);
 		// exclusive_csan ops to get new octree indices
@@ -820,7 +886,7 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 		for(int i = 0; i < iso_nodeOps.size(); i++){
 			int val = iso_nodeOps[i] - 1;
 			if(val != 0 && val != 7){
-				std::cout << "error in iso_nodeOps, " << i << "th value is " << val << std::endl;
+				// std::cout << "error in iso_nodeOps, " << i << "th value is " << val << std::endl;
 			}
 		}
 		std::exclusive_scan(iso_nodeOps.begin(), iso_nodeOps.end(), iso_nodeOpsLayout.begin(), 0);
@@ -921,6 +987,56 @@ void SurfReconstructor::Run(float iso_factor, float smooth_factor)
 
 	printf("-= Box =-\n");
 	loadRootBox();
+
+	// ------ make the old and new particle arrays sort is the same start ------
+
+	_particles.resize(_GlobalParticles.size());
+	for(int i = 0; i < _GlobalParticles.size(); i++){
+		_particles[i] = Vec3f(_GlobalParticles[i].x(), _GlobalParticles[i].y(), _GlobalParticles[i].z());
+	}
+	_GlobalParticles.clear();
+	int particle_size = _particles.size();
+
+	// --- Freeze the box only for this dam project test --- 
+	Box box(1.0526, 3.6126, -0.780035, 1.77996, -1.01442, 1.54558);
+	
+	// ============1.2 Calculate the morton code for each particle and sort the outputs===========
+	_mortonCodes.resize(particle_size);
+	calMortonCodeCPU(_particles, _mortonCodes, box);
+
+	std::vector<size_t> indices(particle_size);
+	for (size_t i = 0; i < indices.size(); ++i) {
+		indices[i] = i;
+	}
+	std::sort(indices.begin(), indices.end(),
+              [&](size_t i, size_t j) { return _mortonCodes[i] < _mortonCodes[j]; });
+	std::vector<Vec3f> particleSorted(particle_size);
+	std::vector<float> rSorted(particle_size);
+	std::vector<uint64_t> mortonCodesSorted(_mortonCodes.size());
+
+	for (size_t i = 0; i < indices.size(); ++i) {
+        particleSorted[i] = _particles[indices[i]];
+		if(IS_CONST_RADIUS){
+			rSorted[i] = _RADIUS;
+		}
+		else{
+			rSorted[i] = _GlobalRadiuses[indices[i]];
+		}
+		mortonCodesSorted[i] = _mortonCodes[indices[i]];
+    }
+	_particles = particleSorted;
+	_GlobalRadiuses = rSorted;
+	_mortonCodes = mortonCodesSorted;	
+	particleSorted.clear();
+	rSorted.clear();
+	mortonCodesSorted.clear();
+
+	_GlobalParticles = std::vector<Eigen::Vector3f>(_particles.size());
+	for(int i = 0; i < _particles.size(); i++){
+		_GlobalParticles[i] = Eigen::Vector3f(_particles[i].x, _particles[i].y, _particles[i].z);
+	}
+	// ------ make the old and new particle arrays sort is the same  end ------
+
 
 	temp_time = get_time();
 

@@ -7,8 +7,8 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
-        // "CMAKE_CXX_FLAGS_DEBUG": "-g -O0 -fno-inline"
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_FLAGS_DEBUG": "-g -O0 -fno-inline"
       }
     } 
   ] 

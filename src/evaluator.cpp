@@ -193,6 +193,7 @@ void Evaluator::SingleEvalWithGradCPU(int idx, float& scalar, Eigen::Vector3f& g
     int numNeighbors = findNeighborsCPU(idx, *_GlobalPoses, *GlobalRadius, _octreeNs, _box, _ngmax, neighbors.data());
     Eigen::Vector3f pos = Eigen::Vector3f(_GlobalPoses->at(idx).x, _GlobalPoses->at(idx).y, _GlobalPoses->at(idx).z);
     Eigen::Vector3f diff;
+    neighbors.resize(numNeighbors);
     for (int pIdx : neighbors)
     {
         if (this->CheckSplash(pIdx))
@@ -578,7 +579,7 @@ void Evaluator::RecommendIsoValueVarR()
 
 void Evaluator::CalcParticlesNormalCPU()
 {
-#pragma omp parallel for
+// #pragma omp parallel for
     for (int pIdx = 0; pIdx < _GlobalParticlesNum; pIdx++)
     {
         float tempScalar = 0;
