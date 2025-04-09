@@ -1,10 +1,11 @@
 #pragma once
 #include <vector>
 #include <string>
+#include <typeinfo>
 //#include <Eigen/Dense>
 
 
-int sign(const float &x)
+inline int sign(const float &x)
 {
 	return x > 0 ? 1 : -1;
 }

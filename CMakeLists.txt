@@ -16,7 +16,7 @@ check_language(CUDA)
 
 if(CMAKE_CUDA_COMPILER)
     message("Rendertoolengine found cuda")
-    set(CUDA_TOOLKIT_ROOT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.6")
+    # set(CUDA_TOOLKIT_ROOT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.6")
     enable_language(CUDA)
     find_package(CUDAToolkit REQUIRED)
     # find_package(Thrust CONFIG)
@@ -24,7 +24,6 @@ if(CMAKE_CUDA_COMPILER)
     message(STATUS "CUDA_TOOLKIT_ROOT_DIR: ${CUDA_TOOLKIT_ROOT_DIR}")
     include_directories(${CUDA_INCLUDE_DIR})
     include_directories(${CUDA_TOOLKIT_ROOT_DIR}/include)
-    add_compile_definitions(__CUDACC__)  # 强制定义宏
 endif()
 
 ################################################################################
@@ -118,14 +117,14 @@ add_executable(${PROJECT_NAME}
     main.cpp
     ${ORIGINAL_SOURCE_FILES}
     ${CSTONEOCTREE_SOURCE_FILES}
-    ${ISO_SOURCE_FILES}
+    # ${ISO_SOURCE_FILES}
 )
 
 include_directories(
     pugixml/src
     "${VTK_USE_FILE}"
     ${ORIGINAL_INCLUDE_DIR}
-    ${ISO_INCLUDE_DIR}
+    # ${ISO_INCLUDE_DIR}
     ${CSTONEOCTREE_INCLUDE_DIR}
     )
 
@@ -137,7 +136,7 @@ add_library(pugixml
 target_include_directories(${PROJECT_NAME} 
     PUBLIC
     ${ORIGINAL_INCLUDE_DIR}
-    ${ISO_INCLUDE_DIR}
+    # ${ISO_INCLUDE_DIR}
     ${CSTONEOCTREE_INCLUDE_DIR}
     ${MPI_CXX_INCLUDE_DIRS}
     ${HDF5_INCLUDE_DIR}

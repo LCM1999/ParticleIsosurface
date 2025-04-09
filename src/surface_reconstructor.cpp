@@ -12,8 +12,6 @@
 #include "timer.h"
 #include <var.h>
 
-#include <extract_manager.h>
-#include <traverse_manager.h>
 
 // #include <morton.h>
 using namespace cal;
@@ -625,7 +623,7 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 	temp_time = get_time();
 	if (CALC_P_NORMAL)
 	{
-		_evaluator->CalcParticlesNormalCPU();
+		_evaluator->CalcParticlesNormal();
 		last_temp_time = temp_time;
 		temp_time = get_time();
 		printf("   Calculate Particals Normal Time = %f\n", temp_time - last_temp_time);
@@ -693,126 +691,12 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 			}
 			emptys[i] = insideParticlesIdx.empty();
 
-			if(!emptys[i]){
-				bool all_splash = true;
-				for(const int& in: insideParticlesIdx){
-					if(!_evaluator->CheckSplash(in)){
-						if(_particles[in].x > (box1.x - (_GlobalRadiuses[in] * _evaluator->getSmoothFactor())) && 
-							_particles[in].x < (box2.x + (_GlobalRadiuses[in] * _evaluator->getSmoothFactor())) &&
-							_particles[in].y > (box1.y - (_GlobalRadiuses[in] * _evaluator->getSmoothFactor())) && 
-							_particles[in].y < (box2.y + (_GlobalRadiuses[in] * _evaluator->getSmoothFactor())) &&
-							_particles[in].z > (box1.z - (_GlobalRadiuses[in] * _evaluator->getSmoothFactor())) && 
-							_particles[in].z < (box2.z + (_GlobalRadiuses[in] * _evaluator->getSmoothFactor()))){
-							
-							if (CALC_P_NORMAL){
-								cstoneOctree::Vec3f tempNorm = _evaluator->PariclesNormals[in];
-								norms += tempNorm;
-								area += tempNorm.norm();
-							}
-							if(!IS_CONST_RADIUS){
-								if(min_radiuses[i] > _GlobalRadiuses[in]){
-									min_radiuses[i] = _GlobalRadiuses[in];
-								}
-							}
-							all_splash = false;
-						}
-					}
-				}
-				emptys[i] = all_splash;
-			}
-
 			curvs[i] = (area == 0) ? 1.0 : (norms.norm() / area);
 
 			if(emptys[i]){
 				scalars[i] = _evaluator->getIsoValue();
 				nodes_type[i] = 0;
 			}
-			// end beforeSampleEval
-
-			// begin afterSampleEval
-			if(!emptys[i]){
-				int sample_points_start = int(i * std::pow(getOverSampleQEF()+1, 3) * 4);
-				int sample_grads_start = int(i * std::pow(getOverSampleQEF()+1, 3) * 3);
-				unsigned curr_level = treeLevel(iso_tree[i + 1] - iso_tree[i]);
-				bool is_big_node = curr_level < _DEPTH_MIN;
-				bool signchange = false;
-				float cell_size = iso_sizes[i].x * 2;
-
-				if(!is_big_node){
-					// GenerateSampling()
-					cstoneOctree::Vec3f minV(iso_centers[i].x - iso_sizes[i].x, iso_centers[i].y - iso_sizes[i].y, iso_centers[i].z - iso_sizes[i].z);
-					cstoneOctree::Vec3f maxV(iso_centers[i].x + iso_sizes[i].x, iso_centers[i].y + iso_sizes[i].y, iso_centers[i].z + iso_sizes[i].z);
-
-					for (int z = 0; z <= getOverSampleQEF(); z++)
-					{
-						for (int y = 0; y <= getOverSampleQEF(); y++)
-						{
-							for (int x = 0; x <= getOverSampleQEF(); x++)
-							{
-								sample_points[sample_points_start + (z * (getOverSampleQEF()+1) * (getOverSampleQEF()+1) + y * (getOverSampleQEF()+1) + x) * 4 + 0] = 
-								(1 - float(x) / getOverSampleQEF()) * minV[0] + (float(x) / getOverSampleQEF()) * maxV[0];
-								sample_points[sample_points_start + (z * (getOverSampleQEF()+1) * (getOverSampleQEF()+1) + y * (getOverSampleQEF()+1) + x) * 4 + 1] = 
-								(1 - float(y) / getOverSampleQEF()) * minV[1] + (float(y) / getOverSampleQEF()) * maxV[1];
-								sample_points[sample_points_start + (z * (getOverSampleQEF()+1) * (getOverSampleQEF()+1) + y * (getOverSampleQEF()+1) + x) * 4 + 2] = 
-								(1 - float(z) / getOverSampleQEF()) * minV[2] + (float(z) / getOverSampleQEF()) * maxV[2];
-								sample_points[sample_points_start + (z * (getOverSampleQEF()+1) * (getOverSampleQEF()+1) + y * (getOverSampleQEF()+1) + x) * 4 + 3] = 0;
-							}
-						}
-					}
-					// NodeSampling()
-					bool origin_sign;
-					signchange = false;
-					_evaluator->GridEvalCPU(&sample_points[sample_points_start], &sample_grads[sample_points_start], 
-											cell_size, signchange, getOverSampleQEF(), false);
-				}
-
-				if(cell_size - min_radiuses[i] < 1e-8){
-					nodes_type[i] = 2;
-					// begin single eval
-					// Eigen::Vector3f center = Eigen::Vector3f(iso_centers[i].x, iso_centers[i].y, iso_centers[i].z);
-					_evaluator->SingleEvalCPU(iso_centers[i], scalars[i]);
-					continue;
-				}
-
-				// check curvature
-				if(is_big_node || (signchange && curvs[i] < 0.995)){
-					nodes_type[i] = 1;
-				}
-				else{
-					nodes_type[i] = 2;
-					// Eigen::Vector3f center = Eigen::Vector3f(iso_centers[i].x, iso_centers[i].y, iso_centers[i].z);
-					_evaluator->SingleEvalCPU(iso_centers[i], scalars[i]);
-				}
-				// --- end afterSampleEval() ---
-			}
-
-			// calculate the nodeOps value
-			// if(nodes_type[i] == 0){
-			// 	iso_nodeOps[i] = 1;
-			// }
-			// else if(nodes_type[i] == 1){
-			// 	iso_nodeOps[i] = 8;
-			// }
-			// else if(nodes_type[i] == 2){
-			// 	iso_nodeOps[i] = 1;
-			// }	
-			// else{
-			// 	std::cout << "error in nodes_type, " << i << "th value is " << nodes_type[i] << std::endl;
-			// }
-		} // end octree node loop
-		for(int i = 0; i < iso_tree_size; i++){
-			if(nodes_type[i] == 0){
-				iso_nodeOps[i] = 1;
-			}
-			else if(nodes_type[i] == 1){
-				iso_nodeOps[i] = 8;
-			}
-			else if(nodes_type[i] == 2){
-				iso_nodeOps[i] = 1;
-			}	
-			else{
-				// std::cout << "error in nodes_type, " << i << "th value is " << nodes_type[i] << std::endl;
-			}	
 		}
 		
 		uint64_t iso_allOpsSum = std::accumulate(iso_nodeOps.begin(), iso_nodeOps.end(), 0);
@@ -880,33 +764,8 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 	IsoOctreeNs iso_octreeNs(iso_prefixes.data(), iso_childOffsets.data(), iso_leafToInternal.data(), iso_internalToLeaf.data(), iso_levelRange.data(), scalars.data(), iso_centers.data(), iso_sizes.data());
 
 	// extract the isosurface value
-	iso::ExtractManager extractManager(this, _OurMesh, &iso_octreeNs);
-	iso::traverse_node_CPU<iso::trav_vert, iso::ExtractManager>(extractManager, 0);
-	extractManager.cal_vertices_CPU();
-	extractManager.generate_mesh_CPU();
-	if (GEN_SPLASH)
-	{
-		printf("-= Generate Splash =-\n");
-		std::vector<cstoneOctree::Vec3f> splash_pos;
-		std::vector<float> splash_radiuses;
-		for (int pIdx = 0; pIdx < getGlobalParticlesNum(); pIdx++)
-		{
-			if (_evaluator->CheckSplash(pIdx))
-			{
-				splash_pos.push_back(_GlobalParticles[pIdx]);
-				if (!IS_CONST_RADIUS)
-				{
-					splash_radiuses.push_back(_GlobalRadiuses[pIdx]);
-				}
-			}
-		}
-		if (IS_CONST_RADIUS)
-		{
-			_OurMesh->AppendSplash_ConstR(splash_pos, _RADIUS);
-		} else {
-			_OurMesh->AppendSplash_VarR(splash_pos, splash_radiuses);
-		}
-	}
+	
+
 
 }
 

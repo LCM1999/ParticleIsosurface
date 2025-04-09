@@ -118,45 +118,6 @@ Evaluator::Evaluator(
 }
 
 
-void Evaluator::SingleEvalCPU(Vec3f& pos, float& scalar)
-{
-	scalar = 0;
-    int tmpnum = _ngmax;
-    std::vector<int> neighbors(tmpnum, 0); 
-
-    int numNeighbors;
-    numNeighbors = findInfluencedParticlesCPU(pos, MAX_RADIUS, _octreeNs, _box, _ngmax, neighbors.data());
-    // if (IS_CONST_RADIUS)
-    // {
-    //     _hashgrid->GetPIdxList(pos, neighbors);
-    // } else {
-    //     // _searcher->GetNeighbors(pos, neighbors);
-    // }
-    neighbors.resize(numNeighbors); 
-
-    Vec3f diff;
-    Vec3f pos3f(pos.x, pos.y, pos.z);
-    for (int pIdx : neighbors)
-    {
-        if (this->CheckSplash(pIdx))
-        {
-            continue;
-        }
-#if USE_ANI
-        diff = pos3f - GlobalxMeans[pIdx];
-            scalar += AnisotropicInterpolate(pIdx, diff);
-        if (USE_ANI)
-        {
-        } else {
-        }
-#else
-        diff = pos3f - (*GlobalPoses)[pIdx];
-            scalar += IsotropicInterpolate(pIdx, diff.squaredNorm());
-#endif // USE_ANI
-    }
-    scalar = _ISO_VALUE - scalar;   //((scalar - _MIN_SCALAR) / _MAX_SCALAR * 255);
-}
-
 void Evaluator::SingleEval(const Vec3f& pos, float& scalar)
 {
 	scalar = 0;
@@ -189,40 +150,6 @@ void Evaluator::SingleEval(const Vec3f& pos, float& scalar)
 #endif // USE_ANI
     }
     scalar = _ISO_VALUE - scalar;   //((scalar - _MIN_SCALAR) / _MAX_SCALAR * 255);
-}
-
-void Evaluator::SingleEvalWithGradCPU(int idx, float& scalar, Vec3f& gradient){
-    if (_MAX_SCALAR >= 0)
-	{
-		scalar = 0;
-        if (!gradient.isZero())
-        {
-            gradient.setZero();
-        }
-	}
-
-    std::vector<int> neighbors(_ngmax);
-    int numNeighbors = findNeighborsCPU(idx, *_GlobalPoses, *GlobalRadius, _octreeNs, _box, _ngmax, neighbors.data());
-    Vec3f pos = Vec3f(_GlobalPoses->at(idx).x, _GlobalPoses->at(idx).y, _GlobalPoses->at(idx).z);
-    Vec3f diff;
-    for (int pIdx : neighbors)
-    {
-        if (this->CheckSplash(pIdx))
-        {
-            continue;
-        }
-#if USE_ANI
-        diff = pos - GlobalxMeans[pIdx];
-        scalar += AnisotropicInterpolate(pIdx, diff);
-        gradient += AnisotropicInterpolateGrad(pIdx, diff);
-#else
-        diff = pos - (*GlobalPoses)[pIdx];
-        scalar += IsotropicInterpolate(pIdx, diff.squaredNorm());
-        gradient += IsotropicInterpolateGrad(pIdx, diff.squaredNorm(), diff);
-#endif // USE_ANI
-    }
-    scalar = _ISO_VALUE - scalar;   //((scalar - _MIN_SCALAR) / _MAX_SCALAR * 255);
-
 }
 
 void Evaluator::SingleEvalWithGrad(const Vec3f& pos, float& scalar, Vec3f& gradient)
@@ -261,95 +188,6 @@ void Evaluator::SingleEvalWithGrad(const Vec3f& pos, float& scalar, Vec3f& gradi
 #endif // USE_ANI
     }
     scalar = _ISO_VALUE - scalar;   //((scalar - _MIN_SCALAR) / _MAX_SCALAR * 255);
-}
-
-void Evaluator::GridEvalCPU(
-    float* sample_points, float* field_gradients, float cellsize, 
-    bool& signchange, int oversample, bool grad_normalize)
-{
-    bool origin_sign;
-    float step = cellsize / oversample;
-    for (int i = 0; i < pow(oversample+1, 3); i++)
-    {
-        Vec3f pos = Vec3f(sample_points[i*4 + 0], sample_points[i*4 + 1], sample_points[i*4 + 2]);
-        SingleEvalCPU(
-            pos,
-            sample_points[i*4 + 3]
-        );
-
-        origin_sign = (sample_points[3] >= 0);
-        if (!signchange)
-        {
-            signchange = origin_sign ^ (sample_points[i*4 + 3] >= 0);
-        }
-    }
-    int index, next_idx, last_idx;
-    for (int z = 0; z <= oversample; z++)
-    {
-        for (int y = 0; y <= oversample; y++)
-        {
-            for (int x = 0; x <= oversample; x++)
-            {
-                index = (z * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + x);
-                Vec3f gradient(0.0f, 0.0f, 0.0f);
-
-                next_idx = (z * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + (x + 1));
-                last_idx = (z * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + (x - 1));
-                if (x == 0)
-                {
-                    gradient[0] = (sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3]) / step;
-                }
-                else if (x == oversample)
-                {
-                    gradient[0] = (sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3]) / step;
-                }
-                else
-                {
-                    gradient[0] = (sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3]) / (step * 2);
-                }
-
-                next_idx = (z * (oversample + 1) * (oversample + 1) + (y + 1) * (oversample + 1) + x);
-                last_idx = (z * (oversample + 1) * (oversample + 1) + (y - 1) * (oversample + 1) + x);
-                if (y == 0)
-                {
-                    gradient[1] = (sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3]) / step;
-                }
-                else if (y == oversample)
-                {
-                    gradient[1] = (sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3]) / step;
-                }
-                else
-                {
-                    gradient[1] = (sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3]) / (step * 2);
-                }
-
-                next_idx = ((z + 1) * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + x);
-                last_idx = ((z - 1) * (oversample + 1) * (oversample + 1) + y * (oversample + 1) + x);
-                if (z == 0)
-                {
-                    gradient[2] = (sample_points[index * 4 + 3] - sample_points[next_idx * 4 + 3]) / step;
-                }
-                else if (z == oversample)
-                {
-                    gradient[2] = (sample_points[last_idx * 4 + 3] - sample_points[index * 4 + 3]) / step;
-                }
-                else
-                {
-                    gradient[2] = (sample_points[last_idx * 4 + 3] - sample_points[next_idx * 4 + 3]) / (step * 2);
-                }
-                if (grad_normalize)
-                {
-                    //gradient.normalize();
-                    gradient[0] = std::isnan(gradient[0]) ? 0.0f : gradient[0];
-                    gradient[1] = std::isnan(gradient[1]) ? 0.0f : gradient[1];
-                    gradient[2] = std::isnan(gradient[2]) ? 0.0f : gradient[2];
-                }
-                field_gradients[index * 3 + 0] = gradient[0];
-                field_gradients[index * 3 + 1] = gradient[1];
-                field_gradients[index * 3 + 2] = gradient[2];
-            }
-        }
-    }
 }
 
 void Evaluator::GridEval(
@@ -588,19 +426,6 @@ void Evaluator::RecommendIsoValueVarR()
     _ISO_VALUE = recommend; //(recommend - _MIN_SCALAR) / _MAX_SCALAR * 255;
 }
 
-void Evaluator::CalcParticlesNormalCPU()
-{
-#pragma omp parallel for
-    for (int pIdx = 0; pIdx < _GlobalParticlesNum; pIdx++)
-    {
-        float tempScalar = 0;
-        Vec3f tempGrad(0, 0, 0);
-        if (!CheckSplash(pIdx))
-        {
-            SingleEvalWithGradCPU(pIdx, tempScalar, PariclesNormals[pIdx]);
-        }
-    }
-}
 
 void Evaluator::CalcParticlesNormal()
 {

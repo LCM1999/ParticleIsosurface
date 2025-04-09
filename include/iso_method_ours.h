@@ -6,10 +6,10 @@
 #include "index.h"
 #include <math.h>
 #include <memory>
+#include <array>
 #include <coord_struct.h>
 
 class SurfReconstructor;
-
 //typedef Eigen::Vector<float, 5> Vector5f;
 //typedef Eigen::Vector<float, 5> Vector5f;
 //typedef Eigen::Vector<float, 6> Vector6f;

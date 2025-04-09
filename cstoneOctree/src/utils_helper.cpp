@@ -1,4 +1,5 @@
 #include <utils_helper.h>
+#include <sstream>
 
 namespace cstoneOctree{
 

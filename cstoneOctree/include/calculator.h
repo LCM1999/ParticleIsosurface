@@ -1,5 +1,5 @@
 #pragma once
-
+#include <algorithm>
 #include <cuda_def.h>
 #include <coord_struct.h>
 #include <cuda_runtime.h>

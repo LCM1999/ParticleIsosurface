@@ -46,7 +46,6 @@ private:
 	float AnisotropicInterpolate(const int pIdx, const Eigen::Vector3f diff);
     Eigen::Vector3f AnisotropicInterpolateGrad(const int pIdx, const Eigen::Vector3f diff);
     void compute_xMeans(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Eigen::Vector3f &xMean);
-    void compute_xMeansCPU(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Eigen::Vector3f &xMean);
     void compute_G_ours(int pIdx, Eigen::Vector3f xMean, std::vector<int> neighbors, Eigen::Matrix3f &G);
     void compute_G_Yus(int pIdx, Eigen::Vector3f xMean, std::vector<int> neighbors, Eigen::Matrix3f &G);
 #endif // USE_ANI
@@ -97,12 +96,11 @@ public:
                 int ngmax
                 );
 
-    void SingleEvalCPU(Vec3f& pos, float& scalar);
+
 	void SingleEval(const Vec3f& pos, float& scalar);
-    void SingleEvalWithGradCPU(int idx, float& scalar, Vec3f& gradient);
+
     void SingleEvalWithGrad(const Vec3f& pos, float& scalar, Vec3f& gradient);
-    void GridEvalCPU(float* sample_points, float* field_gradients, float cellsize, 
-                                bool& signchange, int oversample, bool grad_normalize);
+
     void GridEval(
         float* sample_points, float* field_gradients, float cellsize, 
         bool& signchange, int oversample, bool grad_normalize = false);
@@ -113,7 +111,6 @@ public:
     void CalculateMaxScalarVarR();
     void RecommendIsoValueConstR();
     void RecommendIsoValueVarR();
-    void CalcParticlesNormalCPU();
     void CalcParticlesNormal();
 
     inline float getNeighborFactor() {return _NEIGHBOR_FACTOR;}

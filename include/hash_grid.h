@@ -6,6 +6,7 @@
 #include <coord_struct.h>
 //#include <Eigen/Dense>
 #include "iso_common.h"
+#include <algorithm>
 
 class HashGrid
 {

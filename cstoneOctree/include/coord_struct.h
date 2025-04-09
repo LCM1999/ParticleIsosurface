@@ -7,6 +7,7 @@
 //#include <Eigen/Core>
 #include <cuda_def.h>
 #include <cuda_runtime.h>
+#include <cassert>
 
 namespace cstoneOctree
 {

@@ -27,29 +27,29 @@
 #endif
 
 #include <var.h>
- int OMP_USE_DYNAMIC_THREADS = 0;
- int OMP_THREADS_NUM = 16;
- bool IS_CONST_RADIUS = false;
- bool USE_ANI = true;
- // variants for test
- bool NEED_RECORD = false;
- int TARGET_FRAME = 0;
- // std::string PREFIX = "";
- std::string SUFFIX = "";    // CSV, H5
- std::vector<std::string> DATA_PATHES;
- std::string OUTPUT_TYPE = "ply";
- float RADIUS = 0;
- float MAX_RADIUS = 0;
- float MIN_RADIUS = 0;
- float SMOOTH_FACTOR = 2.0;
- float ISO_FACTOR = 1.9;
- float ISO_VALUE = 0.0f;
- // bool USE_CUDA = false;
- bool CALC_P_NORMAL = true;
- bool GEN_SPLASH = true;
- bool SINGLE_LAYER = false;
- bool USE_OURS = true;
- bool USE_POLY6 = 0;
+//  int OMP_USE_DYNAMIC_THREADS = 0;
+//  int OMP_THREADS_NUM = 16;
+//  bool IS_CONST_RADIUS = false;
+//  bool USE_ANI = true;
+//  // variants for test
+//  bool NEED_RECORD = false;
+//  int TARGET_FRAME = 0;
+//  // std::string PREFIX = "";
+//  std::string SUFFIX = "";    // CSV, H5
+//  std::vector<std::string> DATA_PATHES;
+//  std::string OUTPUT_TYPE = "ply";
+//  float RADIUS = 0;
+//  float MAX_RADIUS = 0;
+//  float MIN_RADIUS = 0;
+//  float SMOOTH_FACTOR = 2.0;
+//  float ISO_FACTOR = 1.9;
+//  float ISO_VALUE = 0.0f;
+//  // bool USE_CUDA = false;
+//  bool CALC_P_NORMAL = true;
+//  bool GEN_SPLASH = true;
+//  bool SINGLE_LAYER = false;
+//  bool USE_OURS = true;
+//  bool USE_POLY6 = 0;
 
 void writeObjFile(Mesh &m, std::string fn)
 {
@@ -156,34 +156,34 @@ void loadConfigJson(std::string dataPath)
         {
             OUTPUT_TYPE = readInJSON.at("OUTPUT_TYPE");
         }
-//        if (readInJSON.contains("SUFFIX"))
-//        {
-//            SUFFIX = readInJSON.at("SUFFIX");
-//        }
-//        if (SUFFIX.empty() || SUFFIX == "")
-//        {
-//            const std::string filePath = readInJSON.at("DATA_FILE");
-//            std::string data_pathes = filePath;
-//            parseString(&DATA_PATHES, data_pathes, ",");
-//        } else {
-//#ifdef _WIN32
-//            intptr_t hFile;
-//            _finddata_t fileInfo;
-//            std::string p;
-//            if ((hFile = _findfirst(p.assign(dataPath).append("/").append("*").append(SUFFIX).c_str(), &fileInfo)) != -1)
-//            {
-//                do
-//                {
-//                    if (!(fileInfo.attrib & _A_SUBDIR))
-//                    {
-//                        DATA_PATHES.push_back(std::string(fileInfo.name));
-//                    }
-//                } while (_findnext(hFile, &fileInfo) == 0);
-//            }   
-//#else
-//                // TODO: In Linux
-//#endif
-//        }
+       if (readInJSON.contains("SUFFIX"))
+       {
+           SUFFIX = readInJSON.at("SUFFIX");
+       }
+       if (SUFFIX.empty() || SUFFIX == "")
+       {
+           const std::string filePath = readInJSON.at("DATA_FILE");
+           std::string data_pathes = filePath;
+           parseString(&DATA_PATHES, data_pathes, ",");
+       } else {
+#ifdef _WIN32
+           intptr_t hFile;
+           _finddata_t fileInfo;
+           std::string p;
+           if ((hFile = _findfirst(p.assign(dataPath).append("/").append("*").append(SUFFIX).c_str(), &fileInfo)) != -1)
+           {
+               do
+               {
+                   if (!(fileInfo.attrib & _A_SUBDIR))
+                   {
+                       DATA_PATHES.push_back(std::string(fileInfo.name));
+                   }
+               } while (_findnext(hFile, &fileInfo) == 0);
+           }   
+#else
+               // TODO: In Linux
+#endif
+       }
         if (readInJSON.contains("RADIUS"))
         {
             RADIUS = readInJSON.at("RADIUS");
@@ -709,8 +709,8 @@ int main(int argc, char **argv)
         // testHashGrid(5000000, dataDirPath + "/" + DATA_PATHES[0]);
         //if (USE_OURS)
         //{
-            // runOurs(dataDirPath, outPath);
-            runCPU(dataDirPath, outPath);
+            runOurs(dataDirPath, outPath);
+            // runCPU(dataDirPath, outPath);
         //} else {
         //    runUniform(dataDirPath, outPath);
         //}

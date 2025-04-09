@@ -2,3 +2,6 @@
 build/
 .vs/
 .idea
+CMakePresets.json
+CMakeUserPresets.json
+CMakeLists.txt

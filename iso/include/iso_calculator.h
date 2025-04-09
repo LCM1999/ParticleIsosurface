@@ -3,9 +3,9 @@
 
 namespace iso{
 
-template <class T>
-inline int sign(T x){
-    return (x > 0) ? 1 : -1;
-}
+// template <class T>
+// inline int sign(T x){
+//     return (x > 0) ? 1 : -1;
+// }
 
 }
