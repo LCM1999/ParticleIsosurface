@@ -141,8 +141,8 @@ void updateNodeCountsCPU(std::vector<uint64_t>& tree, std::vector<uint64_t>& mor
     uint64_t treeNodes = coverNodes[1] - coverNodes[0];
     auto countsStart = counts.data() + coverNodes[0];
 
-    #pragma omp parallel for
-    for(uint64_t i = treeStart; i < treeStart + treeNodes; i++){
+#pragma omp parallel for
+    for(ptrdiff_t i = treeStart; i < treeStart + treeNodes; i++){
         counts[i] = updateNodeCountsCPU(tree, mortonCodes, i);
     }
 }
@@ -317,10 +317,10 @@ void calculateNodeCentersAndSizesCPU(std::vector<uint64_t>& prefixes, std::vecto
 }
 
 
-void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves, std::vector<Vec3f>& centers, std::vector<Vec3f>& sizes, Box& box){
+void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves, std::vector<Vec3f>& centers, std::vector<Vec3f>& sizes, std::vector<unsigned>& levels, Box& box){
     #pragma omp parallel for
     for(int i = 0; i < leaves.size() - 1; i++){
-        calculateLeavesCentersAndSizesCPU(leaves, centers, sizes, box, i);
+        calculateLeavesCentersAndSizesCPU(leaves, centers, sizes, levels, box, i);
     }
 }
 
@@ -333,11 +333,13 @@ void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves, std::vecto
  * @param box the big box that stores the whole space range information
  * @param idx index
  */
-void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves, std::vector<Vec3f>& centers, std::vector<Vec3f>& sizes, Box& box, int idx){
+void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves, 
+    std::vector<Vec3f>& centers, std::vector<Vec3f>& sizes, std::vector<unsigned>& levels, 
+    Box& box, int idx){
     uint64_t curr = leaves[idx];
 
     unsigned level = treeLevel(leaves[idx + 1] - curr);
-
+    levels[idx] = level;
     constexpr int maxCoord = 1u << 21;
     unsigned cubeLength = (1u << (21 - level));
 
@@ -365,7 +367,6 @@ int findNeighborsCPU(int idx, std::vector<Vec3f>& particles, std::vector<float>&
     float radiusSquare = 4 * std::pow(radiuses[idx], 2);
     int numNeighbors = 0;
 
-    
     auto overlaps = [particle, radiusSquare, centers = octreeNs.centers, sizes = octreeNs.sizes, &box](int idx){
         auto nodeCenter = centers[idx];
         auto nodeSize = sizes[idx];

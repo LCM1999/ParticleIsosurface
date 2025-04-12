@@ -1,5 +1,9 @@
 #pragma once
+#ifndef CALCULATOR_H
+#define CALCULATOR_H
+
 #include <algorithm>
+#include <numeric>
 #include <cuda_def.h>
 #include <coord_struct.h>
 #include <cuda_runtime.h>
@@ -105,8 +109,8 @@ void sort_by_key_cpu(Iterator1 key_first, Iterator1 key_last, Iterator2 value_fi
 template <class T, class U>
 void fill_data_cpu(T* start, int n, U val) {
     T converted_val = static_cast<T>(val); 
-    #pragma omp parallel for
-    for (size_t i = 0; i < n; ++i) {
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < n; ++i) {
         start[i] = converted_val;
     }
 }
@@ -193,3 +197,4 @@ constexpr tuple<Ts&...> tie(Ts&... args) noexcept
 #endif
 
 }
+#endif

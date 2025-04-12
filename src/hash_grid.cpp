@@ -161,6 +161,43 @@ void HashGrid::GetInCellList(const long long hash, std::vector<int>& pIdxList)
 	}
 }
 
+void HashGrid::GetInBoxEstimate(cstoneOctree::Vec3f box1, cstoneOctree::Vec3f box2, int& insides)
+{
+	cstoneOctree::Vec3i minXyzIdx, maxXyzIdx;
+	for (size_t i = 0; i < 3; i++)
+	{
+		box1[i] = std::max(box1[i], Bounding[2*i]);
+		box2[i] = std::min(box2[i], Bounding[2*i+1]);
+	}
+	CalcXYZIdx(box1, minXyzIdx);
+	CalcXYZIdx(box2, maxXyzIdx);
+	long long temp_hash;
+	for (int x = (minXyzIdx.x-1); x <= (maxXyzIdx.x+1); x++)
+    {
+        for (int y = (minXyzIdx.y-1); y <= (maxXyzIdx.y+1); y++)
+        {
+            for (int z = (minXyzIdx.z-1); z <= (maxXyzIdx.z+1); z++)
+            {
+                temp_hash = CalcCellHash(cstoneOctree::Vec3i(x, y, z));
+                if (temp_hash < 0) {
+					continue;
+				}
+				int startIndex, endIndex;
+				if ((StartList.find(temp_hash) != StartList.end()) && (EndList.find(temp_hash) != EndList.end()))
+				{
+					startIndex = StartList[temp_hash];
+					endIndex = EndList[temp_hash];
+				}
+				else
+				{
+					continue;
+				}
+				insides += endIndex - startIndex;
+            }
+        }
+    }
+}
+
 void HashGrid::GetInBoxParticles(
 	cstoneOctree::Vec3f box1, cstoneOctree::Vec3f box2,
 	std::vector<int>& insides)
@@ -174,7 +211,6 @@ void HashGrid::GetInBoxParticles(
 	CalcXYZIdx(box1, minXyzIdx);
 	CalcXYZIdx(box2, maxXyzIdx);
 
-	int bad_temp_hash = 0;
 	long long temp_hash;
 	for (int x = (minXyzIdx.x-1); x <= (maxXyzIdx.x+1); x++)
     {
@@ -184,13 +220,82 @@ void HashGrid::GetInBoxParticles(
             {
                 temp_hash = CalcCellHash(cstoneOctree::Vec3i(x, y, z));
                 if (temp_hash < 0) {
-					bad_temp_hash++;
 					continue;
 				}
                 GetInCellList(temp_hash, insides);
             }
         }
     }
+}
+
+void HashGrid::GetInBoxParticles(cstoneOctree::Vec3f box1, cstoneOctree::Vec3f box2, int& numNeighbors, int ngmax, int* insides)
+{
+	cstoneOctree::Vec3i minXyzIdx, maxXyzIdx;
+	for (size_t i = 0; i < 3; i++)
+	{
+		box1[i] = std::max(box1[i], Bounding[2*i]);
+		box2[i] = std::min(box2[i], Bounding[2*i+1]);
+	}
+	CalcXYZIdx(box1, minXyzIdx);
+	CalcXYZIdx(box2, maxXyzIdx);
+	long long temp_hash;
+	for (int x = (minXyzIdx.x-1); x <= (maxXyzIdx.x+1); x++)
+    {
+        for (int y = (minXyzIdx.y-1); y <= (maxXyzIdx.y+1); y++)
+        {
+            for (int z = (minXyzIdx.z-1); z <= (maxXyzIdx.z+1); z++)
+            {
+                temp_hash = CalcCellHash(cstoneOctree::Vec3i(x, y, z));
+                if (temp_hash < 0) {
+					continue;
+				}
+				int countIndex, startIndex, endIndex;
+				if ((StartList.find(temp_hash) != StartList.end()) && (EndList.find(temp_hash) != EndList.end()))
+				{
+					startIndex = StartList[temp_hash];
+					endIndex = EndList[temp_hash];
+				}
+				else
+				{
+					continue;
+				}
+				for (int countIndex = startIndex; countIndex < endIndex; countIndex++)
+				{
+					if (numNeighbors < ngmax)
+					{
+						if (IS_CONST_RADIUS)
+						{
+							insides[numNeighbors] = IndexList[countIndex];
+						} else {
+							insides[numNeighbors] = PIndexes[IndexList[countIndex]];
+						}
+					}
+					numNeighbors++;
+				}
+            }
+        }
+    }
+}
+
+void HashGrid::GetPIdxEstimate(const cstoneOctree::Vec3f& pos, int& estimate)
+{
+	// pIdxList.clear();
+	cstoneOctree::Vec3i xyzIdx;
+	long long neighbor_hash;
+	CalcXYZIdx(pos, xyzIdx);
+	for (int z = -1; z <= 1; z++)
+	{
+		for (int y = -1; y <= 1; y++)
+		{
+			for (int x = -1; x <= 1; x++)
+			{
+				neighbor_hash = CalcCellHash((xyzIdx + cstoneOctree::Vec3i(x, y, z)));
+				if (neighbor_hash < 0) {continue;}
+				// GetInCellList(neighbor_hash, pIdxList);
+				estimate += 9;
+			}
+		}
+	}
 }
 
 void HashGrid::GetPIdxList(const cstoneOctree::Vec3f& pos, std::vector<int>& pIdxList)
@@ -208,6 +313,47 @@ void HashGrid::GetPIdxList(const cstoneOctree::Vec3f& pos, std::vector<int>& pId
 				neighbor_hash = CalcCellHash((xyzIdx + cstoneOctree::Vec3i(x, y, z)));
 				if (neighbor_hash < 0) {continue;}
 				GetInCellList(neighbor_hash, pIdxList);
+			}
+		}
+	}
+}
+
+void HashGrid::GetPIdxList(const cstoneOctree::Vec3f& pos, int& numNeighbors, int ngmax, int* pIdxList)
+{
+	cstoneOctree::Vec3i xyzIdx;
+	long long neighbor_hash;
+	CalcXYZIdx(pos, xyzIdx);
+	for (int z = -1; z <= 1; z++)
+	{
+		for (int y = -1; y <= 1; y++)
+		{
+			for (int x = -1; x <= 1; x++)
+			{
+				neighbor_hash = CalcCellHash((xyzIdx + cstoneOctree::Vec3i(x, y, z)));
+				if (neighbor_hash < 0) {continue;}
+				int countIndex, startIndex, endIndex;
+				if ((StartList.find(neighbor_hash) != StartList.end()) && (EndList.find(neighbor_hash) != EndList.end()))
+				{
+					startIndex = StartList[neighbor_hash];
+					endIndex = EndList[neighbor_hash];
+				}
+				else
+				{
+					continue;
+				}
+				for (int countIndex = startIndex; countIndex < endIndex; countIndex++)
+				{
+					if (numNeighbors < ngmax)
+					{
+						if (IS_CONST_RADIUS)
+						{
+							pIdxList[numNeighbors] = IndexList[countIndex];
+						} else {
+							pIdxList[numNeighbors] = PIndexes[IndexList[countIndex]];
+						}
+					}
+					numNeighbors++;
+				}
 			}
 		}
 	}

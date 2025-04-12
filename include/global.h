@@ -1,4 +1,6 @@
 #pragma once
+#ifndef GLOBAL_H
+#define GLOBAL_H
 
 #include <vector>
 #include <array>
@@ -114,3 +116,4 @@ public:
 	void AppendSplash_ConstR(std::vector<cstoneOctree::Vec3f>& splash_particles, const float radius);
 	void AppendSplash_VarR(std::vector<cstoneOctree::Vec3f>& splash_particles, std::vector<float>& splash_radius);
 };
+#endif

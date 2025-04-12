@@ -1,4 +1,6 @@
 #include <float.h>
+#include <Eigen/Core>
+#include <Eigen/Dense>
 #include "evaluator.h"
 
 using namespace cstoneOctree;
@@ -50,14 +52,12 @@ Evaluator::Evaluator(
     
     GlobalSplash.resize(_GlobalParticlesNum, 0);
     GlobalSurface.resize(_GlobalParticlesNum, 0);
-#if USE_ANI
     GlobalxMeans.resize(_GlobalParticlesNum);
     if (USE_ANI)
     {
         GlobalGs.resize(_GlobalParticlesNum);
         GlobalDeterminant.resize(_GlobalParticlesNum);
     }
-#endif // USE_ANI
 }
 
 // new evaluator constructor for conrnerstone octree
@@ -107,14 +107,12 @@ Evaluator::Evaluator(
     
     GlobalSplash.resize(_GlobalParticlesNum, 0);
     GlobalSurface.resize(_GlobalParticlesNum, 0);
-#if USE_ANI
     GlobalxMeans.resize(_GlobalParticlesNum);
     if (USE_ANI)
     {
         GlobalGs.resize(_GlobalParticlesNum);
         GlobalDeterminant.resize(_GlobalParticlesNum);
     }
-#endif // USE_ANI
 }
 
 
@@ -126,7 +124,7 @@ void Evaluator::SingleEval(const Vec3f& pos, float& scalar)
     {
         _hashgrid->GetPIdxList(pos, neighbors);
     } else {
-        // _searcher->GetNeighbors(pos, neighbors);
+        _searcher->GetNeighbors(pos, neighbors);
     }
     Vec3f diff;
     for (int pIdx : neighbors)
@@ -136,18 +134,15 @@ void Evaluator::SingleEval(const Vec3f& pos, float& scalar)
             continue;
         }
 
-#if USE_ANI
-        diff = pos3f - GlobalxMeans[pIdx];
-        scalar += AnisotropicInterpolate(pIdx, diff);
         if (USE_ANI)
         {
+            diff = pos - GlobalxMeans[pIdx];
+            scalar += AnisotropicInterpolate(pIdx, diff);
         }
         else {
+            diff = pos - (*GlobalPoses)[pIdx];
+            scalar += IsotropicInterpolate(pIdx, diff.squaredNorm());
         }
-#else
-        diff = pos - (*GlobalPoses)[pIdx];
-        scalar += IsotropicInterpolate(pIdx, diff.squaredNorm());
-#endif // USE_ANI
     }
     scalar = _ISO_VALUE - scalar;   //((scalar - _MIN_SCALAR) / _MAX_SCALAR * 255);
 }
@@ -177,15 +172,17 @@ void Evaluator::SingleEvalWithGrad(const Vec3f& pos, float& scalar, Vec3f& gradi
         {
             continue;
         }
-#if USE_ANI
-        diff = pos - GlobalxMeans[pIdx];
-        scalar += AnisotropicInterpolate(pIdx, diff);
-        gradient += AnisotropicInterpolateGrad(pIdx, diff);
-#else
-        diff = pos - (*GlobalPoses)[pIdx];
-        scalar += IsotropicInterpolate(pIdx, diff.squaredNorm());
-        gradient += IsotropicInterpolateGrad(pIdx, diff.squaredNorm(), diff);
-#endif // USE_ANI
+
+        if (USE_ANI)
+        {
+            diff = pos - GlobalxMeans[pIdx];
+            scalar += AnisotropicInterpolate(pIdx, diff);
+            gradient += AnisotropicInterpolateGrad(pIdx, diff);
+        } else {
+            diff = pos - (*GlobalPoses)[pIdx];
+            scalar += IsotropicInterpolate(pIdx, diff.squaredNorm());
+            gradient += IsotropicInterpolateGrad(pIdx, diff.squaredNorm(), diff);
+        }
     }
     scalar = _ISO_VALUE - scalar;   //((scalar - _MIN_SCALAR) / _MAX_SCALAR * 255);
 }
@@ -198,40 +195,10 @@ void Evaluator::GridEval(
     float step = cellsize / oversample;
     for (int i = 0; i < pow(oversample+1, 3); i++)
     {
-        // Eigen::Vector4f p(sample_points[i*4 + 0], sample_points[i*4 + 1], sample_points[i*4 + 2], sample_points[i*4 + 3]);
-        // float scalar = 0.0f;
-        // Eigen::Vector3f diff;   //, gradient
-        // std::vector<int> neighbors;
-        // if (IS_CONST_RADIUS)
-        // {
-        //     _hashgrid->GetPIdxList(p.head(3), neighbors);
-        // } else {
-        //     _searcher->GetNeighbors(p.head(3), neighbors);
-        // }
-        // if (!neighbors.empty())
-        // {
-        //     for (const int pIdx : neighbors)
-        //     {
-        //         if (!CheckSplash(pIdx))
-        //         {
-        //             diff = p.head(3) - GlobalxMeans[pIdx];
-        //             if (USE_ANI)
-        //             {
-        //                 scalar += AnisotropicInterpolate(pIdx, diff);
-        //                 // gradient += AnisotropicInterpolateGrad(pIdx, diff);
-        //             } else {
-        //                 scalar += IsotropicInterpolate(pIdx, diff.squaredNorm());
-        //                 // gradient += IsotropicInterpolateGrad(pIdx, diff.squaredNorm(), diff);
-        //             }
-        //         }
-        //     }
-        // }
         SingleEval(
             Vec3f(sample_points[i*4 + 0], sample_points[i*4 + 1], sample_points[i*4 + 2]),
             sample_points[i*4 + 3]
         );
-        // scalar = _ISO_VALUE - scalar;   //((scalar - _MIN_SCALAR) / _MAX_SCALAR * 255);
-        // sample_points[i*4 + 3] = scalar;
         origin_sign = (sample_points[3] >= 0);
         if (!signchange)
         {
@@ -501,36 +468,36 @@ inline Vec3f Evaluator::IsotropicInterpolateGrad(const int pIdx, const float d2,
     return grad;    //(IS_CONST_RADIUS ? Radius3 : GlobalRadius3[pIdx]) * 
 }
 
-//inline float Evaluator::AnisotropicInterpolate(const int pIdx, const Vec3f diff)
-//{
-//    float k_value;
-//    if (USE_POLY6)
-//    {
-//        k_value = poly6_kernel(
-//            (GlobalGs[pIdx] * diff).squaredNorm(), 
-//            (IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx]), 
-//            (IS_CONST_RADIUS ? Sigma : GlobalSigma[pIdx]));        
-//    } else {
-//        k_value = Bspline_kernel(
-//            sqrt((GlobalGs[pIdx] * diff).squaredNorm() /  (IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx])), 
-//            (IS_CONST_RADIUS ? Sigma : GlobalSigma[pIdx]));
-//    }
-//
-//    return (GlobalDeterminant[pIdx] * k_value); //(IS_CONST_RADIUS ? Radius3 : GlobalRadius3[pIdx]) * 
-//}
-//
-//inline Eigen::Vector3f Evaluator::AnisotropicInterpolateGrad(const int pIdx, const Eigen::Vector3f diff)
-//{
-//    Eigen::Vector3f grad = poly6_gradient_kernel(
-//        (GlobalGs[pIdx] * diff).squaredNorm(), 
-//        // diff.squaredNorm(), 
-//        (IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx]), 
-//        (IS_CONST_RADIUS ? Sigma : GlobalSigma[pIdx]), (GlobalGs[pIdx] * diff));
-//    return (GlobalDeterminant[pIdx] * grad);    //(IS_CONST_RADIUS ? Radius3 : GlobalRadius3[pIdx]) * 
-//}
+inline float Evaluator::AnisotropicInterpolate(const int pIdx, const Vec3f diff)
+{
+   float k_value;
+   if (USE_POLY6)
+   {
+       k_value = poly6_kernel(
+           (GlobalGs[pIdx] * diff).squaredNorm(), 
+           (IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx]), 
+           (IS_CONST_RADIUS ? Sigma : GlobalSigma[pIdx]));
+   } else {
+       k_value = Bspline_kernel(
+           sqrt((GlobalGs[pIdx] * diff).squaredNorm() /  (IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx])), 
+           (IS_CONST_RADIUS ? Sigma : GlobalSigma[pIdx]));
+   }
 
-//inline void Evaluator::compute_xMeansCPU(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Vec3f &xMean)
-//{
+   return (GlobalDeterminant[pIdx] * k_value); //(IS_CONST_RADIUS ? Radius3 : GlobalRadius3[pIdx]) * 
+}
+
+inline Vec3f Evaluator::AnisotropicInterpolateGrad(const int pIdx, const Vec3f diff)
+{
+   Vec3f grad = poly6_gradient_kernel(
+       (GlobalGs[pIdx] * diff).squaredNorm(), 
+       // diff.squaredNorm(), 
+       (IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx]), 
+       (IS_CONST_RADIUS ? Sigma : GlobalSigma[pIdx]), (GlobalGs[pIdx] * diff));
+   return (grad * GlobalDeterminant[pIdx]);    //(IS_CONST_RADIUS ? Radius3 : GlobalRadius3[pIdx]) * 
+}
+
+// inline void Evaluator::compute_xMeansCPU(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Vec3f &xMean)
+// {
 //    Vec3f xMean_copy = Vec3f(xMean[0], xMean[1], xMean[2]);
 //    float pR, pD2;
 //    pR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx);
@@ -578,182 +545,182 @@ inline Vec3f Evaluator::IsotropicInterpolateGrad(const int pIdx, const float d2,
 //        xMean_copy = (_GlobalPoses->at(pIdx));
 //    }
 //    xMean = Eigen::Vector3f(xMean_copy.x, xMean_copy.y, xMean_copy.z);
-//}
-//
-//inline void Evaluator::compute_xMeans(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Eigen::Vector3f &xMean)
-//{
-//    float pR, pD2;
-//    pR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx);
-//    // pD = SmoothFactor * pR;
-//    pD2 = IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx];
-//    float nR, nD, nD2, nI, nI2, d, d2, wj, wSum = 0;
-//    for (int nIdx : temp_neighbors)
-//    {
-//        if (nIdx == pIdx)
-//            continue;
-//        nR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(nIdx);
-//        nD = _SMOOTH_FACTOR * nR * 1.6;
-//        nD2 = nD * nD;
-//        nI = nR * _NEIGHBOR_FACTOR;
-//        nI2 = nI * nI;
-//        d2 = (((GlobalPoses->at(nIdx))) - ((GlobalPoses->at(pIdx)))).squaredNorm();
-//        if (d2 >= nI2)
-//        {
-//            continue;
-//        }
-//        d = sqrt(d2);
-//        wj = wij(d, nI);
-//        wSum += wj;
-//        xMean += ((GlobalPoses->at(nIdx))) * wj;
-//        neighbors.push_back(nIdx);
-//        if (d2 <= std::max(pD2, nD2))
-//        {
-//            closer_neighbor++;
-//        }
-//    }
-//    if (_USE_XMEAN && !USE_POLY6)
-//    {
-//        if (wSum > 0)
-//        {
-//            xMean /= wSum;
-//            xMean = (GlobalPoses->at(pIdx)) * (1 - _XMEAN_DELTA) + xMean * _XMEAN_DELTA;
-//        }
-//        else
-//        {
-//            xMean = (GlobalPoses->at(pIdx));
-//        }
-//    }
-//    else
-//    {
-//        xMean = (GlobalPoses->at(pIdx));
-//    }
-//}
+// }
 
-//inline void Evaluator::compute_G_ours(int pIdx, Vec3f xMean, std::vector<int> neighbors, Eigen::Matrix3f &G)
-//{
-//    // const float invH = 1/(_SMOOTH_FACTOR * (IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx)));
-//    // const float invH = 1/_SMOOTH_FACTOR;
-//    const float invH = 0.5;
-//    float wSum = 0, d, wj;
-//    float nR, nI, nI2, d2;
-//    Eigen::Vector3f wd = Eigen::Vector3f::Zero();
-//    Eigen::Matrix3f cov = Eigen::Matrix3f::Identity();
-//    cov += Eigen::DiagonalMatrix<float, 3>(invH, invH, invH);
-//    // cov += Eigen::DiagonalMatrix<float, 3>(
-//    //     IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx],
-//    //     IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx], 
-//    //     IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx]);
-//    wSum = 0.0f;
-//    float pR, pD2, pI, pI2;
-//    pR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx);
-//    // pD = SmoothFactor * pR;
-//    // pD2 = IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx];
-//    pI = pR * _NEIGHBOR_FACTOR;
-//    pI2 = pI * pI;
-//    for (int nIdx : neighbors)
-//    {
-//        nR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(nIdx);
-//        nI = nR * _NEIGHBOR_FACTOR;
-//        nI2 = nI * nI;
-//        d2 = (((GlobalPoses->at(nIdx))) - ((GlobalPoses->at(pIdx)))).squaredNorm();
-//        if (d2 >= nI2)  //pI2
-//        {
-//            continue;
-//        }
-//        d = (GlobalPoses->at(pIdx) - GlobalxMeans.at(nIdx)).norm();
-//        wj = wij(d, nI);    //pI
-//        wSum += wj;
-//        wd = ((GlobalxMeans.at(nIdx))) - xMean;
-//        cov += (wd * wd.transpose()) * wj;
-//    }
-//    cov /= wSum;
-//    Eigen::JacobiSVD<Eigen::Matrix3f> svd(cov, Eigen::ComputeFullU | Eigen::ComputeFullV);
-//    Eigen::Matrix3f u = svd.matrixU();
-//    Eigen::Vector3f w = svd.singularValues();
-//    Eigen::Matrix3f v = svd.matrixV();
-//    w = Eigen::Vector3f(w.array().abs());
-//    const float maxSingularVal = w.maxCoeff();
-//    // const float minSingularVal = w.minCoeff();
-//    // if ((maxSingularVal / minSingularVal) > M && (!GlobalSplash[pIdx]))
-//    // {
-//    //     GlobalSurface[pIdx] = true;
-//    // }
-//    const float kr = 4.0;
-//    w[0] = std::max(w[0], maxSingularVal / kr);  // * invH
-//    w[1] = std::max(w[1], maxSingularVal / kr);  // * invH
-//    w[2] = std::max(w[2], maxSingularVal / kr);  // * invH
-//    Eigen::Matrix3f invSigma = w.asDiagonal().inverse();
-//    // Compute G
-//    const float scale =
-//        std::pow(w[0] * w[1] * w[2], 1.0 / 3.0);  // volume preservation
-//    G = (v * invSigma * u.transpose()) * scale * invH;//
-//    // float detC = cov.determinant();
-//    // float detG = G.determinant();
-//}
+inline void Evaluator::compute_xMeans(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Vec3f &xMean)
+{
+   float pR, pD2;
+   pR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx);
+   // pD = SmoothFactor * pR;
+   pD2 = IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx];
+   float nR, nD, nD2, nI, nI2, d, d2, wj, wSum = 0;
+   for (int nIdx : temp_neighbors)
+   {
+       if (nIdx == pIdx)
+           continue;
+       nR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(nIdx);
+       nD = _SMOOTH_FACTOR * nR * 1.6;
+       nD2 = nD * nD;
+       nI = nR * _NEIGHBOR_FACTOR;
+       nI2 = nI * nI;
+       d2 = (((GlobalPoses->at(nIdx))) - ((GlobalPoses->at(pIdx)))).squaredNorm();
+       if (d2 >= nI2)
+       {
+           continue;
+       }
+       d = sqrt(d2);
+       wj = wij(d, nI);
+       wSum += wj;
+       xMean += ((GlobalPoses->at(nIdx))) * wj;
+       neighbors.push_back(nIdx);
+       if (d2 <= std::max(pD2, nD2))
+       {
+           closer_neighbor++;
+       }
+   }
+   if (_USE_XMEAN && !USE_POLY6)
+   {
+       if (wSum > 0)
+       {
+           xMean /= wSum;
+           xMean = (GlobalPoses->at(pIdx)) * (1 - _XMEAN_DELTA) + xMean * _XMEAN_DELTA;
+       }
+       else
+       {
+           xMean = (GlobalPoses->at(pIdx));
+       }
+   }
+   else
+   {
+       xMean = (GlobalPoses->at(pIdx));
+   }
+}
 
-//inline void Evaluator::compute_G_Yus(int pIdx, Eigen::Vector3f xMean, std::vector<int> neighbors, Eigen::Matrix3f &G)
-//{
-//    const float invH = 1/(_SMOOTH_FACTOR * (IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx)));
-//    // const float invH = 1/_SMOOTH_FACTOR;
-//    // const float invH = 0.5;
-//    float wSum = 0, d, wj;
-//    float nR, nI, nI2, d2;
-//    Eigen::Vector3f wd = Eigen::Vector3f::Zero();
-//    Eigen::Matrix3f cov = Eigen::Matrix3f::Zero();
-//    // cov += Eigen::DiagonalMatrix<float, 3>(invH, invH, invH);
-//    cov += Eigen::DiagonalMatrix<float, 3>(
-//        IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx],
-//        IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx], 
-//        IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx]);
-//    wSum = 0.0f;
-//    float pR, pD2, pI, pI2;
-//    pR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx);
-//    // pD = SmoothFactor * pR;
-//    // pD2 = IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx];
-//    pI = pR * _NEIGHBOR_FACTOR;
-//    pI2 = pI * pI;
-//    for (int nIdx : neighbors)
-//    {
-//        nR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(nIdx);
-//        nI = nR * _NEIGHBOR_FACTOR;
-//        nI2 = nI * nI;
-//        d2 = (((GlobalxMeans.at(nIdx))) - ((GlobalxMeans.at(pIdx)))).squaredNorm();
-//        if (d2 >= nI2)  //pI2
-//        {
-//            continue;
-//        }
-//        d = (GlobalxMeans.at(pIdx) - GlobalxMeans.at(nIdx)).norm();
-//        wj = wij(d, nI);    //pI
-//        wSum += wj;
-//        wd = ((GlobalxMeans.at(nIdx))) - xMean;
-//        cov += (wd * wd.transpose()) * wj;
-//    }
-//    cov /= wSum;
-//    Eigen::JacobiSVD<Eigen::Matrix3f> svd(cov, Eigen::ComputeFullU | Eigen::ComputeFullV);
-//    Eigen::Matrix3f u = svd.matrixU();
-//    Eigen::Vector3f w = svd.singularValues();
-//    Eigen::Matrix3f v = svd.matrixV();
-//    w = Eigen::Vector3f(w.array().abs());
-//    const float maxSingularVal = w.maxCoeff();
-//    // const float minSingularVal = w.minCoeff();
-//    // if ((maxSingularVal / minSingularVal) > M && (!GlobalSplash[pIdx]))
-//    // {
-//    //     GlobalSurface[pIdx] = true;
-//    // }
-//    const float kr = 4.0, ks = 1e7;//;1
-//    w[0] = std::max(w[0], maxSingularVal / kr);  // * invH* ks
-//    w[1] = std::max(w[1], maxSingularVal / kr);  // * invH* ks
-//    w[2] = std::max(w[2], maxSingularVal / kr);  // * invH* ks
-//    Eigen::Matrix3f invSigma = w.asDiagonal().inverse();
-//    // Compute G
-//    const float scale =
-//        std::pow(w[0] * w[1] * w[2], 1.0 / 3.0);  // volume preservation
+inline void Evaluator::compute_G_ours(int pIdx, Vec3f xMean, std::vector<int> neighbors, Mat3f &G)
+{
+    const float invH = 0.5;
+    float wSum = 0, d, wj;
+    float nR, nI, nI2, d2;
+    Eigen::Vector3f wd = Eigen::Vector3f::Zero();
+    Eigen::Matrix3f cov = Eigen::Matrix3f::Identity();
+    cov += Eigen::DiagonalMatrix<float, 3>(invH, invH, invH);
+    wSum = 0.0f;
+    float pR, pD2, pI, pI2;
+    pR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx);
+    // pD = SmoothFactor * pR;
+    // pD2 = IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx];
+    pI = pR * _NEIGHBOR_FACTOR;
+    pI2 = pI * pI;
+    for (int nIdx : neighbors)
+    {
+        nR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(nIdx);
+        nI = nR * _NEIGHBOR_FACTOR;
+        nI2 = nI * nI;
+        d2 = (((GlobalPoses->at(nIdx))) - ((GlobalPoses->at(pIdx)))).squaredNorm();
+        if (d2 >= nI2)  //pI2
+        {
+            continue;
+        }
+        d = (GlobalPoses->at(pIdx) - GlobalxMeans.at(nIdx)).norm();
+        wj = wij(d, nI);    //pI
+        wSum += wj;
+        auto vecWd = ((GlobalxMeans.at(nIdx))) - xMean;
+        wd << vecWd[0], vecWd[1], vecWd[2];
+        cov += (wd * wd.transpose()) * wj;
+    }
+    cov /= wSum;
+    Eigen::JacobiSVD<Eigen::Matrix3f> svd(cov, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    Eigen::Matrix3f u = svd.matrixU();
+    Eigen::Vector3f w = svd.singularValues();
+    Eigen::Matrix3f v = svd.matrixV();
+    
+    w = Eigen::Vector3f(w.array().abs());
+    const float maxSingularVal = w.maxCoeff();
+    const float kr = 4.0;
+    
+    w(0) = std::max(w(0), maxSingularVal / kr);  // * invH
+    w(1) = std::max(w(1), maxSingularVal / kr);  // * invH
+    w(2) = std::max(w(2), maxSingularVal / kr);  // * invH
+    
+    Eigen::Matrix3f invSigma = w.cwiseInverse().asDiagonal();
+    const float scale = std::pow(w(0) * w(1) * w(2), 1.0 / 3.0);  // volume preservation
+    Eigen::Matrix3f EigenG = (v * invSigma * u.transpose()) * scale * invH;
+   	for (size_t i = 0; i < 9; i++)
+	{
+       G.data[i] = EigenG(i);
+	}
+   // float detC = cov.determinant();
+   // float detG = G.determinant();
+}
+
+inline void Evaluator::compute_G_Yus(int pIdx, Vec3f xMean, std::vector<int> neighbors, Mat3f &G)
+{
+   const float invH = 1 / (_SMOOTH_FACTOR * (IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx)));
+   // const float invH = 1/_SMOOTH_FACTOR;
+   // const float invH = 0.5;
+   float wSum = 0, d, wj;
+   float nR, nI, nI2, d2;
+   Eigen::Vector3f wd = Eigen::Vector3f::Zero();
+   Eigen::Matrix3f cov = Eigen::Matrix3f::Zero();
+   // cov += Eigen::DiagonalMatrix<float, 3>(invH, invH, invH);
+   cov += Eigen::DiagonalMatrix<float, 3>(
+       IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx],
+       IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx], 
+       IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx]);
+   wSum = 0.0f;
+   float pR, pD2, pI, pI2;
+   pR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx);
+   // pD = SmoothFactor * pR;
+   // pD2 = IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx];
+   pI = pR * _NEIGHBOR_FACTOR;
+   pI2 = pI * pI;
+   for (int nIdx : neighbors)
+   {
+       nR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(nIdx);
+       nI = nR * _NEIGHBOR_FACTOR;
+       nI2 = nI * nI;
+       d2 = (((GlobalxMeans.at(nIdx))) - ((GlobalxMeans.at(pIdx)))).squaredNorm();
+       if (d2 >= nI2)  //pI2
+       {
+           continue;
+       }
+       d = (GlobalxMeans.at(pIdx) - GlobalxMeans.at(nIdx)).norm();
+       wj = wij(d, nI);    //pI
+       wSum += wj;
+    //    wd = ((GlobalxMeans.at(nIdx))) - xMean;
+       auto vecWd = ((GlobalxMeans.at(nIdx))) - xMean;
+       wd << vecWd[0], vecWd[1], vecWd[2];
+       cov += (wd * wd.transpose()) * wj;
+   }
+   cov /= wSum;
+   Eigen::JacobiSVD<Eigen::Matrix3f> svd(cov, Eigen::ComputeFullU | Eigen::ComputeFullV);
+   Eigen::Matrix3f u = svd.matrixU();
+   Eigen::Vector3f w = svd.singularValues();
+   Eigen::Matrix3f v = svd.matrixV();
+   w = Eigen::Vector3f(w.array().abs());
+   const float maxSingularVal = w.maxCoeff();
+   // const float minSingularVal = w.minCoeff();
+   // if ((maxSingularVal / minSingularVal) > M && (!GlobalSplash[pIdx]))
+   // {
+   //     GlobalSurface[pIdx] = true;
+   // }
+   const float kr = 4.0, ks = 1e7;//;1
+   w[0] = std::max(w[0], maxSingularVal / kr);  // * invH* ks
+   w[1] = std::max(w[1], maxSingularVal / kr);  // * invH* ks
+   w[2] = std::max(w[2], maxSingularVal / kr);  // * invH* ks
+   Eigen::Matrix3f invSigma = w.asDiagonal().inverse();
+   // Compute G
+   const float scale =
+       std::pow(w[0] * w[1] * w[2], 1.0 / 3.0);  // volume preservation
 //    G = (v * invSigma * u.transpose()) * scale;//* invH
-//    // float detC = cov.determinant();
-//    // float detG = G.determinant();
-//}
-//
-//void Evaluator::compute_Gs_xMeansCPU(){
+    auto EigenG = (v * invSigma * u.transpose()) * scale * invH;//
+    for (size_t i = 0; i < 9; i++)
+    {
+        G.data[i] = EigenG(i);
+    }
+}
+
+// void Evaluator::compute_Gs_xMeansCPU(){
 //    std::cout << "start compute_Gs_xMeansCPU " << std::endl;
 //    // #pragma omp parallel for
 //    for(int pIdx = 0; pIdx < _GlobalParticlesNum; pIdx++){
@@ -763,7 +730,7 @@ inline Vec3f Evaluator::IsotropicInterpolateGrad(const int pIdx, const float d2,
 //        int closerNeigbors = 0;
 //        Eigen::Vector3f xMean = Eigen::Vector3f::Zero();
 //        Eigen::Matrix3f G = Eigen::Matrix3f::Zero();
-//
+
 //        // std::cout << "idx: " << pIdx << std::endl;
 //        numNeighbors = findNeighborsCPU(pIdx, *_GlobalPoses, *GlobalRadius, _octreeNs, _box, _ngmax, tempNeighbors.data());
 //        tempNeighbors.resize(numNeighbors); 
@@ -780,9 +747,9 @@ inline Vec3f Evaluator::IsotropicInterpolateGrad(const int pIdx, const float d2,
 //            // GlobalxMeans[pIdx] = _GlobalPoses[pIdx];
 //            continue;
 //        } 
-//
+
 //        compute_xMeansCPU(pIdx, tempNeighbors, neighbors, closerNeigbors, xMean); 
-//
+
 //        if (neighbors.size() <= 1)
 //        {
 //            G = Eigen::DiagonalMatrix<float, 3>(1.0, 1.0, 1.0);
@@ -795,10 +762,10 @@ inline Vec3f Evaluator::IsotropicInterpolateGrad(const int pIdx, const float d2,
 //            GlobalxMeans[pIdx] = Eigen::Vector3f(xMean);
 //            continue;
 //        }
-//
+
 //        GlobalxMeans[pIdx] = Eigen::Vector3f(xMean);
 //    }
-//
+
 //    #pragma omp parallel for
 //    for (int pIdx = 0; pIdx < _GlobalParticlesNum; pIdx++)
 //    {
@@ -810,7 +777,7 @@ inline Vec3f Evaluator::IsotropicInterpolateGrad(const int pIdx, const float d2,
 //        Eigen::Matrix3f G = Eigen::Matrix3f::Identity();
 //        int numNeighbors;
 //        numNeighbors = findNeighborsCPU(pIdx, *_GlobalPoses, *GlobalRadius, _octreeNs, _box, _ngmax, tempNeighbors.data());
-//
+
 //        if (USE_ANI)
 //        {
 //            if (USE_POLY6)
@@ -823,103 +790,103 @@ inline Vec3f Evaluator::IsotropicInterpolateGrad(const int pIdx, const float d2,
 //            GlobalDeterminant[pIdx] = G.determinant();
 //        }
 //    }
-//
-//}
-//
-//void Evaluator::compute_Gs_xMeans()
-//{
-//#pragma omp parallel for
-//    for (int pIdx = 0; pIdx < _GlobalParticlesNum; pIdx++)
-//    {
-//        std::vector<int> tempNeighbors;
-//        std::vector<int> neighbors;
-//        int closerNeigbors = 0;
-//        Eigen::Vector3f xMean = Eigen::Vector3f::Zero();
-//        Eigen::Matrix3f G = Eigen::Matrix3f::Zero();
-//        if (IS_CONST_RADIUS)
-//        {
-//            _hashgrid->GetPIdxList((GlobalPoses->at(pIdx)), tempNeighbors);
-//        } else {
-//            // _searcher->GetNeighbors((GlobalPoses->at(pIdx)), tempNeighbors);
-//        }
-//        if (tempNeighbors.size() <= 2)
-//        {
-//            G = Eigen::DiagonalMatrix<float, 3>(1.0, 1.0, 1.0);
-//            // GlobalSplash[pIdx] = true;
-//            if (USE_ANI)
-//            {
-//                GlobalGs[pIdx] = Eigen::Matrix3f(G);
-//                GlobalDeterminant[pIdx] = G.determinant();
-//            }
-//            GlobalxMeans[pIdx] = GlobalPoses->at(pIdx);
-//            continue;
-//        }
-//
-//        compute_xMeans(pIdx, tempNeighbors, neighbors, closerNeigbors, xMean);
-//
-//        if (neighbors.size() <= 2)
-//        {
-//            G = Eigen::DiagonalMatrix<float, 3>(1.0, 1.0, 1.0);
-//            // GlobalSplash[pIdx] = true;
-//            if (USE_ANI)
-//            {
-//                GlobalGs[pIdx] = Eigen::Matrix3f(G);
-//                GlobalDeterminant[pIdx] = G.determinant();
-//            }
-//            GlobalxMeans[pIdx] = Eigen::Vector3f(xMean);
-//            continue;
-//        }
-//        // if (closerNeigbors < 1)
-//        // {
-//        //     G = Eigen::DiagonalMatrix<float, 3>(1.0, 1.0, 1.0);
-//        //     GlobalSplash[pIdx] = true;
-//        // } 
-//        // else
-//        // {
-//        //     if (USE_ANI)
-//        //     {
-//        //         compute_G_ours(pIdx, xMean, neighbors, G);
-//        //     }
-//        // }
-//        
-//        GlobalxMeans[pIdx] = Eigen::Vector3f(xMean);
-//        // if (USE_ANI)
-//        // {
-//        //     GlobalGs[pIdx] = Eigen::Matrix3f(G);
-//        //     GlobalDeterminant[pIdx] = G.determinant();
-//        // }
-//    }
-//
-//#pragma omp parallel for
-//    for (int pIdx = 0; pIdx < _GlobalParticlesNum; pIdx++)
-//    {
-//        if (CheckSplash(pIdx))
-//        {
-//            continue;
-//        }
-//        std::vector<int> tempNeighbors;
-//        Eigen::Matrix3f G = Eigen::Matrix3f::Identity();
-//        if (IS_CONST_RADIUS)
-//        {
-//            _hashgrid->GetPIdxList((GlobalPoses->at(pIdx)), tempNeighbors);
-//        } else {
-//            // _searcher->GetNeighbors((GlobalPoses->at(pIdx)), tempNeighbors);
-//        }
-//
-//
-//        if (USE_ANI)
-//        {
-//            if (USE_POLY6)
-//            {
-//                compute_G_ours(pIdx, GlobalxMeans[pIdx], tempNeighbors, G);
-//            } else {
-//                compute_G_Yus(pIdx, GlobalxMeans[pIdx], tempNeighbors, G);
-//            }
-//            GlobalGs[pIdx] = Eigen::Matrix3f(G);
-//            GlobalDeterminant[pIdx] = G.determinant();
-//        }
-//    }
-//}
+
+// }
+
+void Evaluator::compute_Gs_xMeans()
+{
+#pragma omp parallel for
+   for (int pIdx = 0; pIdx < _GlobalParticlesNum; pIdx++)
+   {
+       std::vector<int> tempNeighbors;
+       std::vector<int> neighbors;
+       int closerNeigbors = 0;
+       Vec3f xMean(0, 0, 0);
+    //    Mat3f G;
+       if (IS_CONST_RADIUS)
+       {
+           _hashgrid->GetPIdxList((GlobalPoses->at(pIdx)), tempNeighbors);
+       } else {
+           // _searcher->GetNeighbors((GlobalPoses->at(pIdx)), tempNeighbors);
+       }
+       if (tempNeighbors.size() <= 2)
+       {
+           Mat3f G(1.0, 1.0, 1.0);
+           // GlobalSplash[pIdx] = true;
+           if (USE_ANI)
+           {
+               GlobalGs[pIdx] = G;
+               GlobalDeterminant[pIdx] = G.determinant();
+           }
+           GlobalxMeans[pIdx] = GlobalPoses->at(pIdx);
+           continue;
+       }
+
+       compute_xMeans(pIdx, tempNeighbors, neighbors, closerNeigbors, xMean);
+
+       if (neighbors.size() <= 2)
+       {
+           Mat3f G(1.0, 1.0, 1.0);
+           // GlobalSplash[pIdx] = true;
+           if (USE_ANI)
+           {
+               GlobalGs[pIdx] = G;
+               GlobalDeterminant[pIdx] = G.determinant();
+           }
+           GlobalxMeans[pIdx] = xMean;
+           continue;
+       }
+       // if (closerNeigbors < 1)
+       // {
+       //     G = Eigen::DiagonalMatrix<float, 3>(1.0, 1.0, 1.0);
+       //     GlobalSplash[pIdx] = true;
+       // } 
+       // else
+       // {
+       //     if (USE_ANI)
+       //     {
+       //         compute_G_ours(pIdx, xMean, neighbors, G);
+       //     }
+       // }
+       
+       GlobalxMeans[pIdx] = Vec3f(xMean);
+       // if (USE_ANI)
+       // {
+       //     GlobalGs[pIdx] = Eigen::Matrix3f(G);
+       //     GlobalDeterminant[pIdx] = G.determinant();
+       // }
+   }
+
+#pragma omp parallel for
+   for (int pIdx = 0; pIdx < _GlobalParticlesNum; pIdx++)
+   {
+       if (CheckSplash(pIdx))
+       {
+           continue;
+       }
+       std::vector<int> tempNeighbors;
+       Mat3f G(1.0, 1.0, 1.0);
+       if (IS_CONST_RADIUS)
+       {
+           _hashgrid->GetPIdxList((GlobalPoses->at(pIdx)), tempNeighbors);
+       } else {
+           // _searcher->GetNeighbors((GlobalPoses->at(pIdx)), tempNeighbors);
+       }
+
+
+       if (USE_ANI)
+       {
+           if (USE_POLY6)
+           {
+               compute_G_ours(pIdx, GlobalxMeans[pIdx], tempNeighbors, G);
+           } else {
+               compute_G_Yus(pIdx, GlobalxMeans[pIdx], tempNeighbors, G);
+           }
+           GlobalGs[pIdx] = G;
+           GlobalDeterminant[pIdx] = G.determinant();
+       }
+   }
+}
 
 inline float Evaluator::wij(float d, float h)
 {

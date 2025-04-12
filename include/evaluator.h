@@ -18,7 +18,7 @@
 using namespace cstoneOctree;
 class Evaluator
 {
-private:
+public:
     const float sqrt2 = 1.4142135623730950488016887242097;
     const float sqrt3 = 1.7320508075688772935274463415059;
     const float sqrt11 = 3.3166247903553998491149327366707;
@@ -41,19 +41,16 @@ private:
     float Bspline_kernel(float ratio, float sigma);
     float Gaussian_kernel(float ratio2, float sigma);
     Vec3f poly6_gradient_kernel(float d2, float h2, float sigma, Vec3f diff);
-#if USE_ANI
-    Eigen::Vector3f Bspline_gradient_kernel(float ratio, float sigma, Eigen::Vector3f diff);
-	float AnisotropicInterpolate(const int pIdx, const Eigen::Vector3f diff);
-    Eigen::Vector3f AnisotropicInterpolateGrad(const int pIdx, const Eigen::Vector3f diff);
-    void compute_xMeans(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Eigen::Vector3f &xMean);
-    void compute_G_ours(int pIdx, Eigen::Vector3f xMean, std::vector<int> neighbors, Eigen::Matrix3f &G);
-    void compute_G_Yus(int pIdx, Eigen::Vector3f xMean, std::vector<int> neighbors, Eigen::Matrix3f &G);
-#endif // USE_ANI
+    Vec3f Bspline_gradient_kernel(float ratio, float sigma, Vec3f diff);
+	float AnisotropicInterpolate(const int pIdx, const Vec3f diff);
+    Vec3f AnisotropicInterpolateGrad(const int pIdx, const Vec3f diff);
+    void compute_xMeans(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Vec3f &xMean);
+    void compute_G_ours(int pIdx, Vec3f xMean, std::vector<int> neighbors, Mat3f &G);
+    void compute_G_Yus(int pIdx, Vec3f xMean, std::vector<int> neighbors, Mat3f &G);
     Vec3f IsotropicInterpolateGrad(const int pIdx, const float d2, const Vec3f diff);
 	float IsotropicInterpolate(const int pIdx, const float d);
 	float wij(float d, float r);
 
-public:
 	Evaluator() {};
 	~Evaluator() {};
 
@@ -76,13 +73,11 @@ public:
     std::vector<bool> GlobalSplash;
     std::vector<bool> GlobalSurface;
     std::vector<Vec3f> PariclesNormals;
-#if USE_ANI
-	std::vector<Eigen::Vector3f> GlobalxMeans;
-    std::vector<Eigen::Matrix3f> GlobalGs;
+	std::vector<Vec3f> GlobalxMeans;
+    std::vector<Mat3f> GlobalGs;
     std::vector<float> GlobalDeterminant;
 	void compute_Gs_xMeans();
-    void compute_Gs_xMeansCPU();
-#endif // USE_ANI
+    // void compute_Gs_xMeansCPU();
 	Evaluator(  std::shared_ptr<HashGrid>& hashgrid,
                 std::shared_ptr<MultiLevelSearcher>& searcher,
                 std::vector<Vec3f>* global_particles, 

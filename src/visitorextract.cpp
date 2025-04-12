@@ -43,7 +43,7 @@ void VisitorExtract::calc_vertices()
 {
 	dual_cells.resize(dual_grids.size());
 #pragma omp parallel for 
-	for (size_t i = 0; i < dual_grids.size(); i++)
+	for (ptrdiff_t i = 0; i < dual_grids.size(); i++)
 	{
 		auto calculate_point = [&](int e_index, int v_index1, int v_index2) {
 			auto& v1 = *dual_grids[i].grid[v_index1];

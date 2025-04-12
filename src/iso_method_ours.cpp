@@ -81,11 +81,11 @@ void TNode::NodeSampling(
 	bool origin_sign;
 	signchange = false;
 	constructor->getEvaluator()->GridEval(sample_points, sample_grads, cellsize, signchange, constructor->getOverSampleQEF(), false);
-	// Eigen::Vector3f norms(0, 0, 0);
+	// Vec3f norms(0, 0, 0);
 	// float area = 0;
 	// for (int i = 0; i < pow(constructor->getOverSampleQEF() + 1, 3); i++)
 	// {
-	// 	Eigen::Vector3f n(
+	// 	Vec3f n(
 	// 		sample_grads[i * 3 + 0], 
 	// 		sample_grads[i * 3 + 1], 
 	// 		sample_grads[i * 3 + 2]);

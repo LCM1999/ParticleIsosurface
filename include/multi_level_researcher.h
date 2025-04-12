@@ -34,6 +34,10 @@ public:
     inline float getAvgRadius() {return avgRadius;}
     inline float getParticlesNum() {return particlesNum;}
 
+    void GetNeighborsEstimate(const cstoneOctree::Vec3f& pos, int& estimate);
     void GetNeighbors(const cstoneOctree::Vec3f& pos, std::vector<int>& neighbors);
+    void GetNeighbors(const cstoneOctree::Vec3f& pos, int& numNeighbors, int ngmax, int* neighbors);
+    void GetInBoxEstimate(const cstoneOctree::Vec3f& box1, const cstoneOctree::Vec3f& box2, int& insides);
     void GetInBoxParticles(const cstoneOctree::Vec3f& box1, const cstoneOctree::Vec3f& box2, std::vector<int>& insides);
+    void GetInBoxParticles(cstoneOctree::Vec3f box1, cstoneOctree::Vec3f box2, int& numNeighbors, int ngmax, int* insides);
 };

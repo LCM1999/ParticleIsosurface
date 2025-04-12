@@ -1,4 +1,6 @@
 #pragma once
+#ifndef OCTREE_FUNC_H
+#define OCTREE_FUNC_H
 
 #include <cassert>
 #include <cmath>
@@ -182,9 +184,9 @@ void calculateNodeCentersAndSizesCPU(std::vector<uint64_t>& prefixes, std::vecto
 
 void calculateNodeCentersAndSizesCPU(std::vector<uint64_t>& prefixes, std::vector<Vec3f>& centers, std::vector<Vec3f>& sizes, Box& box, int idx);
 
-void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves, std::vector<Vec3f>& centers, std::vector<Vec3f>& sizes, Box& box);
+void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves, std::vector<Vec3f>& centers, std::vector<Vec3f>& sizes, std::vector<unsigned>& levels, Box& box);
 
-void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves, std::vector<Vec3f>& centers, std::vector<Vec3f>& sizes, Box& box, int idx);
+void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves, std::vector<Vec3f>& centers, std::vector<Vec3f>& sizes, std::vector<unsigned>& levels, Box& box, int idx);
 
 void findNeighborsCPU(std::vector<Vec3f>& particles, std::vector<float>& radiuses, OctreeNs& octreeNs, Box& box, int ngmax, std::vector<int>& neighbors, std::vector<int>& numNeighbors);
 
@@ -215,3 +217,4 @@ __global__ void calculateNodeCentersAndSizesKernel(uint64_t* prefixesDevice, int
 __global__ void findNeighborsKernel(Vec3f* coordsDevice, int coords_size, float* radiusesDevice, OctreeNs* octreeNs, Box* boxDevice, int ngmax, int* neighborsDevice, int* numNeighborsDevice);
 
 }
+#endif

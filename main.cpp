@@ -20,6 +20,7 @@
 #include "timer.h"
 
 #ifdef _WIN32
+#define NOMINMAX
 #include <windows.h>
 #include <io.h>
 #else
@@ -63,7 +64,6 @@ void writeObjFile(Mesh &m, std::string fn)
         fprintf(f, "f %d %d %d\n", t.v[0], t.v[1], t.v[2]);
     }
     fclose(f);
-    std::cout << "Output Done" << std::endl;
 }
 
 int writePlyFile(Mesh& m, std::string fn)
@@ -127,10 +127,6 @@ void loadConfigJson(std::string dataPath)
         if (readInJSON.contains("USE_ANI"))
         {
             USE_ANI = readInJSON.at("USE_ANI");
-            if (USE_ANI)
-            {
-#define USE_ANI 1
-            }
         }
         if (readInJSON.contains("USE_OURS"))
         {
@@ -452,7 +448,9 @@ void runOurs(std::string dataDirPath, std::string outPath)
         }
         printf("Particles Number = %zd\n", particles.size());
         SurfReconstructor* constructor = new SurfReconstructor(particles, radiuses, &mesh, RADIUS);
-        constructor->Run(ISO_FACTOR, SMOOTH_FACTOR);
+        // constructor->Run(ISO_FACTOR, SMOOTH_FACTOR);
+        constructor->RunCPU2(ISO_FACTOR, SMOOTH_FACTOR);
+        exit(1);
         std::string output_name = frame.substr(0, frame.find_last_of('.'));
         std::cout << "Output path: " << outPath + "/" + output_name + "." + OUTPUT_TYPE<< std::endl; 
         
@@ -589,8 +587,8 @@ void testHashGrid(int sampleNum, std::string dataPath)
     // std::shuffle(indexes.begin(), indexes.end(), g);
     std::vector<cstoneOctree::Vec3f> samples;
     samples.resize(sampleNum);
-    #pragma omp parallel for
-    for (size_t i = 0; i < sampleNum; i++)
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < sampleNum; i++)
     {
         samples[i] = getRandomPos(_BoundingBox, u(e1), u(e1), u(e1));
     }
@@ -681,30 +679,30 @@ int main(int argc, char **argv)
     case 1:
     default:
         dataDirPath =
-        "/home/letian/Letian_Xie/work/ParticleIsosurface/test_cases";
+        // "/home/letian/Letian_Xie/work/ParticleIsosurface/test_cases";
         // "D:/data/inWater/particles";
         // "E:/data/geo";
         // "D:/data/3s/20231222-water";
         // "D:/data/car_render_test_data_2/Fluid";
-        // "E:/data/damBreak3D-27steps";
+        "D:/data/damBreak3D-27steps";
         // "E:/BaiduNetdiskDownload/MultiResolutionResults/damBreak3D";
         // "E:/data/ring/csv";
         // "E:/data/oil_csv";
         // "D:/data/test";
         // "C:/Users/11379/Desktop/protein";
-        // outPath = 
+        outPath = 
         // "D:/data/multiR/mr_csv";
         // "D:/data/inWater/particles/out";
         // "E:/data/geo/out";
         // "D:/data/3s/20231222-water/out";
         // "D:/data/car_render_test_data_2/Fluid/out";
-        // "E:/data/damBreak3D-27steps/out";
+        "D:/data/damBreak3D-27steps/out";
         // "E:/BaiduNetdiskDownload/MultiResolutionResults/damBreak3D/out";
         // "E:/data/ring/csv/out";
         // "E:/data/oil_csv/out";
         // "D:/data/test/out";
         // "C:/Users/11379/Desktop/protein/out";
-        outPath = "/home/letian/Letian_Xie/work/ParticleIsosurface/test_cases";
+        // outPath = "/home/letian/Letian_Xie/work/ParticleIsosurface/test_cases";
         loadConfigJson(dataDirPath);
         // testHashGrid(5000000, dataDirPath + "/" + DATA_PATHES[0]);
         //if (USE_OURS)

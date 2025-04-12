@@ -1,4 +1,7 @@
 #pragma once
+#ifndef UTILS_H
+#define UTILS_H
+
 #include <vector>
 #include <string>
 #include <typeinfo>
@@ -56,4 +59,5 @@ void parseStringToElements(std::vector<T>* elements, std::string& input, std::st
 		input.clear();
 	}
 }
+#endif
 

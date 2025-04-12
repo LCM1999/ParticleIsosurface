@@ -2,6 +2,7 @@
 #define Timer_H
 
 #ifdef _WIN32
+#define NOMINMAX
 #include <windows.h>
 #include <Psapi.h>
 
@@ -45,6 +46,5 @@ public:
 
 #endif
 
-double get_time();
-
 #endif
+

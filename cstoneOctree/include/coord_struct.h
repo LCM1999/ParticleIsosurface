@@ -1,4 +1,6 @@
 #pragma once
+#ifndef COORD_STRUCT_H
+#define COORD_STRUCT_H
 
 #include <iostream>
 #include <vector>
@@ -182,6 +184,14 @@ struct Vec3
 	{
         return sqrt(squaredNorm());
 	}
+
+    HOST_DEVICE void normalize()
+    {
+        float n = norm();
+        x /= n;
+        y /= n;
+        z /= n;
+    }
 
 	HOST_DEVICE bool isZero() const
 	{
@@ -454,6 +464,13 @@ struct Mat3f
         data[8] = i;
     }
 
+    HOST_DEVICE Mat3f(float a, float b, float c)
+    {
+        data[0] = a;
+        data[4] = b;
+        data[8] = c;
+    }
+
  //   HOST_DEVICE Mat3f(const Eigen::Matrix3f &mat)
 	//{
  //       for (size_t i = 0; i < 9; i++)
@@ -539,6 +556,13 @@ struct Mat3f
         return *this;
     }
 
+    HOST_DEVICE float determinant()
+    {
+        return data[0] * (data[4] * data[8] - data[5] * data[7]) 
+            -  data[1] * (data[3] * data[8] - data[5] * data[6]) 
+            +  data[2] * (data[3] * data[7] - data[4] * data[6]);
+    }
+
  //   HOST_DEVICE Mat3f& operator=(const Eigen::Matrix3f mat)
  //   {
 	//	for (size_t i = 0; i < 9; i++)
@@ -558,3 +582,4 @@ struct Mat3f
 };
 
 }
+#endif

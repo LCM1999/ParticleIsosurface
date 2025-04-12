@@ -280,7 +280,7 @@ void SurfReconstructor::afterSampleEval(
 
 void SurfReconstructor::genIsoOurs()
 {
-    float t_start = get_time();
+    timer t;
 
 	auto sign = [&](unsigned int x)
 	{
@@ -297,7 +297,7 @@ void SurfReconstructor::genIsoOurs()
 		_OurRoot->half_length = _RootHalfLength;
 	} else if (_STATE == 1) {
 		printf("-= Generate Surface =-\n");
-		float t_gen_mesh = get_time();
+		timer t_gen_mesh;
 		_OurMesh->tris.reserve(1000000);
 		VisitorExtract v(this, _OurMesh);
 		TraversalData td(_OurRoot);
@@ -327,8 +327,7 @@ void SurfReconstructor::genIsoOurs()
 				_OurMesh->AppendSplash_VarR(splash_pos, splash_radiuses);
 			}
 		}
-		float t_alldone = get_time();
-		printf("Time generating polygons = %f\n", t_alldone - t_gen_mesh);
+		printf("Time generating polygons = %f\n", t_gen_mesh.elapsed());
 		return;
 	}
 	// int depth = 0;
@@ -356,13 +355,10 @@ void SurfReconstructor::genIsoOurs()
 		cuvrs.resize(queue_flag);
 		min_raiduses.resize(queue_flag);
 		emptys.resize(queue_flag);
-		#pragma omp parallel
 		{
-			#pragma omp single
 			{
 				for (size_t i = 0; i < queue_flag; i++)
 				{
-					#pragma omp task
 						beforeSampleEval(*ProcessArray[i], cuvrs[i], min_raiduses[i], emptys[i]);
 				}
 			}
@@ -380,15 +376,12 @@ void SurfReconstructor::genIsoOurs()
 		sample_points = new float[int(pow(getOverSampleQEF()+1, 3)) * 4 * queue_flag];
 		sample_grads = new float[int(pow(getOverSampleQEF()+1, 3)) * 3 * queue_flag];
 		//TODO: Sampling
-		#pragma omp parallel
 		{
-			#pragma omp single
 			{
 				for (size_t i = 0; i < queue_flag; i++)
 				{
 					if (!emptys[i])
 					{
-						#pragma omp task
 							afterSampleEval(
 									*ProcessArray[i], cuvrs[i], min_raiduses[i], 
 									sample_points + int(i * pow(getOverSampleQEF()+1, 3) * 4), 
@@ -418,8 +411,7 @@ void SurfReconstructor::genIsoOurs()
 	ProcessArray.clear();
 	delete[] sample_points;
 	delete[] sample_grads;
-	float t_finish = get_time();
-	printf("Time generating tree = %f\n", t_finish - t_start);	
+	printf("Time generating tree = %f\n", t.elapsed());	
 	_STATE++;
 }
 
@@ -434,8 +426,7 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 	_OurMesh->reset();
 
 	printf("-= Run =-\n");
-	float time_all_start = get_time();
-	float temp_time, last_temp_time;
+	timer t;
 
 	loadRootBox();
 
@@ -600,10 +591,9 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 	_evaluator->setIsoFactor(iso_factor);
 	//_evaluator->compute_Gs_xMeansCPU();
 
-	last_temp_time = temp_time;
-	temp_time = get_time();
-	printf("   Initialize Evaluator Time = %f \n", temp_time - last_temp_time);
-	
+	printf("   Initialize Evaluator Time = %f \n", t.elapsed());
+	t.reset();	
+
 	printf("-= Resize Box =-\n");
 	// shrinkBox();
 	if (IS_CONST_RADIUS)
@@ -620,13 +610,11 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 	IS_CONST_RADIUS ? _evaluator->RecommendIsoValueConstR() : _evaluator->RecommendIsoValueVarR();
     printf("   Recommend Iso Value = %f\n", _evaluator->getIsoValue());
 
-	temp_time = get_time();
 	if (CALC_P_NORMAL)
 	{
 		_evaluator->CalcParticlesNormal();
-		last_temp_time = temp_time;
-		temp_time = get_time();
-		printf("   Calculate Particals Normal Time = %f\n", temp_time - last_temp_time);
+		printf("   Calculate Particals Normal Time = %f\n", t.elapsed());
+		t.reset();
 	}
 
 	// ----------- generating iso surface octree ---------
@@ -654,7 +642,7 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 		// }
 		std::vector<Vec3f> iso_centers(iso_tree_size);
 		std::vector<Vec3f> iso_sizes(iso_tree_size);
-		calculateLeavesCentersAndSizesCPU(iso_tree, iso_centers, iso_sizes, box);
+		// calculateLeavesCentersAndSizesCPU(iso_tree, iso_centers, iso_sizes, box);
 
 		// ---- iso surface split decision making ----
 		std::vector<float> sample_points(int(std::pow(getOverSampleQEF() + 1, 3) * 4 * iso_tree_size));
@@ -666,9 +654,9 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 		std::vector<int> nodes_type(iso_tree_size, 1);
 		scalars = std::vector<float>(iso_tree_size, 0.0); // Stores each tree nodes' scalar value on dual vertices
 		std::vector<uint64_t> iso_nodeOps(iso_tree.size(), 0); // Store the split decision for each node (the split decision is based on whether the node has isosurface)
-
+					// bool
 		// #pragma omp parallel for
-		for(int i = 0; i < iso_tree_size; i++){
+		for(int i = 0; i < iso_tree_size; i++) {
 			// begin beforeSampleEval
 			Vec3f center = iso_centers[i];
 			Vec3f box1 = center - Vec3f(iso_sizes[i].x, iso_sizes[i].y, iso_sizes[i].z);
@@ -682,6 +670,9 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 			int mortonCodesSize = _mortonCodes.size();
 			uint64_t nodeStartVal = iso_tree[i];
 			uint64_t nodeEndVal = iso_tree[i + 1];
+			// here, a better method could be estimate neighbors size by counting leaves which covered by box.
+			// however, i dont know how to get leaf info in searching tree
+			// so, TODO()
 			auto rangeStart = cal::lower_bound(_mortonCodes.data(), _mortonCodes.data() + mortonCodesSize, nodeStartVal);
 			auto rangeEnd = cal::lower_bound(_mortonCodes.data(), _mortonCodes.data() + mortonCodesSize, nodeEndVal);
 			int index_start = std::distance(_mortonCodes.data(), rangeStart);
@@ -690,15 +681,15 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 				insideParticlesIdx.push_back(index);
 			}
 			emptys[i] = insideParticlesIdx.empty();
-
 			curvs[i] = (area == 0) ? 1.0 : (norms.norm() / area);
-
 			if(emptys[i]){
 				scalars[i] = _evaluator->getIsoValue();
 				nodes_type[i] = 0;
 			}
 		}
+		//
 		
+		//
 		uint64_t iso_allOpsSum = std::accumulate(iso_nodeOps.begin(), iso_nodeOps.end(), 0);
 		// exclusive_csan ops to get new octree indices
 		std::vector<uint64_t> iso_nodeOpsLayout(iso_nodeOps.size());
@@ -722,67 +713,57 @@ void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
 		if(iso_allOpsSum == iso_nodeOps.size() - 1) break;
 	} // end octree generation loop
 
-	//  ---  link iso octree (tree node and internal node) ---
-	int iso_numLeafNodes = iso_tree.size() - 1; // tree size minus 1 because the range end variable is added before.
-    int iso_numInternalNodes = (iso_numLeafNodes - 1) / 7; // number of nodes which is not leaf nodes
-    int iso_numNodes         = iso_numLeafNodes + iso_numInternalNodes; // total number of nodes (leaf nodes + internal nodes)
-	std::vector<uint64_t> iso_prefixes;  // used to delete the righthand side 0 bits for each morton code
-    std::vector<TreeNodeIndex> iso_internalToLeaf;
-    std::vector<TreeNodeIndex> iso_leafToInternal;
-    std::vector<TreeNodeIndex> iso_childOffsets;
-	iso_prefixes.resize(iso_numNodes);
-	iso_internalToLeaf.resize(iso_numNodes);
-    iso_leafToInternal.resize(iso_numNodes);
-    iso_childOffsets.resize(iso_numNodes + 1);
-    std::vector<TreeNodeIndex> iso_parents;
-    std::vector<int> iso_levelRange;
-    iso_parents.resize(std::max(1, (iso_numNodes - 1) / 8));
-    iso_levelRange.resize(21 + 2);
+	// //  ---  link iso octree (tree node and internal node) ---
+	// int iso_numLeafNodes = iso_tree.size() - 1; // tree size minus 1 because the range end variable is added before.
+    // int iso_numInternalNodes = (iso_numLeafNodes - 1) / 7; // number of nodes which is not leaf nodes
+    // int iso_numNodes         = iso_numLeafNodes + iso_numInternalNodes; // total number of nodes (leaf nodes + internal nodes)
+	// std::vector<uint64_t> iso_prefixes;  // used to delete the righthand side 0 bits for each morton code
+    // std::vector<TreeNodeIndex> iso_internalToLeaf;
+    // std::vector<TreeNodeIndex> iso_leafToInternal;
+    // std::vector<TreeNodeIndex> iso_childOffsets;
+	// iso_prefixes.resize(iso_numNodes);
+	// iso_internalToLeaf.resize(iso_numNodes);
+    // iso_leafToInternal.resize(iso_numNodes);
+    // iso_childOffsets.resize(iso_numNodes + 1);
+    // std::vector<TreeNodeIndex> iso_parents;
+    // std::vector<int> iso_levelRange;
+    // iso_parents.resize(std::max(1, (iso_numNodes - 1) / 8));
+    // iso_levelRange.resize(21 + 2);
 
-	createUnsortedLayoutCPU(iso_tree, iso_numInternalNodes, iso_numLeafNodes, iso_prefixes, iso_internalToLeaf);	
-	cal::sort_by_key_cpu(iso_prefixes.data(), iso_prefixes.data() + iso_prefixes.size(), iso_internalToLeaf.data());
+	// createUnsortedLayoutCPU(iso_tree, iso_numInternalNodes, iso_numLeafNodes, iso_prefixes, iso_internalToLeaf);	
+	// cal::sort_by_key_cpu(iso_prefixes.data(), iso_prefixes.data() + iso_prefixes.size(), iso_internalToLeaf.data());
 
-	invertOrderCPU(iso_internalToLeaf, iso_leafToInternal, iso_numNodes, iso_numInternalNodes);
-	// Calculate node range for each tree level
-	getLevelRangeCPU(iso_prefixes, iso_numNodes, iso_levelRange);
-	cal::fill_data_cpu(iso_childOffsets.data(), iso_numNodes + 1, 0);
+	// invertOrderCPU(iso_internalToLeaf, iso_leafToInternal, iso_numNodes, iso_numInternalNodes);
+	// // Calculate node range for each tree level
+	// getLevelRangeCPU(iso_prefixes, iso_numNodes, iso_levelRange);
+	// cal::fill_data_cpu(iso_childOffsets.data(), iso_numNodes + 1, 0);
 
-	linkOctreeCPU(iso_prefixes,
-				iso_numInternalNodes,
-				iso_leafToInternal,
-				iso_levelRange,
-				iso_childOffsets,
-				iso_parents);
+	// linkOctreeCPU(iso_prefixes,
+	// 			iso_numInternalNodes,
+	// 			iso_leafToInternal,
+	// 			iso_levelRange,
+	// 			iso_childOffsets,
+	// 			iso_parents);
 	
-	std::vector<Vec3f> iso_centers(iso_numNodes);
-	std::vector<Vec3f> iso_sizes(iso_numNodes);
-	calculateNodeCentersAndSizesCPU(iso_prefixes, iso_centers, iso_sizes, box);
-	std::cout << "iso centers[0]: " << iso_centers[0].x << ", " << iso_centers[0].y << ", " << iso_centers[0].z << std::endl;
-	std::cout << "iso size[0]: " << iso_sizes[0].x << ", " << iso_sizes[0].y << ", " << iso_sizes[0].z << std::endl;
+	// std::vector<Vec3f> iso_centers(iso_numNodes);
+	// std::vector<Vec3f> iso_sizes(iso_numNodes);
+	// calculateNodeCentersAndSizesCPU(iso_prefixes, iso_centers, iso_sizes, box);
+	// std::cout << "iso centers[0]: " << iso_centers[0].x << ", " << iso_centers[0].y << ", " << iso_centers[0].z << std::endl;
+	// std::cout << "iso size[0]: " << iso_sizes[0].x << ", " << iso_sizes[0].y << ", " << iso_sizes[0].z << std::endl;
 
-    std::vector<int> iso_layout(iso_numLeafNodes + 1); // particle layout. This is not used in iso octree
-	IsoOctreeNs iso_octreeNs(iso_prefixes.data(), iso_childOffsets.data(), iso_leafToInternal.data(), iso_internalToLeaf.data(), iso_levelRange.data(), scalars.data(), iso_centers.data(), iso_sizes.data());
+    // std::vector<int> iso_layout(iso_numLeafNodes + 1); // particle layout. This is not used in iso octree
+	// IsoOctreeNs iso_octreeNs(iso_prefixes.data(), iso_childOffsets.data(), iso_leafToInternal.data(), iso_internalToLeaf.data(), iso_levelRange.data(), scalars.data(), iso_centers.data(), iso_sizes.data());
 
 	// extract the isosurface value
 	
-
-
 }
 
-void SurfReconstructor::Run(float iso_factor, float smooth_factor)
+void SurfReconstructor::RunCPU2(float iso_factor, float smooth_factor)
 {
-	printf("-= Run =-\n");
-	_OurRoot = nullptr;
-    _OurMesh->reset();
-    _STATE = 0;
-
-    float time_all_start = get_time();
-	float temp_time, last_temp_time;
+	timer t;
 
 	printf("-= Box =-\n");
 	loadRootBox();
-
-	temp_time = get_time();
 
 	printf("-= Build Neighbor Searcher =-\n");
 	if (IS_CONST_RADIUS)
@@ -791,34 +772,17 @@ void SurfReconstructor::Run(float iso_factor, float smooth_factor)
 	} else {
 		_searcher = std::make_shared<MultiLevelSearcher>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
 	}
-    last_temp_time = temp_time;
-    temp_time = get_time();
-	printf("   Build Neighbor Searcher Time = %f \n", temp_time - last_temp_time);
+	printf("   Build Neighbor Searcher Time = %f \n", t.elapsed());
+	t.reset();
 
     printf("-= Initialize Evaluator =-\n");
 	_evaluator = std::make_shared<Evaluator>(_hashgrid, _searcher, &_GlobalParticles, &_GlobalRadiuses, _RADIUS);
 	_evaluator->setSmoothFactor(smooth_factor);
 	_evaluator->setIsoFactor(iso_factor);
-	//_evaluator->compute_Gs_xMeans();
-	// if (USE_POLY6)
-	// {
-	// 	if (IS_CONST_RADIUS)
-	// 	{
-	// 		_hashgrid.reset();
-	// 		_hashgrid = std::make_shared<HashGrid>(&_GlobalParticles, _BoundingBox, _RADIUS, 2.0f);
-	// 		_evaluator->_hashgrid = _hashgrid;
-	// 	} else {
-	// 		_searcher.reset();
-	// 		_searcher = std::make_shared<MultiLevelSearcher>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 2.0f);
-	// 		_evaluator->_searcher = _searcher;
-	// 	}
-	// }
-	last_temp_time = temp_time;
-	temp_time = get_time();
-	printf("   Initialize Evaluator Time = %f \n", temp_time - last_temp_time);
-	
+	_evaluator->compute_Gs_xMeans();
+	printf("   Initialize Evaluator Time = %f \n", t.elapsed());
+	t.reset();
 	printf("-= Resize Box =-\n");
-	// shrinkBox();
 	if (IS_CONST_RADIUS)
 	{
 		resizeRootBoxConstR();
@@ -832,14 +796,340 @@ void SurfReconstructor::Run(float iso_factor, float smooth_factor)
 	
 	IS_CONST_RADIUS ? _evaluator->RecommendIsoValueConstR() : _evaluator->RecommendIsoValueVarR();
     printf("   Recommend Iso Value = %f\n", _evaluator->getIsoValue());
-	// _evaluator->setIsoValue(0.4033877702884984e+30);
-	temp_time = get_time();
 	if (CALC_P_NORMAL)
 	{
 		_evaluator->CalcParticlesNormal();
-		last_temp_time = temp_time;
-		temp_time = get_time();
-		printf("   Calculate Particals Normal Time = %f\n", temp_time - last_temp_time);
+		printf("   Calculate Particals Normal Time = %f\n", t.elapsed());
+		t.reset();
+	}
+
+	// ----------- generating iso surface octree ---------
+	std::vector<uint64_t> iso_tree;
+	// iso_tree.assign(_tree.begin(), _tree.end());
+	iso_tree.resize(1 + 1);
+	cal::fill_data_cpu(iso_tree.data(), 1, 0);
+	cal::fill_data_cpu(iso_tree.data() + 1, 1, uint64_t(1) << 63);
+
+	int iso_count = 0;
+	std::vector<float> scalars; // used to store each leaf nodes' scalar value on dual vertices. important for isosurface generation
+
+	cstoneOctree::Box box(_BoundingBox[0], _BoundingBox[1], _BoundingBox[2], 
+						  _BoundingBox[3], _BoundingBox[4], _BoundingBox[5]);
+	
+	while(1){
+		// ---- iso octree's info calculation ----
+		int iso_tree_size = iso_tree.size() - 1;
+		std::cout << "tree size in loop " << iso_count << ": " << iso_tree_size << std::endl;
+		std::vector<uint64_t> iso_prefixes(iso_tree_size);
+
+		// calculate prefixes for each node
+		// for(int i = 0; i < iso_tree_size; i++){
+		// 	uint64_t curr_key = iso_tree[i];
+		// 	if(!isPowerOf8(iso_tree[i + 1] - curr_key)) printf("The index %d is not the power of 8\n", i);
+		// 	unsigned curr_level = treeLevel(iso_tree[i + 1] - curr_key);
+		// 	iso_prefixes[i] = encodePlaceholderBit(curr_key, 3 * curr_level);	
+		// }
+		std::vector<Vec3f> iso_centers(iso_tree_size);
+		std::vector<Vec3f> iso_sizes(iso_tree_size);
+		std::vector<unsigned> iso_levels(iso_tree_size);
+		calculateLeavesCentersAndSizesCPU(iso_tree, iso_centers, iso_sizes, iso_levels, box);
+
+		// ---- iso surface split decision making ----
+		// std::vector<float> sample_points(int(std::pow(getOverSampleQEF() + 1, 3) * 4 * iso_tree_size));
+		// std::vector<float> sample_grads(int(std::pow(getOverSampleQEF() + 1, 3) * 4 * iso_tree_size));
+		std::vector<float> curvs(iso_tree_size);
+		std::vector<float> min_radiuses(iso_tree_size);	
+		std::vector<unsigned char> emptys(iso_tree_size, 0);
+		// std::vector<float> iso_values(iso_tree_size);
+		// std::vector<int> nodes_type(iso_tree_size, 1);
+		scalars = std::vector<float>(iso_tree_size, 0.0); // Stores each tree nodes' scalar value on dual vertices
+		std::vector<uint64_t> iso_nodeOps(iso_tree.size(), 0); // Store the split decision for each node (the split decision is based on whether the node has isosurface)
+					// bool
+		// #pragma omp parallel for
+		for(int i = 0; i < iso_tree_size; i++) {
+			// begin beforeSampleEval
+			Vec3f center = iso_centers[i];
+			Vec3f box1 = center - Vec3f(iso_sizes[i].x, iso_sizes[i].y, iso_sizes[i].z);
+			Vec3f box2 = center + Vec3f(iso_sizes[i].x, iso_sizes[i].y, iso_sizes[i].z);
+			int estimateNeighborsNum = 0;
+			int trueNeighborsNum = 0;
+			std::vector<int> insideParticlesIdx;
+			if (IS_CONST_RADIUS)
+			{
+				_hashgrid->GetInBoxEstimate(box1, box2, estimateNeighborsNum);
+				insideParticlesIdx.resize(estimateNeighborsNum);
+				_hashgrid->GetInBoxParticles(box1, box2, trueNeighborsNum, estimateNeighborsNum, insideParticlesIdx.data());
+			} else {
+				_searcher->GetInBoxEstimate(box1, box2, estimateNeighborsNum);
+				insideParticlesIdx.resize(estimateNeighborsNum);
+				_searcher->GetInBoxParticles(box1, box2, trueNeighborsNum, estimateNeighborsNum, insideParticlesIdx.data());
+			}
+			// check empty and calculate curvature implentation below
+			cstoneOctree::Vec3f norms(0, 0, 0);
+			float area = 0.0f;
+			min_radiuses[i] = IS_CONST_RADIUS ? _GlobalRadiuses[i] : FLT_MAX;
+			emptys[i] = trueNeighborsNum == 0;
+			if (!emptys[i])
+			{
+				bool allSplash = true;
+				for (int j = 0; j < trueNeighborsNum; j++) {
+					int in = insideParticlesIdx[j];
+					if (!_evaluator->CheckSplash(in))
+					{
+						if (_GlobalParticles[in].x > (box1.x - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())) && 
+							_GlobalParticles[in].x < (box2.x + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())) &&
+							_GlobalParticles[in].y > (box1.y - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())) && 
+							_GlobalParticles[in].y < (box2.y + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())) &&
+							_GlobalParticles[in].z > (box1.z - ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())) && 
+							_GlobalParticles[in].z < (box2.z + ((IS_CONST_RADIUS ? _RADIUS : _GlobalRadiuses[in]) * _evaluator->getSmoothFactor())))
+						{
+							if (CALC_P_NORMAL)
+							{
+								cstoneOctree::Vec3f tempNorm = _evaluator->PariclesNormals[in];
+								norms += tempNorm;
+								area += tempNorm.norm();
+							}
+							if (!IS_CONST_RADIUS)
+							{
+								if (min_radiuses[i] > _GlobalRadiuses[in])
+								{
+									min_radiuses[i] = _GlobalRadiuses[in];
+								}
+							}
+							allSplash = false;
+						}
+					}
+				}
+				emptys[i] = allSplash;
+			}
+			curvs[i] = (area == 0) ? 1.0 : (norms.norm() / area);
+			if (emptys[i]) {
+				scalars[i] = _evaluator->getIsoValue();
+				// nodes_type[i] = 0;
+				iso_nodeOps[i] = 1;
+				continue;
+			}
+			bool isbig = (iso_levels[i] < _DEPTH_MIN);
+			if (isbig)
+			{
+				iso_nodeOps[i] = 8;
+				continue;
+			}
+			bool signchange = false;
+			std::vector<float> nodeSamplePoints(pow(2 + 1, 3) * 3);
+			std::vector<float> nodeSampleScalars(pow(2 + 1, 3), 0);
+			std::vector<float> nodeSampleGrads(pow(2+1, 3) * 3);
+			for (float z = 0; z <= 2; z++)
+			{
+				for (float y = 0; y <= 2; y++)
+				{
+					for (float x = 0; x <= 2; x++)
+					{
+						nodeSamplePoints[(z * (2+1) * (2+1) + y * (2+1) + x) * 3 + 0] = 
+						(1 - x / 2) * box1[0] + (x / 2) * box2[0];
+						nodeSamplePoints[(z * (2+1) * (2+1) + y * (2+1) + x) * 3 + 1] = 
+						(1 - y / 2) * box1[1] + (y / 2) * box2[1];
+						nodeSamplePoints[(z * (2+1) * (2+1) + y * (2+1) + x) * 3 + 2] = 
+						(1 - z / 2) * box1[2] + (z / 2) * box2[2];
+					}
+				}
+			}
+			// grid sampling
+			bool origin_sign;
+			float cellSize = iso_sizes[i][0] * 2;
+			float step = cellSize / 2;
+			for (int j = 0; j < pow(2+1, 3); j++)
+			{
+				Vec3f diff;
+				Vec3f samplePoint(nodeSamplePoints[j * 3 + 0], nodeSamplePoints[j * 3 + 1], nodeSamplePoints[j * 3 + 2]);
+				for (int k = 0; k < trueNeighborsNum; k++)
+				{
+					int pIdx = insideParticlesIdx[k];
+					if (_evaluator->CheckSplash(pIdx))
+					{
+						continue;
+					}
+					diff = samplePoint - _evaluator->GlobalxMeans[pIdx];
+					nodeSampleScalars[j] += _evaluator->AnisotropicInterpolate(pIdx, diff);
+					// if (USE_ANI)
+					// {
+					// }
+					// else {
+					// 	diff = pos - (*GlobalPoses)[pIdx];
+					// 	scalar += IsotropicInterpolate(pIdx, diff.squaredNorm());
+					// }
+				}
+				nodeSampleScalars[j] = _evaluator->getIsoValue() - nodeSampleScalars[j];
+				origin_sign = (nodeSampleScalars[0] >= 0);
+				if (!signchange)
+				{
+					signchange = origin_sign ^ (nodeSampleScalars[j] >= 0);
+				}
+				// int index, next_idx, last_idx;
+				// for (int z = 0; z <= 2; z++)
+				// {
+				// 	for (int y = 0; y <= 2; y++)
+				// 	{
+				// 		for (int x = 0; x <= 2; x++)
+				// 		{
+				// 			index = (z * (2 + 1) * (2 + 1) + y * (2 + 1) + x);
+				// 			Vec3f gradient(0.0f, 0.0f, 0.0f);
+				// 			next_idx = (z * (2 + 1) * (2 + 1) + y * (2 + 1) + (x + 1));
+				// 			last_idx = (z * (2 + 1) * (2 + 1) + y * (2 + 1) + (x - 1));
+				// 			if (x == 0)
+				// 			{
+				// 				gradient[0] = (nodeSampleScalars[index] - nodeSampleScalars[next_idx]) / step;
+				// 			}
+				// 			else if (x == 2)
+				// 			{
+				// 				gradient[0] = (nodeSampleScalars[last_idx] - nodeSampleScalars[index]) / step;
+				// 			}
+				// 			else
+				// 			{
+				// 				gradient[0] = (nodeSampleScalars[last_idx] - nodeSampleScalars[next_idx]) / (step * 2);
+				// 			}
+				// 			next_idx = (z * (2 + 1) * (2 + 1) + (y + 1) * (2 + 1) + x);
+				// 			last_idx = (z * (2 + 1) * (2 + 1) + (y - 1) * (2 + 1) + x);
+				// 			if (y == 0)
+				// 			{
+				// 				gradient[1] = (nodeSampleScalars[index] - nodeSampleScalars[next_idx]) / step;
+				// 			}
+				// 			else if (y == 2)
+				// 			{
+				// 				gradient[1] = (nodeSampleScalars[last_idx] - nodeSampleScalars[index]) / step;
+				// 			}
+				// 			else
+				// 			{
+				// 				gradient[1] = (nodeSampleScalars[last_idx] - nodeSampleScalars[next_idx]) / (step * 2);
+				// 			}
+				// 			next_idx = ((z + 1) * (2 + 1) * (2 + 1) + y * (2 + 1) + x);
+				// 			last_idx = ((z - 1) * (2 + 1) * (2 + 1) + y * (2 + 1) + x);
+				// 			if (z == 0)
+				// 			{
+				// 				gradient[2] = (nodeSampleScalars[index] - nodeSampleScalars[next_idx]) / step;
+				// 			}
+				// 			else if (z == 2)
+				// 			{
+				// 				gradient[2] = (nodeSampleScalars[last_idx] - nodeSampleScalars[index]) / step;
+				// 			}
+				// 			else
+				// 			{
+				// 				gradient[2] = (nodeSampleScalars[last_idx] - nodeSampleScalars[next_idx]) / (step * 2);
+				// 			}
+				// 			gradient.normalize();
+				// 			nodeSampleGrads[index * 3 + 0] = std::isnan(gradient[0]) ? 0.0f : gradient[0];
+				// 			nodeSampleGrads[index * 3 + 1] = std::isnan(gradient[1]) ? 0.0f : gradient[1];
+				// 			nodeSampleGrads[index * 3 + 2] = std::isnan(gradient[2]) ? 0.0f : gradient[2];
+				// 		}
+				// 	}
+				// }
+			}
+			// after process
+			if ((cellSize - min_radiuses[i]) < 1e-8)
+			{
+				// it's a leaf
+				// nodes_type[i] = LEAF;
+				iso_nodeOps[i] = 1;
+				scalars[i] = nodeSampleScalars[13];
+				continue;
+			}
+		
+			// check curvature
+			if (isbig || (signchange && curvs[i] < 0.995))//
+			{
+				// tnode->type = INTERNAL;
+				iso_nodeOps[i] = 8;
+				continue;
+			}
+			else
+			{
+				// tnode->type = LEAF;
+				iso_nodeOps[i] = 1;
+				scalars[i] = nodeSampleScalars[13];
+				// _evaluator->SingleEval(tnode->center, tnode->nodeScalar);
+				continue;
+			}
+		}
+		uint64_t iso_allOpsSum = std::accumulate(iso_nodeOps.begin(), iso_nodeOps.end(), 0);
+		// exclusive_csan ops to get new octree indices
+		std::vector<uint64_t> iso_nodeOpsLayout(iso_nodeOps.size());
+		int newInternalNodes = 0;
+		for(int i = 0; i < iso_nodeOps.size() - 1; i++){
+			int val = iso_nodeOps[i] - 1;
+			if(val != 0 && val != 7){
+				std::cout << "error in iso_nodeOps, " << i << "th value is " << val << std::endl;
+			}
+			if (iso_nodeOps[i] == 8)
+			{
+				newInternalNodes += 8;
+			}
+		}
+		std::cout << newInternalNodes << std::endl;
+		std::exclusive_scan(iso_nodeOps.begin(), iso_nodeOps.end(), iso_nodeOpsLayout.begin(), 0);
+		uint64_t newTreeNodesNum;	
+		newTreeNodesNum = iso_nodeOpsLayout[iso_tree.size() - 1];
+		std::vector<uint64_t> new_iso_tree(newTreeNodesNum + 1);  // updated tree array
+
+		updateTreeArrayCPU(iso_nodeOpsLayout, iso_tree, new_iso_tree);
+
+		std::copy_n(iso_tree.data() + iso_tree.size() - 1, 1, new_iso_tree.data() + new_iso_tree.size() - 1);
+		std::swap(new_iso_tree, iso_tree);
+
+		iso_count++;
+		if(iso_allOpsSum == iso_nodeOps.size() - 1) break;
+	} // end octree generation loop
+}
+
+void SurfReconstructor::Run(float iso_factor, float smooth_factor)
+{
+	printf("-= Run =-\n");
+	_OurRoot = nullptr;
+    _OurMesh->reset();
+    _STATE = 0;
+
+	timer t;
+
+	printf("-= Box =-\n");
+	loadRootBox();
+
+	printf("-= Build Neighbor Searcher =-\n");
+	if (IS_CONST_RADIUS)
+	{
+    	_hashgrid = std::make_shared<HashGrid>(&_GlobalParticles, _BoundingBox, _RADIUS, 4.0f);
+	} else {
+		_searcher = std::make_shared<MultiLevelSearcher>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
+	}
+	printf("   Build Neighbor Searcher Time = %f \n", t.elapsed());
+	t.reset();
+
+    printf("-= Initialize Evaluator =-\n");
+	_evaluator = std::make_shared<Evaluator>(_hashgrid, _searcher, &_GlobalParticles, &_GlobalRadiuses, _RADIUS);
+	_evaluator->setSmoothFactor(smooth_factor);
+	_evaluator->setIsoFactor(iso_factor);
+	_evaluator->compute_Gs_xMeans();
+	printf("   Initialize Evaluator Time = %f \n", t.elapsed());
+	t.reset();
+	printf("-= Resize Box =-\n");
+
+	if (IS_CONST_RADIUS)
+	{
+		resizeRootBoxConstR();
+	} else {
+		resizeRootBoxVarR();
+	}
+	printf("   MAX_DEPTH = %d, MIN_DEPTH = %d\n", _DEPTH_MAX, _DEPTH_MIN);
+
+	IS_CONST_RADIUS ? _evaluator->CalculateMaxScalarConstR() : _evaluator->CalculateMaxScalarVarR();
+    printf("   Max Scalar Value = %f\n", _evaluator->getMaxScalar());
+	
+	IS_CONST_RADIUS ? _evaluator->RecommendIsoValueConstR() : _evaluator->RecommendIsoValueVarR();
+    printf("   Recommend Iso Value = %f\n", _evaluator->getIsoValue());
+
+	if (CALC_P_NORMAL)
+	{
+		_evaluator->CalcParticlesNormal();
+		printf("   Calculate Particals Normal Time = %f\n",t.elapsed());
+		t.reset();
 	}
 
 	// printMem();
@@ -847,7 +1137,7 @@ void SurfReconstructor::Run(float iso_factor, float smooth_factor)
 	// printMem();
 	genIsoOurs();
 
-	printf("-=  Total time= %f  =-\n", get_time() - time_all_start);
+	printf("-=  Total time= %f  =-\n", t.elapsed());
 }
 
 

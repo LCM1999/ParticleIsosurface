@@ -1,4 +1,6 @@
 #pragma once
+#ifndef MORTON_H
+#define MORTON_H
 
 #include <cuda_def.h>
 #include <box.h>
@@ -62,3 +64,4 @@ void calMortonCodeCPU(std::vector<Vec3f>& coords, std::vector<uint64_t>& mortonC
 __global__ void calMortonCodeGPUKenrel(Vec3f* coordsDevice, uint64_t* mortonCodesDevice, Box* box, int numParticles);
 
 }
+#endif

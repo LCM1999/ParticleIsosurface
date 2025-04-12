@@ -1,4 +1,7 @@
 #pragma once
+#ifndef EXTRACT_MANAGER_H
+#define EXTRACT_MANAGER_H
+
 #include <iterator>
 #include <vector>
 #include <array>
@@ -391,3 +394,4 @@ namespace iso{
 // };
 
 }
+#endif

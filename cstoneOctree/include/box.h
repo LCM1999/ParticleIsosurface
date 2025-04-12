@@ -1,4 +1,6 @@
 #pragma once
+#ifndef BOX_H
+#define BOX_H
 
 #include <cassert>
 #include <cmath>
@@ -148,3 +150,4 @@ DEVICE inline thrust::tuple<Vec3f, Vec3f> centerAndSizeGPU(IBox* ibox, Box* box)
 
     
 }
+#endif

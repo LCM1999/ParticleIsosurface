@@ -33,12 +33,15 @@ public:
 	std::vector<int> IndexList;
 	std::map<long long, int> StartList;
 	std::map<long long, int> EndList;
+	void GetPIdxEstimate(const cstoneOctree::Vec3f& pos, int& estimate);
 	void GetPIdxList(const cstoneOctree::Vec3f& pos, std::vector<int>& pIdxList);
+	void GetPIdxList(const cstoneOctree::Vec3f& pos, int& numNeighbors, int ngmax, int* pIdxList);
 	void CalcXYZIdx(const cstoneOctree::Vec3f& pos, cstoneOctree::Vec3i& xyzIdx);
 	long long CalcCellHash(const cstoneOctree::Vec3i& xyzIdx);
 	void GetInCellList(const long long hash, std::vector<int>& pIdxList);
+	void GetInBoxEstimate(cstoneOctree::Vec3f box1, cstoneOctree::Vec3f box2, int& inCells);
     void GetInBoxParticles(cstoneOctree::Vec3f box1, cstoneOctree::Vec3f box2, std::vector<int>& insides);
-	// void FindParticlesNeighbor(const int& pIdx, std::vector<int>& pIdxList);
+    void GetInBoxParticles(cstoneOctree::Vec3f box1, cstoneOctree::Vec3f box2, int& numNeighbors, int ngmax, int* insides);
 private:
 	void BuildTable();
 	void CalcHashList();

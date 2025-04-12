@@ -77,7 +77,7 @@ void UniformGrid::gridSampling()
     cstoneOctree::Vec3f maxV(_BoundingBox[1], _BoundingBox[3], _BoundingBox[5]);
 
 #pragma omp parallel for
-    for (size_t i = 0; i < _Scalars.size(); i++)    //
+    for (ptrdiff_t i = 0; i < _Scalars.size(); i++)    //
     {
         int x,y,z;
         z = (i / (dims[0] * dims[1]));

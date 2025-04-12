@@ -1,4 +1,6 @@
 #pragma once
+#ifndef CUDA_DEF_CUH
+#define CUDA_DEF_CUH
 
 #include <iostream>
 #include <random>
@@ -10,9 +12,9 @@
     #define DEVICE __device__
     #define HOST __host__
 #else
-    #define HOST_DEVICE
-    #define DEVICE
-    #define HOST
+    #define HOST_DEVICE 
+    #define DEVICE 
+    #define HOST 
 #endif
 
 struct DeviceConfig {
@@ -51,3 +53,4 @@ struct DeviceBlock {
     }
     
 };
+#endif

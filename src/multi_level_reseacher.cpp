@@ -76,23 +76,67 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<cstoneOctree::Vec3f>* particl
     printf("   Seachers level: %d.\n", searchers.size());
 }
 
-void MultiLevelSearcher::GetNeighbors(const cstoneOctree::Vec3f& pos, std::vector<int>& neighbors)
+void MultiLevelSearcher::GetNeighborsEstimate(const cstoneOctree::Vec3f& pos, int& estimate)
 {
-    // std::vector<int> subNeighbors;
-    // size_t searcherId = 0;
     for (size_t sIndexId = 0; sIndexId < sortedIndex.size(); sIndexId++)
     {
         if (sortedIndex[sIndexId].empty())
         {
             continue;
         }
-        // subNeighbors.clear();
+        searchers[sIndexId]->GetPIdxEstimate(pos, estimate);
+    }
+}
+
+void MultiLevelSearcher::GetNeighbors(const cstoneOctree::Vec3f& pos, std::vector<int>& neighbors)
+{
+    for (size_t sIndexId = 0; sIndexId < sortedIndex.size(); sIndexId++)
+    {
+        if (sortedIndex[sIndexId].empty())
+        {
+            continue;
+        }
         searchers[sIndexId]->GetPIdxList(pos, neighbors);
-        // for (size_t nId = 0; nId < subNeighbors.size(); nId++)
-        // {
-        //     neighbors.push_back(sortedIndex[sIndexId][subNeighbors[nId]]);
-        // }
-        // searcherId++;
+    }
+}
+
+void MultiLevelSearcher::GetNeighbors(const cstoneOctree::Vec3f& pos, int& numNeighbors, int ngmax, int* neighbors)
+{
+    for (size_t sIndexId = 0; sIndexId < sortedIndex.size(); sIndexId++)
+    {
+        if (sortedIndex[sIndexId].empty())
+        {
+            continue;
+        }
+        searchers[sIndexId]->GetPIdxList(pos, numNeighbors, ngmax, neighbors);
+    }
+}
+
+void MultiLevelSearcher::GetInBoxEstimate(const cstoneOctree::Vec3f& box1, const cstoneOctree::Vec3f& box2, int& insides)
+{
+    size_t sIndexId = 0, searcherId = 0;
+    for (sIndexId = 0; sIndexId < sortedIndex.size(); sIndexId++)
+    {
+        if (sortedIndex[sIndexId].empty())
+        {
+            continue;
+        }
+        searchers[searcherId]->GetInBoxEstimate(box1, box2, insides);
+        searcherId++;
+    }
+}
+
+void MultiLevelSearcher::GetInBoxParticles(cstoneOctree::Vec3f box1, cstoneOctree::Vec3f box2, int& numNeighbors, int ngmax, int* insides)
+{
+    size_t sIndexId = 0, searcherId = 0;
+    for (sIndexId = 0; sIndexId < sortedIndex.size(); sIndexId++)
+    {
+        if (sortedIndex[sIndexId].empty())
+        {
+            continue;
+        }
+        searchers[searcherId]->GetInBoxParticles(box1, box2, numNeighbors, ngmax, insides);
+        searcherId++;
     }
 }
 

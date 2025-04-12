@@ -97,6 +97,7 @@ public:
 
     void Run(float iso_factor, float smooth_factor);
     void RunCPU(float iso_factor, float smooth_factor);
+    void RunCPU2(float iso_factor, float smooth_factor);
 
     inline int getOverSampleQEF() {return _OVERSAMPLE_QEF;}
     inline float getBorder() {return _BORDER;}
