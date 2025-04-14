@@ -10,6 +10,7 @@
 #include "visitorextract.h"
 #include "traverse.h"
 #include "timer.h"
+#include "iso.cuh"
 #include <var.h>
 
 
@@ -831,8 +832,8 @@ void SurfReconstructor::RunCPU2(float iso_factor, float smooth_factor)
 		// }
 		std::vector<Vec3f> iso_centers(iso_tree_size);
 		std::vector<Vec3f> iso_sizes(iso_tree_size);
-		std::vector<unsigned> iso_levels(iso_tree_size);
-		calculateLeavesCentersAndSizesCPU(iso_tree, iso_centers, iso_sizes, iso_levels, box);
+		std::vector<unsigned> iso_depths(iso_tree_size);
+		calculateLeavesCentersAndSizesCPU(iso_tree, iso_centers, iso_sizes, iso_depths, box);
 
 		// ---- iso surface split decision making ----
 		// std::vector<float> sample_points(int(std::pow(getOverSampleQEF() + 1, 3) * 4 * iso_tree_size));
@@ -909,7 +910,7 @@ void SurfReconstructor::RunCPU2(float iso_factor, float smooth_factor)
 				iso_nodeOps[i] = 1;
 				continue;
 			}
-			bool isbig = (iso_levels[i] < _DEPTH_MIN);
+			bool isbig = (iso_depths[i] < _DEPTH_MIN);
 			if (isbig)
 			{
 				iso_nodeOps[i] = 8;
@@ -1033,7 +1034,6 @@ void SurfReconstructor::RunCPU2(float iso_factor, float smooth_factor)
 				scalars[i] = nodeSampleScalars[13];
 				continue;
 			}
-		
 			// check curvature
 			if (isbig || (signchange && curvs[i] < 0.995))//
 			{
@@ -1078,6 +1078,37 @@ void SurfReconstructor::RunCPU2(float iso_factor, float smooth_factor)
 		iso_count++;
 		if(iso_allOpsSum == iso_nodeOps.size() - 1) break;
 	} // end octree generation loop
+
+	std::vector<Vec3i> iso_lowers(iso_tree.size() - 1);
+	std::vector<unsigned> iso_levels(iso_tree.size() - 1);
+	calculateLeavesLowersAndLevelsCPU(iso_tree, iso_lowers, iso_levels, box);
+
+	iso::generateIso(iso_tree, iso_lowers, iso_levels, scalars, 0.0, _OurMesh);
+	if (GEN_SPLASH)
+	{
+		printf("-= Generate Splash =-\n");
+		std::vector<cstoneOctree::Vec3f> splash_pos;
+		std::vector<float> splash_radiuses;
+		for (int pIdx = 0; pIdx < getGlobalParticlesNum(); pIdx++)
+		{
+			if (_evaluator->CheckSplash(pIdx))
+			{
+				splash_pos.push_back(_GlobalParticles[pIdx]);
+				if (!IS_CONST_RADIUS)
+				{
+					splash_radiuses.push_back(_GlobalRadiuses[pIdx]);
+				}
+			}
+		}
+		if (IS_CONST_RADIUS)
+		{
+			_OurMesh->AppendSplash_ConstR(splash_pos, _RADIUS);
+		} else {
+			_OurMesh->AppendSplash_VarR(splash_pos, splash_radiuses);
+		}
+	}
+	// printf("Time generating polygons = %f\n", t_gen_mesh.elapsed());
+	std::cout << "Time generating polygons;" << std::endl;
 }
 
 void SurfReconstructor::Run(float iso_factor, float smooth_factor)

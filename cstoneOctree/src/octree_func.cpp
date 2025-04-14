@@ -347,9 +347,24 @@ void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves,
 
     IBox nodeBox(ivec.x, ivec.x + cubeLength, ivec.y, ivec.y + cubeLength, ivec.z, ivec.z + cubeLength);
     cal::tie(centers[idx], sizes[idx]) = centerAndSizeCPU(nodeBox, box);
-    
 }
 
+void calculateLeavesLowersAndLevelsCPU(std::vector<uint64_t>& leaves, 
+    std::vector<Vec3i>& lowers, std::vector<unsigned>& levels, Box& box)
+{
+    #pragma omp parallel for
+    for(int i = 0; i < leaves.size() - 1; i++){
+        calculateLeavesLowersAndLevelsCPU(leaves, lowers, levels, box, i);
+    }
+}
+
+void calculateLeavesLowersAndLevelsCPU(std::vector<uint64_t>& leaves, 
+    std::vector<Vec3i>& lowers, std::vector<unsigned>& levels, Box& box, int idx)
+{
+    uint64_t curr = leaves[idx];
+    levels[idx] = 21 - treeLevel(leaves[idx + 1] - curr);
+    lowers[idx] = decodeMorton(curr);
+}
 
 void findNeighborsCPU(std::vector<Vec3f>& particles, std::vector<float>& radiuses, OctreeNs& octreeNs, Box& box, int ngmax, std::vector<int>& neighbors, std::vector<int>& numNeighbors){
     #pragma omp parallel for

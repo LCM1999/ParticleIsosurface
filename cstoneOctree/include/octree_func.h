@@ -184,9 +184,13 @@ void calculateNodeCentersAndSizesCPU(std::vector<uint64_t>& prefixes, std::vecto
 
 void calculateNodeCentersAndSizesCPU(std::vector<uint64_t>& prefixes, std::vector<Vec3f>& centers, std::vector<Vec3f>& sizes, Box& box, int idx);
 
-void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves, std::vector<Vec3f>& centers, std::vector<Vec3f>& sizes, std::vector<unsigned>& levels, Box& box);
+void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves, std::vector<Vec3f>& centers, std::vector<Vec3f>& sizes, std::vector<unsigned>& depths, Box& box);
 
-void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves, std::vector<Vec3f>& centers, std::vector<Vec3f>& sizes, std::vector<unsigned>& levels, Box& box, int idx);
+void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves, std::vector<Vec3f>& centers, std::vector<Vec3f>& sizes, std::vector<unsigned>& depths, Box& box, int idx);
+
+void calculateLeavesLowersAndLevelsCPU(std::vector<uint64_t>& leaves, std::vector<Vec3i>& lowers, std::vector<unsigned>& levels, Box& box);
+
+void calculateLeavesLowersAndLevelsCPU(std::vector<uint64_t>& leaves, std::vector<Vec3i>& lowers, std::vector<unsigned>& levels, Box& box, int idx);
 
 void findNeighborsCPU(std::vector<Vec3f>& particles, std::vector<float>& radiuses, OctreeNs& octreeNs, Box& box, int ngmax, std::vector<int>& neighbors, std::vector<int>& numNeighbors);
 

@@ -25,6 +25,14 @@ struct Vec3
 
 	HOST_DEVICE Vec3(T x, T y, T z): x(x), y(y), z(z) {}
 
+	HOST_DEVICE Vec3(T v): x(v), y(v), z(v) {}
+
+    template <typename U>
+    Vec3(const Vec3<U>& other)
+        : x(static_cast<T>(other.x)),
+          y(static_cast<T>(other.y)),
+          z(static_cast<T>(other.z)) {}
+
     HOST_DEVICE T& operator[](int i) {
         assert(i >= 0 && i < 3);
         if (i == 0) return x;
@@ -167,6 +175,16 @@ struct Vec3
     HOST_DEVICE bool operator<(const Vec3& other) const
     {
         return (x < other.x) || ((x == other.x) && ((y < other.y) || (y == other.y) && (z < other.z)));
+    }
+
+    HOST_DEVICE bool operator==(const Vec3& other) const
+    {
+        return (x == other.x) && (y == other.y) && (z == other.z);
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const Vec3<T>& vec) {
+        os << "(" << vec.x << ", " << vec.y << ", " << vec.z << ")";
+        return os;
     }
 
     // HOST_DEVICE Vec3 abs()
