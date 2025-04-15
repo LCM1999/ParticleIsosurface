@@ -10,7 +10,6 @@ inline bool IS_CONST_RADIUS = false;
 inline bool USE_ANI = true;
 
 // variants for test
-inline bool NEED_RECORD = false;
 inline int TARGET_FRAME = 0;
 // std::string PREFIX = "";
 inline std::string SUFFIX = "";    // CSV, H5
@@ -27,5 +26,4 @@ inline float ISO_VALUE = 0.0f;
 inline bool CALC_P_NORMAL = true;
 inline bool GEN_SPLASH = true;
 inline bool SINGLE_LAYER = false;
-inline bool USE_OURS = true;
 inline bool USE_POLY6 = 0;

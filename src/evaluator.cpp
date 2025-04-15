@@ -6,12 +6,10 @@
 using namespace cstoneOctree;
 
 Evaluator::Evaluator(
-    std::shared_ptr<HashGrid>& hashgrid,
-    std::shared_ptr<MultiLevelSearcher>& searcher,
+    std::shared_ptr<MultiLevelSearcherGPU>& searcher,
     std::vector<Vec3f>* global_particles, 
     std::vector<float>* radiuses, float radius)
 {
-    _hashgrid = hashgrid;
     _searcher = searcher;
 	GlobalPoses = global_particles;
     GlobalRadius = radiuses;
@@ -60,72 +58,70 @@ Evaluator::Evaluator(
     }
 }
 
-// new evaluator constructor for conrnerstone octree
-Evaluator::Evaluator(
-    std::vector<Vec3f>* global_particles, 
-    std::vector<float>* radiuses, OctreeNs octreeNs, Box box, int ngmax)
-{
-    // _ngmax = ngmax;
-    _box = box;
-    _octreeNs = octreeNs;
-	_GlobalPoses = global_particles;
-    GlobalRadius = radiuses;
-    _GlobalParticlesNum = global_particles->size();
-    if (!IS_CONST_RADIUS)
-    {
-        GlobalRadius2.resize(_GlobalParticlesNum);
-        GlobalRadius3.resize(_GlobalParticlesNum);
-        GlobalInflunce2.resize(_GlobalParticlesNum);
-        GlobalSigma.resize(_GlobalParticlesNum);
-#pragma omp parallel for
-        for (int i = 0; i < _GlobalParticlesNum; i++)
-        {
-            float smooth = GlobalRadius->at(i) * _SMOOTH_FACTOR;
-            GlobalRadius2[i] = pow(GlobalRadius->at(i), 2);
-            GlobalRadius3[i] = GlobalRadius->at(i) * GlobalRadius2[i];
-            GlobalInflunce2[i] = pow(smooth, 2);
-            GlobalSigma[i] = 1/pow(smooth, 6);   //(315 / (64 * pow(influnce, 9))) * inv_pi;
-        }
-    } else {
-        Radius = GlobalRadius->at(0);
-        Radius2 = Radius * Radius;
-        Radius3 = Radius * Radius2;
-        Influnce2 = pow(Radius * _SMOOTH_FACTOR, 2);
-        Sigma = 1 / pow(Radius * _SMOOTH_FACTOR, 6);    //(315 / (64 * pow(radius * _SMOOTH_FACTOR, 9))) * inv_pi;
-    }
+// // new evaluator constructor for conrnerstone octree
+// Evaluator::Evaluator(
+//     std::vector<Vec3f>* global_particles, 
+//     std::vector<float>* radiuses, OctreeNs octreeNs, Box box, int ngmax)
+// {
+//     // _ngmax = ngmax;
+//     _box = box;
+//     _octreeNs = octreeNs;
+// 	_GlobalPoses = global_particles;
+//     GlobalRadius = radiuses;
+//     _GlobalParticlesNum = global_particles->size();
+//     if (!IS_CONST_RADIUS)
+//     {
+//         GlobalRadius2.resize(_GlobalParticlesNum);
+//         GlobalRadius3.resize(_GlobalParticlesNum);
+//         GlobalInflunce2.resize(_GlobalParticlesNum);
+//         GlobalSigma.resize(_GlobalParticlesNum);
+// #pragma omp parallel for
+//         for (int i = 0; i < _GlobalParticlesNum; i++)
+//         {
+//             float smooth = GlobalRadius->at(i) * _SMOOTH_FACTOR;
+//             GlobalRadius2[i] = pow(GlobalRadius->at(i), 2);
+//             GlobalRadius3[i] = GlobalRadius->at(i) * GlobalRadius2[i];
+//             GlobalInflunce2[i] = pow(smooth, 2);
+//             GlobalSigma[i] = 1/pow(smooth, 6);   //(315 / (64 * pow(influnce, 9))) * inv_pi;
+//         }
+//     } else {
+//         Radius = GlobalRadius->at(0);
+//         Radius2 = Radius * Radius;
+//         Radius3 = Radius * Radius2;
+//         Influnce2 = pow(Radius * _SMOOTH_FACTOR, 2);
+//         Sigma = 1 / pow(Radius * _SMOOTH_FACTOR, 6);    //(315 / (64 * pow(radius * _SMOOTH_FACTOR, 9))) * inv_pi;
+//     }
 
-    if (!USE_POLY6)
-    {
-        _XMEAN_DELTA = 0.9;
-    }
+//     if (!USE_POLY6)
+//     {
+//         _XMEAN_DELTA = 0.9;
+//     }
 
-    if (CALC_P_NORMAL)
-    {
-        PariclesNormals.clear();
-        PariclesNormals.resize(_GlobalParticlesNum, Vec3f(0, 0, 0)); 
-    }
+//     if (CALC_P_NORMAL)
+//     {
+//         PariclesNormals.clear();
+//         PariclesNormals.resize(_GlobalParticlesNum, Vec3f(0, 0, 0)); 
+//     }
     
-    GlobalSplash.resize(_GlobalParticlesNum, 0);
-    GlobalSurface.resize(_GlobalParticlesNum, 0);
-    GlobalxMeans.resize(_GlobalParticlesNum);
-    if (USE_ANI)
-    {
-        GlobalGs.resize(_GlobalParticlesNum);
-        GlobalDeterminant.resize(_GlobalParticlesNum);
-    }
-}
+//     GlobalSplash.resize(_GlobalParticlesNum, 0);
+//     GlobalSurface.resize(_GlobalParticlesNum, 0);
+//     GlobalxMeans.resize(_GlobalParticlesNum);
+//     if (USE_ANI)
+//     {
+//         GlobalGs.resize(_GlobalParticlesNum);
+//         GlobalDeterminant.resize(_GlobalParticlesNum);
+//     }
+// }
 
 
 void Evaluator::SingleEval(const Vec3f& pos, float& scalar)
 {
 	scalar = 0;
     std::vector<int> neighbors;
-    if (IS_CONST_RADIUS)
-    {
-        _hashgrid->GetPIdxList(pos, neighbors);
-    } else {
-        _searcher->GetNeighbors(pos, neighbors);
-    }
+    int realNeighbors = 0, estimate = 0;
+    _searcher->GetNeighborsEstimate(pos, estimate);
+    neighbors.resize(estimate);
+    _searcher->GetNeighbors(pos, realNeighbors, estimate, neighbors.data());
     Vec3f diff;
     for (int pIdx : neighbors)
     {
@@ -159,12 +155,10 @@ void Evaluator::SingleEvalWithGrad(const Vec3f& pos, float& scalar, Vec3f& gradi
 	}
 
     std::vector<int> neighbors;
-    if (IS_CONST_RADIUS)
-    {
-        _hashgrid->GetPIdxList(pos, neighbors);
-    } else {
-        _searcher->GetNeighbors(pos, neighbors);
-    }
+    int realNeighbors = 0, estimate = 0;
+    _searcher->GetNeighborsEstimate(pos, estimate);
+    neighbors.resize(estimate);
+    _searcher->GetNeighbors(pos, realNeighbors, estimate, neighbors.data());
     Vec3f diff;
     for (int pIdx : neighbors)
     {
@@ -328,10 +322,9 @@ void Evaluator::CalculateMaxScalarVarR()
     float max_scalar = 0;
     unsigned int rId;
     float temp_scalar;
-    for (const auto searcher : *(_searcher->getSearchers()))
+    for (const auto& rId : _searcher->maxRadiusParticleIds)
     {
         temp_scalar = 0.0;
-        rId = searcher->RadiusId;
         if (USE_POLY6)
         {
             temp_scalar += poly6_kernel(0.0, GlobalInflunce2[rId], GlobalSigma[rId]);
@@ -344,7 +337,6 @@ void Evaluator::CalculateMaxScalarVarR()
             temp_scalar += Bspline_kernel(sqrt2, GlobalSigma[rId]) * 12;
             temp_scalar += Bspline_kernel(sqrt3, GlobalSigma[rId]) * 8;
         }
-        // temp_scalar = GlobalRadius3[rId] * temp_scalar;
         if (temp_scalar > max_scalar)
         {
             max_scalar = temp_scalar;
@@ -374,17 +366,15 @@ void Evaluator::RecommendIsoValueVarR()
     unsigned int rId;
     float temp_scalar;
 
-    for (const auto searcher : *(searchers->getSearchers()))
+    for (const auto& rId : _searcher->maxRadiusParticleIds)
     {
         temp_scalar = 0.0;
-        rId = searcher->RadiusId;
         if (USE_POLY6)
         {
             temp_scalar = poly6_kernel(_ISO_FACTOR * GlobalRadius2[rId], GlobalInflunce2[rId], GlobalSigma[rId]);
         } else {
             temp_scalar = Bspline_kernel(0.25, GlobalSigma[rId]);
         }
-        // temp_scalar = GlobalRadius3[rId] * temp_scalar;
         if (temp_scalar > recommend)
         {
             recommend = temp_scalar;
@@ -396,7 +386,7 @@ void Evaluator::RecommendIsoValueVarR()
 
 void Evaluator::CalcParticlesNormal()
 {
-#pragma omp parallel for
+// #pragma omp parallel for
     for (int pIdx = 0; pIdx < _GlobalParticlesNum; pIdx++)
     {
         float tempScalar = 0;
@@ -678,13 +668,10 @@ void Evaluator::compute_Gs_xMeans()
        std::vector<int> neighbors;
        int closerNeigbors = 0;
        Vec3f xMean(0, 0, 0);
-    //    Mat3f G;
-       if (IS_CONST_RADIUS)
-       {
-           _hashgrid->GetPIdxList((GlobalPoses->at(pIdx)), tempNeighbors);
-       } else {
-           _searcher->GetNeighbors((GlobalPoses->at(pIdx)), tempNeighbors);
-       }
+       int realNeighbors = 0, estimate = 0;
+       _searcher->GetNeighborsEstimate((GlobalPoses->at(pIdx)), estimate);
+       neighbors.resize(estimate);
+       _searcher->GetNeighbors((GlobalPoses->at(pIdx)), realNeighbors, estimate, neighbors.data());
        if (tempNeighbors.size() <= 2)
        {
            Mat3f G(1.0, 1.0, 1.0);
@@ -742,13 +729,16 @@ void Evaluator::compute_Gs_xMeans()
        }
        std::vector<int> tempNeighbors;
        Mat3f G(1.0, 1.0, 1.0);
-       if (IS_CONST_RADIUS)
-       {
-           _hashgrid->GetPIdxList((GlobalPoses->at(pIdx)), tempNeighbors);
-       } else {
-           _searcher->GetNeighbors((GlobalPoses->at(pIdx)), tempNeighbors);
-       }
-
+    //    if (IS_CONST_RADIUS)
+    //    {
+    //        _hashgrid->GetPIdxList((GlobalPoses->at(pIdx)), tempNeighbors);
+    //    } else {
+    //        _searcher->GetNeighbors((GlobalPoses->at(pIdx)), tempNeighbors);
+    //    }
+       int realNeighbors = 0, estimate = 0;
+       _searcher->GetNeighborsEstimate((GlobalPoses->at(pIdx)), estimate);
+       tempNeighbors.resize(estimate);
+       _searcher->GetNeighbors((GlobalPoses->at(pIdx)), realNeighbors, estimate, tempNeighbors.data());
        if (USE_ANI)
        {
            if (USE_POLY6)

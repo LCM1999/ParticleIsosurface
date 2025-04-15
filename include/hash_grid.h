@@ -21,7 +21,6 @@ public:
 		std::vector<unsigned int>& pIndexes, float* bounding, unsigned int radiusId, float inf_factor);
 
 	std::vector<cstoneOctree::Vec3f>* Particles;
-	std::vector<unsigned int> PIndexes;
 	unsigned int ParticlesNum;
 	unsigned int RadiusId;
 	float Radius;
@@ -29,6 +28,7 @@ public:
 	float Bounding[6];
 	unsigned int XYZCellNum[3];
 	unsigned long long CellNum;
+	std::vector<unsigned int> PIndexes;
 	std::vector<long long> HashList;
 	std::vector<int> IndexList;
 	std::map<long long, int> StartList;

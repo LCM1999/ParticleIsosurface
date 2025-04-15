@@ -1,8 +1,11 @@
 #pragma once
+#ifndef EVALUATOR_H
+#define EVALUATOR_H
 
 #include "iso_common.h"
-#include "hash_grid.h"
-#include "multi_level_researcher.h"
+// #include "hash_grid.h"
+// #include "multi_level_researcher.h"
+#include "multi_level_searcher_gpu.cuh"
 #include <assert.h>
 #include <iostream>
 #include <vector>
@@ -54,8 +57,8 @@ public:
 	Evaluator() {};
 	~Evaluator() {};
 
-    std::shared_ptr<HashGrid> _hashgrid;
-    std::shared_ptr<MultiLevelSearcher> _searcher;
+    // std::shared_ptr<HashGrid> _hashgrid;
+    std::shared_ptr<MultiLevelSearcherGPU> _searcher;
 
 	std::vector<Vec3f>* GlobalPoses;
     int _GlobalParticlesNum = 0;
@@ -78,19 +81,19 @@ public:
     std::vector<float> GlobalDeterminant;
 	void compute_Gs_xMeans();
     // void compute_Gs_xMeansCPU();
-	Evaluator(  std::shared_ptr<HashGrid>& hashgrid,
-                std::shared_ptr<MultiLevelSearcher>& searcher,
+	Evaluator(  
+                std::shared_ptr<MultiLevelSearcherGPU>& searcher,
                 std::vector<Vec3f>* global_particles, 
                 std::vector<float>* radiuses,
-                float radius);
+                float radius
+            );
 
-    Evaluator(std::vector<Vec3f>* global_particles,
-                std::vector<float>* radiuses,
-                OctreeNs octreeNs, 
-                Box box,
-                int ngmax
-                );
-
+    // Evaluator(std::vector<Vec3f>* global_particles,
+    //             std::vector<float>* radiuses,
+    //             OctreeNs octreeNs, 
+    //             Box box,
+    //             int ngmax
+    //             );
 
 	void SingleEval(const Vec3f& pos, float& scalar);
 
@@ -126,3 +129,5 @@ public:
     Box _box;
     const int _ngmax = 16;
 };
+
+#endif

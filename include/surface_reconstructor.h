@@ -21,10 +21,12 @@
 #include <bitset>
 #include <algorithm>
 #include <cuda_def.h>
+#include "evaluator.h"
+#include "multi_level_searcher_gpu.cuh"
 
-class HashGrid;
-class MultiLevelSearcher;
-class Evaluator;
+// class HashGrid;
+// class MultiLevelSearcherGPU;
+// class Evaluator;
 class Mesh;
 
 struct TNode;
@@ -38,8 +40,8 @@ private:
     int _DEPTH_MAX = 8; // 7
     int _DEPTH_MIN = 6; // 4
 
-    std::shared_ptr<HashGrid> _hashgrid;
-    std::shared_ptr<MultiLevelSearcher> _searcher;
+    // std::shared_ptr<HashGrid> _hashgrid;
+    std::shared_ptr<MultiLevelSearcherGPU> _searcher;
     std::shared_ptr<Evaluator> _evaluator;
 
     std::vector<Vec3f> _GlobalParticles;
@@ -105,8 +107,8 @@ public:
     inline float getBorder() {return _BORDER;}
     inline int getDepthMax() {return _DEPTH_MAX;}
     inline int getDepthMin() {return _DEPTH_MIN;}
-    inline std::shared_ptr<HashGrid> getHashGrid() {return _hashgrid;}
-    inline std::shared_ptr<MultiLevelSearcher> getSearcher() {return _searcher;}
+    // inline std::shared_ptr<HashGrid> getHashGrid() {return _hashgrid;}
+    inline std::shared_ptr<MultiLevelSearcherGPU> getSearcher() {return _searcher;}
     inline std::shared_ptr<Evaluator> getEvaluator() {return _evaluator;}
     inline std::vector<cstoneOctree::Vec3f>* getGlobalParticles() {return &_GlobalParticles;}
     inline int getGlobalParticlesNum() {return _GlobalParticlesNum;}
