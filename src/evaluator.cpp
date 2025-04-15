@@ -408,13 +408,13 @@ void Evaluator::CalcParticlesNormal()
     }
 }
 
-inline float Evaluator::poly6_kernel(float d2, float h2, float sigma)
+float Evaluator::poly6_kernel(float d2, float h2, float sigma)
 {
     float p_dist = (d2 > h2 ? 0.0 : pow(h2 - d2, 3));
     return p_dist * sigma;
 }
 
-inline float Evaluator::Bspline_kernel(float ratio, float sigma)
+float Evaluator::Bspline_kernel(float ratio, float sigma)
 {
     if (ratio < 2)
     {
@@ -429,7 +429,7 @@ inline float Evaluator::Bspline_kernel(float ratio, float sigma)
     }
 }
 
-inline float Gaussian_kernel(float ratio2, float sigma)
+float Gaussian_kernel(float ratio2, float sigma)
 {
     if (ratio2 <= 9)
     {
@@ -439,7 +439,7 @@ inline float Gaussian_kernel(float ratio2, float sigma)
     }
 }
 
-inline Vec3f Evaluator::poly6_gradient_kernel(float d2, float h2, float sigma, const Vec3f diff)
+Vec3f Evaluator::poly6_gradient_kernel(float d2, float h2, float sigma, const Vec3f diff)
 {
     Vec3f grad;
     grad[0] = sigma * (-6 * diff[0]) * (d2 > h2 ? 0.0f : ((h2 - d2) * (h2 - d2)));
@@ -448,7 +448,7 @@ inline Vec3f Evaluator::poly6_gradient_kernel(float d2, float h2, float sigma, c
     return grad;
 }
 
-inline float Evaluator::IsotropicInterpolate(const int pIdx, const float d2)
+float Evaluator::IsotropicInterpolate(const int pIdx, const float d2)
 {
     float k_value = poly6_kernel(
         d2, (IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx]), 
@@ -459,7 +459,7 @@ inline float Evaluator::IsotropicInterpolate(const int pIdx, const float d2)
 	return k_value; //(IS_CONST_RADIUS ? Radius3 : GlobalRadius3[pIdx]) * 
 }
 
-inline Vec3f Evaluator::IsotropicInterpolateGrad(const int pIdx, const float d2, const Vec3f diff)
+Vec3f Evaluator::IsotropicInterpolateGrad(const int pIdx, const float d2, const Vec3f diff)
 {
     Vec3f grad = poly6_gradient_kernel(
         d2, 
@@ -468,7 +468,7 @@ inline Vec3f Evaluator::IsotropicInterpolateGrad(const int pIdx, const float d2,
     return grad;    //(IS_CONST_RADIUS ? Radius3 : GlobalRadius3[pIdx]) * 
 }
 
-inline float Evaluator::AnisotropicInterpolate(const int pIdx, const Vec3f diff)
+float Evaluator::AnisotropicInterpolate(const int pIdx, const Vec3f diff)
 {
    float k_value;
    if (USE_POLY6)
@@ -486,7 +486,7 @@ inline float Evaluator::AnisotropicInterpolate(const int pIdx, const Vec3f diff)
    return (GlobalDeterminant[pIdx] * k_value); //(IS_CONST_RADIUS ? Radius3 : GlobalRadius3[pIdx]) * 
 }
 
-inline Vec3f Evaluator::AnisotropicInterpolateGrad(const int pIdx, const Vec3f diff)
+Vec3f Evaluator::AnisotropicInterpolateGrad(const int pIdx, const Vec3f diff)
 {
    Vec3f grad = poly6_gradient_kernel(
        (GlobalGs[pIdx] * diff).squaredNorm(), 
@@ -547,7 +547,7 @@ inline Vec3f Evaluator::AnisotropicInterpolateGrad(const int pIdx, const Vec3f d
 //    xMean = Eigen::Vector3f(xMean_copy.x, xMean_copy.y, xMean_copy.z);
 // }
 
-inline void Evaluator::compute_xMeans(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Vec3f &xMean)
+void Evaluator::compute_xMeans(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Vec3f &xMean)
 {
    float pR, pD2;
    pR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx);
@@ -596,7 +596,7 @@ inline void Evaluator::compute_xMeans(int pIdx, std::vector<int> temp_neighbors,
    }
 }
 
-inline void Evaluator::compute_G_ours(int pIdx, Vec3f xMean, std::vector<int> neighbors, Mat3f &G)
+void Evaluator::compute_G_ours(int pIdx, Vec3f xMean, std::vector<int> neighbors, Mat3f &G)
 {
     const float invH = 0.5;
     float wSum = 0, d, wj;
@@ -653,7 +653,7 @@ inline void Evaluator::compute_G_ours(int pIdx, Vec3f xMean, std::vector<int> ne
    // float detG = G.determinant();
 }
 
-inline void Evaluator::compute_G_Yus(int pIdx, Vec3f xMean, std::vector<int> neighbors, Mat3f &G)
+void Evaluator::compute_G_Yus(int pIdx, Vec3f xMean, std::vector<int> neighbors, Mat3f &G)
 {
    const float invH = 1 / (_SMOOTH_FACTOR * (IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx)));
    // const float invH = 1/_SMOOTH_FACTOR;

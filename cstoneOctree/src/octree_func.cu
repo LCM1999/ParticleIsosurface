@@ -388,5 +388,30 @@ __global__ void findNeighborsKernel(Vec3f* coordsDevice, int coords_size, float*
 
 }
 
+__global__ void calculatePrefixesKernel(uint64_t* d_iso_tree, uint64_t* d_prefixes, int d_iso_tree_size){
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tid < d_iso_tree_size){
+        uint64_t curr_key = d_iso_tree[tid];
+        // if(!isPowerOf8(d_iso_tree[tid + 1] - curr_key)) printf("The index %d is not the power of 8\n", tid);
+        unsigned curr_level = treeLevel(d_iso_tree[tid + 1] - curr_key);
+        d_prefixes[tid] = encodePlaceholderBit(curr_key, 3 * curr_level);
+    }
+}
+
+__global__ void calculateLeavesCentersAndSizesKernel(uint64_t* d_iso_tree, int d_iso_tree_size, Vec3f* d_iso_centers, Vec3f* d_iso_sizes, unsigned* d_iso_depths, Box* d_box){
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tid < d_iso_tree_size){
+        uint64_t curr = d_iso_tree[tid];
+
+        unsigned level = treeLevel(d_iso_tree[tid + 1] - curr);
+        const int maxCoord = 1u << 21;
+        unsigned cubeLength = (1u << (21 - level));
+
+        Vec3<int> ivec = decodeMorton(curr);
+
+        IBox nodeBox(ivec.x, ivec.x + cubeLength, ivec.y, ivec.y + cubeLength, ivec.z, ivec.z + cubeLength);
+        cal::tie(d_iso_centers[tid], d_iso_sizes[tid]) = centerAndSizeGPU(&nodeBox, d_box);
+    }
+}
 
 }

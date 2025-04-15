@@ -1,6 +1,7 @@
 {
+  "DATA_TYPE": 0,
   "DATA_FILE": "dam.csv",
-  "CSV_TYPE": 0,
-  "NEED_RECORD": false,
-  "OUTPUT_PREFIX": "inlet_"
+  "USE_OURS": true,
+  "USE_ANI": true,
+  "USE_POLY6": true
 }

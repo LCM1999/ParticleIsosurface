@@ -50,7 +50,9 @@ HOST_DEVICE constexpr uint64_t compactBits(uint64_t v){
 }
 // HOST_DEVICE constexpr uint64_t compactBits(uint64_t v);
 
-HOST_DEVICE Vec3<int> decodeMorton(uint64_t code);
+inline HOST_DEVICE Vec3<int> decodeMorton(uint64_t code){
+    return Vec3<int>(compactBits(code >> 2), compactBits(code >> 1), compactBits(code));
+}
 
 // template<class T>
 HOST_DEVICE uint64_t sfc3D(float x, float y, float z, float xmin, float ymin, float zmin, float mx, float my, float mz);

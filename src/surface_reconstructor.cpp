@@ -13,6 +13,9 @@
 #include "iso.cuh"
 #include <var.h>
 
+#include <thrust/host_vector.h>
+#include <thrust/device_vector.h>
+#include <thrust/sort.h>
 
 // #include <morton.h>
 using namespace cal;
@@ -35,7 +38,7 @@ SurfReconstructor::SurfReconstructor(
 	_OurMesh = mesh;
 }
 
-inline void SurfReconstructor::loadRootBox()
+void SurfReconstructor::loadRootBox()
 {
 	_BoundingBox[0] = _BoundingBox[2] = _BoundingBox[4] = FLT_MAX;
 	_BoundingBox[1] = _BoundingBox[3] = _BoundingBox[5] = -FLT_MAX;
@@ -1170,5 +1173,3 @@ void SurfReconstructor::Run(float iso_factor, float smooth_factor)
 
 	printf("-=  Total time= %f  =-\n", t.elapsed());
 }
-
-
