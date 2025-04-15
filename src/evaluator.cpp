@@ -163,7 +163,7 @@ void Evaluator::SingleEvalWithGrad(const Vec3f& pos, float& scalar, Vec3f& gradi
     {
         _hashgrid->GetPIdxList(pos, neighbors);
     } else {
-        // _searcher->GetNeighbors(pos, neighbors);
+        _searcher->GetNeighbors(pos, neighbors);
     }
     Vec3f diff;
     for (int pIdx : neighbors)
@@ -496,57 +496,6 @@ Vec3f Evaluator::AnisotropicInterpolateGrad(const int pIdx, const Vec3f diff)
    return (grad * GlobalDeterminant[pIdx]);    //(IS_CONST_RADIUS ? Radius3 : GlobalRadius3[pIdx]) * 
 }
 
-// inline void Evaluator::compute_xMeansCPU(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Vec3f &xMean)
-// {
-//    Vec3f xMean_copy = Vec3f(xMean[0], xMean[1], xMean[2]);
-//    float pR, pD2;
-//    pR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx);
-//    // pD = SmoothFactor * pR;
-//    pD2 = IS_CONST_RADIUS ? Influnce2 : GlobalInflunce2[pIdx];
-//    float nR, nD, nD2, nI, nI2, d, d2, wj, wSum = 0;
-//    for (int nIdx : temp_neighbors)
-//    {
-//        if (nIdx == pIdx)
-//            continue;
-//        nR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(nIdx);
-//        nD = _SMOOTH_FACTOR * nR * 1.6;
-//        nD2 = nD * nD;
-//        nI = nR * _NEIGHBOR_FACTOR;
-//        nI2 = nI * nI;
-//        d2 = (((_GlobalPoses->at(nIdx))) - ((_GlobalPoses->at(pIdx)))).squaredNorm();
-//        if (d2 >= nI2)
-//        {
-//            continue;
-//        }
-//        d = sqrt(d2);
-//        wj = wij(d, nI);
-//        wSum += wj;
-//        xMean_copy += ((_GlobalPoses->at(nIdx))) * wj;
-//        neighbors.push_back(nIdx);
-//        if (d2 <= std::max(pD2, nD2))
-//        {
-//            closer_neighbor++;
-//        }
-//    }
-//    if (_USE_XMEAN && !USE_POLY6)
-//    {
-//        if (wSum > 0)
-//        {
-//            xMean_copy /= wSum;
-//            xMean_copy = (_GlobalPoses->at(pIdx)) * (1 - _XMEAN_DELTA) + xMean_copy * _XMEAN_DELTA;
-//        }
-//        else
-//        {
-//            xMean_copy = (_GlobalPoses->at(pIdx));
-//        }
-//    }
-//    else
-//    {
-//        xMean_copy = (_GlobalPoses->at(pIdx));
-//    }
-//    xMean = Eigen::Vector3f(xMean_copy.x, xMean_copy.y, xMean_copy.z);
-// }
-
 void Evaluator::compute_xMeans(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Vec3f &xMean)
 {
    float pR, pD2;
@@ -720,79 +669,6 @@ void Evaluator::compute_G_Yus(int pIdx, Vec3f xMean, std::vector<int> neighbors,
     }
 }
 
-// void Evaluator::compute_Gs_xMeansCPU(){
-//    std::cout << "start compute_Gs_xMeansCPU " << std::endl;
-//    // #pragma omp parallel for
-//    for(int pIdx = 0; pIdx < _GlobalParticlesNum; pIdx++){
-//        std::vector<int> tempNeighbors(_ngmax, 0);
-//        std::vector<int> neighbors;
-//        int numNeighbors;
-//        int closerNeigbors = 0;
-//        Eigen::Vector3f xMean = Eigen::Vector3f::Zero();
-//        Eigen::Matrix3f G = Eigen::Matrix3f::Zero();
-
-//        // std::cout << "idx: " << pIdx << std::endl;
-//        numNeighbors = findNeighborsCPU(pIdx, *_GlobalPoses, *GlobalRadius, _octreeNs, _box, _ngmax, tempNeighbors.data());
-//        tempNeighbors.resize(numNeighbors); 
-//        if (numNeighbors <= 1) // only has one neighbor particle
-//        {
-//            G = Eigen::DiagonalMatrix<float, 3>(1.0, 1.0, 1.0);
-//            // GlobalSplash[pIdx] = true;
-//            if (USE_ANI)
-//            {
-//                GlobalGs[pIdx] = Eigen::Matrix3f(G);
-//                GlobalDeterminant[pIdx] = G.determinant();
-//            }
-//            GlobalxMeans[pIdx] = Eigen::Vector3f(_GlobalPoses->at(pIdx).x, _GlobalPoses->at(pIdx).y, _GlobalPoses->at(pIdx).z);
-//            // GlobalxMeans[pIdx] = _GlobalPoses[pIdx];
-//            continue;
-//        } 
-
-//        compute_xMeansCPU(pIdx, tempNeighbors, neighbors, closerNeigbors, xMean); 
-
-//        if (neighbors.size() <= 1)
-//        {
-//            G = Eigen::DiagonalMatrix<float, 3>(1.0, 1.0, 1.0);
-//            // GlobalSplash[pIdx] = true;
-//            if (USE_ANI)
-//            {
-//                GlobalGs[pIdx] = Eigen::Matrix3f(G);
-//                GlobalDeterminant[pIdx] = G.determinant();
-//            }
-//            GlobalxMeans[pIdx] = Eigen::Vector3f(xMean);
-//            continue;
-//        }
-
-//        GlobalxMeans[pIdx] = Eigen::Vector3f(xMean);
-//    }
-
-//    #pragma omp parallel for
-//    for (int pIdx = 0; pIdx < _GlobalParticlesNum; pIdx++)
-//    {
-//        if (CheckSplash(pIdx))
-//        {
-//            continue;
-//        }
-//        std::vector<int> tempNeighbors(_ngmax, 0);
-//        Eigen::Matrix3f G = Eigen::Matrix3f::Identity();
-//        int numNeighbors;
-//        numNeighbors = findNeighborsCPU(pIdx, *_GlobalPoses, *GlobalRadius, _octreeNs, _box, _ngmax, tempNeighbors.data());
-
-//        if (USE_ANI)
-//        {
-//            if (USE_POLY6)
-//            {
-//                compute_G_ours(pIdx, GlobalxMeans[pIdx], tempNeighbors, G);
-//            } else {
-//                compute_G_Yus(pIdx, GlobalxMeans[pIdx], tempNeighbors, G);
-//            }
-//            GlobalGs[pIdx] = Eigen::Matrix3f(G);
-//            GlobalDeterminant[pIdx] = G.determinant();
-//        }
-//    }
-
-// }
-
 void Evaluator::compute_Gs_xMeans()
 {
 #pragma omp parallel for
@@ -807,7 +683,7 @@ void Evaluator::compute_Gs_xMeans()
        {
            _hashgrid->GetPIdxList((GlobalPoses->at(pIdx)), tempNeighbors);
        } else {
-           // _searcher->GetNeighbors((GlobalPoses->at(pIdx)), tempNeighbors);
+           _searcher->GetNeighbors((GlobalPoses->at(pIdx)), tempNeighbors);
        }
        if (tempNeighbors.size() <= 2)
        {
@@ -870,9 +746,8 @@ void Evaluator::compute_Gs_xMeans()
        {
            _hashgrid->GetPIdxList((GlobalPoses->at(pIdx)), tempNeighbors);
        } else {
-           // _searcher->GetNeighbors((GlobalPoses->at(pIdx)), tempNeighbors);
+           _searcher->GetNeighbors((GlobalPoses->at(pIdx)), tempNeighbors);
        }
-
 
        if (USE_ANI)
        {

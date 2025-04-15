@@ -438,14 +438,14 @@ void runOurs(std::string dataDirPath, std::string outPath)
             readShonDyParticleData(dataPath, particles, radiuses);
         }
 
-        if (!IS_CONST_RADIUS)
-        {
-            if (abs(*std::max_element(radiuses.begin(), radiuses.end()) - *std::min_element(radiuses.begin(), radiuses.end())) < 1e-7)
-            {
-                    IS_CONST_RADIUS = true;
-                    RADIUS = radiuses[0];
-            }
-        }
+        // if (!IS_CONST_RADIUS)
+        // {
+        //     if (abs(*std::max_element(radiuses.begin(), radiuses.end()) - *std::min_element(radiuses.begin(), radiuses.end())) < 1e-7)
+        //     {
+        //             IS_CONST_RADIUS = true;
+        //             RADIUS = radiuses[0];
+        //     }
+        // }
         printf("Particles Number = %zd\n", particles.size());
         SurfReconstructor* constructor = new SurfReconstructor(particles, radiuses, &mesh, RADIUS);
         // constructor->Run(ISO_FACTOR, SMOOTH_FACTOR);
@@ -679,12 +679,12 @@ int main(int argc, char **argv)
     case 1:
     default:
         dataDirPath =
-        "/home/letian/Letian_Xie/work/ParticleIsosurface/test_cases";
+        // "/home/letian/Letian_Xie/work/ParticleIsosurface/test_cases";
         // "D:/data/inWater/particles";
         // "E:/data/geo";
         // "D:/data/3s/20231222-water";
         // "D:/data/car_render_test_data_2/Fluid";
-        // "D:/data/damBreak3D-27steps";
+        "D:/data/damBreak3D-27steps";
         // "E:/BaiduNetdiskDownload/MultiResolutionResults/damBreak3D";
         // "E:/data/ring/csv";
         // "E:/data/oil_csv";
@@ -696,13 +696,13 @@ int main(int argc, char **argv)
         // "E:/data/geo/out";
         // "D:/data/3s/20231222-water/out";
         // "D:/data/car_render_test_data_2/Fluid/out";
-        // "D:/data/damBreak3D-27steps/out";
+        "D:/data/damBreak3D-27steps/out";
         // "E:/BaiduNetdiskDownload/MultiResolutionResults/damBreak3D/out";
         // "E:/data/ring/csv/out";
         // "E:/data/oil_csv/out";
         // "D:/data/test/out";
         // "C:/Users/11379/Desktop/protein/out";
-        outPath = "/home/letian/Letian_Xie/work/ParticleIsosurface/test_cases";
+        // outPath = "/home/letian/Letian_Xie/work/ParticleIsosurface/test_cases";
         loadConfigJson(dataDirPath);
         // testHashGrid(5000000, dataDirPath + "/" + DATA_PATHES[0]);
         //if (USE_OURS)
