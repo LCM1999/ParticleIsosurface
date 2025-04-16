@@ -4,7 +4,7 @@
 
 #include "iso_common.h"
 // #include "hash_grid.h"
-// #include "multi_level_researcher.h"
+#include "multi_level_searcher.h"
 #include "multi_level_searcher_gpu.cuh"
 #include <assert.h>
 #include <iostream>
@@ -58,7 +58,9 @@ public:
 	~Evaluator() {};
 
     // std::shared_ptr<HashGrid> _hashgrid;
-    std::shared_ptr<MultiLevelSearcherGPU> _searcher;
+    bool useCPU = true;
+    std::shared_ptr<MultiLevelSearcher> _searcherCPU;
+    std::shared_ptr<MultiLevelSearcherGPU> _searcherGPU;
 
 	std::vector<Vec3f>* GlobalPoses;
     int _GlobalParticlesNum = 0;
@@ -81,6 +83,13 @@ public:
     std::vector<float> GlobalDeterminant;
 	void compute_Gs_xMeans();
     // void compute_Gs_xMeansCPU();
+	Evaluator(  
+        std::shared_ptr<MultiLevelSearcher>& searcher,
+        std::vector<Vec3f>* global_particles, 
+        std::vector<float>* radiuses,
+        float radius
+    );
+
 	Evaluator(  
                 std::shared_ptr<MultiLevelSearcherGPU>& searcher,
                 std::vector<Vec3f>* global_particles, 

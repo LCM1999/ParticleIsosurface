@@ -53,7 +53,10 @@ void VisitorExtract::calc_vertices()
 			{
 				cstoneOctree::Vec3f tmpv1 = v1.center, tmpv2 = v2.center, tmpv(0, 0, 0);
 				float v1s = v1.nodeScalar, v2s = v2.nodeScalar, tvs = 0;
-				float ratio, d = (tmpv1 - tmpv2).norm(), r = (IS_CONST_RADIUS ? constructor->getConstRadius(): constructor->getSearcher()->getMinRadius()) / 2;
+				float ratio, d = (tmpv1 - tmpv2).norm(), 
+				r = (IS_CONST_RADIUS ? constructor->getConstRadius() : 
+					(constructor->getUseCPU() ? constructor->getSearcherCPU()->getMinRadius() : 
+					 							constructor->getSearcherGPU()->getMinRadius())) / 2;
 				while (d > r)
 				{
 					tmpv[0] =  (tmpv1[0] + tmpv2[0]) / 2;

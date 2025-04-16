@@ -6,11 +6,66 @@
 using namespace cstoneOctree;
 
 Evaluator::Evaluator(
+    std::shared_ptr<MultiLevelSearcher>& searcher,
+    std::vector<Vec3f>* global_particles, 
+    std::vector<float>* radiuses, float radius)
+{
+    this->useCPU = true;
+    _searcherCPU = searcher;
+	GlobalPoses = global_particles;
+    GlobalRadius = radiuses;
+    _GlobalParticlesNum = global_particles->size();
+    if (!IS_CONST_RADIUS)
+    {
+        GlobalRadius2.resize(_GlobalParticlesNum);
+        GlobalRadius3.resize(_GlobalParticlesNum);
+        GlobalInflunce2.resize(_GlobalParticlesNum);
+        GlobalSigma.resize(_GlobalParticlesNum);
+#pragma omp parallel for
+        for (int i = 0; i < _GlobalParticlesNum; i++)
+        {
+            float smooth = GlobalRadius->at(i) * _SMOOTH_FACTOR;
+            GlobalRadius2[i] = pow(GlobalRadius->at(i), 2);
+            GlobalRadius3[i] = GlobalRadius->at(i) * GlobalRadius2[i];
+            GlobalInflunce2[i] = pow(smooth, 2);
+            GlobalSigma[i] = 1/pow(smooth, 6);   //(315 / (64 * pow(influnce, 9))) * inv_pi;
+        }
+    } else {
+        Radius = radius;
+        Radius2 = Radius * Radius;
+        Radius3 = Radius * Radius2;
+        Influnce2 = pow(Radius * _SMOOTH_FACTOR, 2);
+        Sigma = 1 / pow(radius * _SMOOTH_FACTOR, 6);    //(315 / (64 * pow(radius * _SMOOTH_FACTOR, 9))) * inv_pi;
+    }
+
+    if (!USE_POLY6)
+    {
+        _XMEAN_DELTA = 0.9;
+    }
+
+    if (CALC_P_NORMAL)
+    {
+        PariclesNormals.clear();
+        PariclesNormals.resize(_GlobalParticlesNum, Vec3f(0, 0, 0)); 
+    }
+    
+    GlobalSplash.resize(_GlobalParticlesNum, 0);
+    GlobalSurface.resize(_GlobalParticlesNum, 0);
+    GlobalxMeans.resize(_GlobalParticlesNum);
+    if (USE_ANI)
+    {
+        GlobalGs.resize(_GlobalParticlesNum);
+        GlobalDeterminant.resize(_GlobalParticlesNum);
+    }
+}
+
+Evaluator::Evaluator(
     std::shared_ptr<MultiLevelSearcherGPU>& searcher,
     std::vector<Vec3f>* global_particles, 
     std::vector<float>* radiuses, float radius)
 {
-    _searcher = searcher;
+    useCPU = false;
+    _searcherGPU = searcher;
 	GlobalPoses = global_particles;
     GlobalRadius = radiuses;
     _GlobalParticlesNum = global_particles->size();
@@ -119,9 +174,14 @@ void Evaluator::SingleEval(const Vec3f& pos, float& scalar)
 	scalar = 0;
     std::vector<int> neighbors;
     int realNeighbors = 0, estimate = 0;
-    _searcher->GetNeighborsEstimate(pos, estimate);
-    neighbors.resize(estimate);
-    _searcher->GetNeighbors(pos, realNeighbors, estimate, neighbors.data());
+    if (useCPU)
+    {
+        _searcherCPU->GetNeighbors(pos, neighbors);
+    } else {
+        _searcherGPU->GetNeighborsEstimate(pos, estimate);
+        neighbors.resize(estimate);
+        _searcherGPU->GetNeighbors(pos, realNeighbors, estimate, neighbors.data());
+    }
     Vec3f diff;
     for (int pIdx : neighbors)
     {
@@ -156,9 +216,14 @@ void Evaluator::SingleEvalWithGrad(const Vec3f& pos, float& scalar, Vec3f& gradi
 
     std::vector<int> neighbors;
     int realNeighbors = 0, estimate = 0;
-    _searcher->GetNeighborsEstimate(pos, estimate);
-    neighbors.resize(estimate);
-    _searcher->GetNeighbors(pos, realNeighbors, estimate, neighbors.data());
+    if (useCPU)
+    {
+        _searcherCPU->GetNeighbors(pos, neighbors);
+    } else {
+        _searcherGPU->GetNeighborsEstimate(pos, estimate);
+        neighbors.resize(estimate);
+        _searcherGPU->GetNeighbors(pos, realNeighbors, estimate, neighbors.data());
+    }
     Vec3f diff;
     for (int pIdx : neighbors)
     {
@@ -320,9 +385,9 @@ void Evaluator::CalculateMaxScalarConstR()
 void Evaluator::CalculateMaxScalarVarR()
 {
     float max_scalar = 0;
-    unsigned int rId;
     float temp_scalar;
-    for (const auto& rId : _searcher->maxRadiusParticleIds)
+    auto rIds = useCPU ? _searcherCPU->getMaxRadiusParticleIds() : _searcherGPU->getMaxRadiusPaticleIds();
+    for (const auto& rId : rIds)
     {
         temp_scalar = 0.0;
         if (USE_POLY6)
@@ -362,11 +427,9 @@ void Evaluator::RecommendIsoValueConstR()
 void Evaluator::RecommendIsoValueVarR()
 {
     float recommend = 0.0;
-    auto searchers = _searcher;
-    unsigned int rId;
     float temp_scalar;
-
-    for (const auto& rId : _searcher->maxRadiusParticleIds)
+    auto rIds = useCPU ? _searcherCPU->getMaxRadiusParticleIds() : _searcherGPU->getMaxRadiusPaticleIds();
+    for (const auto& rId : rIds)
     {
         temp_scalar = 0.0;
         if (USE_POLY6)
@@ -669,9 +732,14 @@ void Evaluator::compute_Gs_xMeans()
        int closerNeigbors = 0;
        Vec3f xMean(0, 0, 0);
        int realNeighbors = 0, estimate = 0;
-       _searcher->GetNeighborsEstimate((GlobalPoses->at(pIdx)), estimate);
-       neighbors.resize(estimate);
-       _searcher->GetNeighbors((GlobalPoses->at(pIdx)), realNeighbors, estimate, neighbors.data());
+       if (useCPU)
+       {
+           _searcherCPU->GetNeighbors(GlobalPoses->at(pIdx), neighbors);
+       } else {
+           _searcherGPU->GetNeighborsEstimate(GlobalPoses->at(pIdx), estimate);
+           neighbors.resize(estimate);
+           _searcherGPU->GetNeighbors(GlobalPoses->at(pIdx), realNeighbors, estimate, neighbors.data());
+       }
        if (tempNeighbors.size() <= 2)
        {
            Mat3f G(1.0, 1.0, 1.0);
@@ -736,9 +804,14 @@ void Evaluator::compute_Gs_xMeans()
     //        _searcher->GetNeighbors((GlobalPoses->at(pIdx)), tempNeighbors);
     //    }
        int realNeighbors = 0, estimate = 0;
-       _searcher->GetNeighborsEstimate((GlobalPoses->at(pIdx)), estimate);
-       tempNeighbors.resize(estimate);
-       _searcher->GetNeighbors((GlobalPoses->at(pIdx)), realNeighbors, estimate, tempNeighbors.data());
+       if (useCPU)
+       {
+           _searcherCPU->GetNeighbors(GlobalPoses->at(pIdx), tempNeighbors);
+       } else {
+           _searcherGPU->GetNeighborsEstimate(GlobalPoses->at(pIdx), estimate);
+           tempNeighbors.resize(estimate);
+           _searcherGPU->GetNeighbors(GlobalPoses->at(pIdx), realNeighbors, estimate, tempNeighbors.data());
+       }
        if (USE_ANI)
        {
            if (USE_POLY6)

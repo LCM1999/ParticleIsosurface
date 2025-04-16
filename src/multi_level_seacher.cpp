@@ -1,15 +1,14 @@
 #include <set>
-#include "multi_level_researcher.h"
+#include "multi_level_searcher.h"
 #include <cfloat>
 #include "hash_grid.h"
 
 MultiLevelSearcher::MultiLevelSearcher(std::vector<cstoneOctree::Vec3f>* particles, float* bounding, std::vector<float>* radiuses, float inf_factor)
 {
-    // std::vector<std::vector<Eigen::Vector3f>> sortedParticles;
-    maxRadius = *std::max_element(radiuses->begin(), radiuses->end()) * 1.01;
-    minRadius = *std::min_element(radiuses->begin(), radiuses->end()) * 0.99;
+    maxRadius = *std::max_element(radiuses->begin(), radiuses->end());   // * 1.01
+    minRadius = *std::min_element(radiuses->begin(), radiuses->end());   // * 0.99
     infFactor = inf_factor;
-    particlesNum = particles->size();
+    int particlesNum = particles->size();
     std::vector<std::pair<float, float>> bin_bounds;
     float bin_extent = minRadius * 0.5;
     int bins = std::max(int(ceil((maxRadius - minRadius) / bin_extent)), 1);
@@ -30,19 +29,10 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<cstoneOctree::Vec3f>* particl
         }
         return -1;
     };
-    // sortedParticles.clear();
-    sortedIndex.clear();
-    // sortedParticles.resize(bins);
-    sortedIndex.resize(bins);
-    // for (size_t i = 0; i < bins; i++)
-    // {
-    //     // sortedParticles[i].clear();
-    //     sortedIndex[i].clear();
-    // }
+    std::vector<std::vector<unsigned>>sortedIndex(bins);
 
     for (int i = 0; i < radiuses->size(); i++)
     {
-        // sortedParticles[whichBin(radiuses->at(i))].push_back(particles->at(i));
         sortedIndex[whichBin(radiuses->at(i))].push_back(i);
         avgRadius += radiuses->at(i);
     }
@@ -68,94 +58,56 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<cstoneOctree::Vec3f>* particl
             [&](unsigned int& a, unsigned int& b) {
                 return radiuses->at(a) < radiuses->at(b);
             });
-        // std::cout << sortedIndex[i].size() << ", " << radiuses->at(binRadiusId) << std::endl;
+        maxRadiusParticleIds.push_back(binRadiusId);
         searchers.push_back(new HashGrid(particles, radiuses, sortedIndex[i], temp_bounding, binRadiusId, inf_factor));
     }
-    std::set<float> st(radiuses->begin(), radiuses->end());
-    checkedRadiuses.assign(st.begin(), st.end());
     printf("   Seachers level: %d.\n", searchers.size());
 }
 
 void MultiLevelSearcher::GetNeighborsEstimate(const cstoneOctree::Vec3f& pos, int& estimate)
 {
-    for (size_t sIndexId = 0; sIndexId < sortedIndex.size(); sIndexId++)
+    for (auto& searcher : searchers)
     {
-        if (sortedIndex[sIndexId].empty())
-        {
-            continue;
-        }
-        searchers[sIndexId]->GetPIdxEstimate(pos, estimate);
+        searcher->GetPIdxEstimate(pos, estimate);
     }
 }
 
 void MultiLevelSearcher::GetNeighbors(const cstoneOctree::Vec3f& pos, std::vector<int>& neighbors)
 {
-    for (size_t sIndexId = 0; sIndexId < sortedIndex.size(); sIndexId++)
+    for (auto& searcher : searchers)
     {
-        if (sortedIndex[sIndexId].empty())
-        {
-            continue;
-        }
-        searchers[sIndexId]->GetPIdxList(pos, neighbors);
+        searcher->GetPIdxList(pos, neighbors);
     }
 }
 
 void MultiLevelSearcher::GetNeighbors(const cstoneOctree::Vec3f& pos, int& numNeighbors, int ngmax, int* neighbors)
 {
-    for (size_t sIndexId = 0; sIndexId < sortedIndex.size(); sIndexId++)
+    for (auto& searcher : searchers)
     {
-        if (sortedIndex[sIndexId].empty())
-        {
-            continue;
-        }
-        searchers[sIndexId]->GetPIdxList(pos, numNeighbors, ngmax, neighbors);
+        searcher->GetPIdxList(pos, numNeighbors, ngmax, neighbors);
     }
 }
 
 void MultiLevelSearcher::GetInBoxEstimate(const cstoneOctree::Vec3f& box1, const cstoneOctree::Vec3f& box2, int& insides)
 {
-    size_t sIndexId = 0, searcherId = 0;
-    for (sIndexId = 0; sIndexId < sortedIndex.size(); sIndexId++)
+    for (auto& searcher : searchers)
     {
-        if (sortedIndex[sIndexId].empty())
-        {
-            continue;
-        }
-        searchers[searcherId]->GetInBoxEstimate(box1, box2, insides);
-        searcherId++;
+        searcher->GetInBoxEstimate(box1, box2, insides);
     }
 }
 
 void MultiLevelSearcher::GetInBoxParticles(cstoneOctree::Vec3f box1, cstoneOctree::Vec3f box2, int& numNeighbors, int ngmax, int* insides)
 {
-    size_t sIndexId = 0, searcherId = 0;
-    for (sIndexId = 0; sIndexId < sortedIndex.size(); sIndexId++)
+    for (auto& searcher : searchers)
     {
-        if (sortedIndex[sIndexId].empty())
-        {
-            continue;
-        }
-        searchers[searcherId]->GetInBoxParticles(box1, box2, numNeighbors, ngmax, insides);
-        searcherId++;
+        searcher->GetInBoxParticles(box1, box2, numNeighbors, ngmax, insides);
     }
 }
 
 void MultiLevelSearcher::GetInBoxParticles(const cstoneOctree::Vec3f& box1, const cstoneOctree::Vec3f& box2, std::vector<int>& insides)
 {
-    std::vector<int> subInsides;
-    size_t sIndexId = 0, searcherId = 0;
-    for (sIndexId = 0; sIndexId < sortedIndex.size(); sIndexId++)
+    for (auto& searcher : searchers)
     {
-        if (sortedIndex[sIndexId].empty())
-        {
-            continue;
-        }
-        subInsides.clear();
-        searchers[searcherId]->GetInBoxParticles(box1, box2, subInsides);
-        for (size_t nId = 0; nId < subInsides.size(); nId++)
-        {
-            insides.push_back(sortedIndex[sIndexId][subInsides[nId]]);
-        }
-        searcherId++;
+        searcher->GetInBoxParticles(box1, box2, insides);
     }
 }

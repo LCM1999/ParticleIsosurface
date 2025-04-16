@@ -88,6 +88,7 @@ struct MultiLevelSearcherGPU
 
     HOST int getSearchersNum() { return searchers.size(); }
     HOST HashGridGPU* getSearcher(int i) { return searchers[i]; }
+    HOST std::vector<int> getMaxRadiusPaticleIds() {return std::vector<int>(maxRadiusParticleIds.begin(), maxRadiusParticleIds.end());}
     HOST_DEVICE float getMaxRadius() {return maxRadius;}
     HOST_DEVICE float getMinRadius() {return minRadius;}
     HOST_DEVICE float getAvgRadius() {return avgRadius;}

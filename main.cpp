@@ -15,7 +15,7 @@
 #include "rply.h"
 
 #include "hash_grid.h"
-#include "multi_level_researcher.h"
+#include "multi_level_searcher.h"
 #include "timer.h"
 
 #ifdef _WIN32
@@ -539,18 +539,19 @@ int main(int argc, char **argv)
     default:
         dataDirPath =
         // "/home/letian/Letian_Xie/work/ParticleIsosurface/test_cases";
+        "D:/data/multiR/mr_csv";
         // "D:/data/inWater/particles";
         // "E:/data/geo";
         // "D:/data/3s/20231222-water";
         // "D:/data/car_render_test_data_2/Fluid";
-        "D:/data/damBreak3D-27steps";
+        // "D:/data/damBreak3D-27steps";
         // "E:/BaiduNetdiskDownload/MultiResolutionResults/damBreak3D";
         // "E:/data/ring/csv";
         // "E:/data/oil_csv";
         // "D:/data/test";
         // "C:/Users/11379/Desktop/protein";
         outPath = 
-        // "D:/data/multiR/mr_csv";
+        "D:/data/multiR/mr_csv/out";
         // "D:/data/inWater/particles/out";
         // "E:/data/geo/out";
         // "D:/data/3s/20231222-water/out";

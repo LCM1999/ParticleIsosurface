@@ -72,13 +72,8 @@ struct HashGridGPU
         EndList = new int[CellNum];
         std::memset(StartList, -1, CellNum * sizeof(int));
         std::memset(EndList, -1, CellNum * sizeof(int));
-        // IndexList.resize(particlesNum, 0);
-        // StartList.resize(CellNum, -1);
-        // EndList.resize(CellNum, -1);
         BuildTable(particlesNum, particles);
         HashList.clear();
-        // delete[] HashList;
-        // HashList = nullptr;
     }
 
     HOST_DEVICE void CalcXYZIdx(const cstoneOctree::Vec3f& pos, cstoneOctree::Vec3i& xyzIdx) const

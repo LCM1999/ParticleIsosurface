@@ -1,4 +1,6 @@
 #pragma once
+#ifndef MULTI_LEVEL_SEARCHER_H
+#define MULTI_LEVEL_SEARCHER_H
 
 #include <vector>
 //#include <Eigen/Dense>
@@ -10,11 +12,9 @@ class MultiLevelSearcher
 {
 private:
     std::vector<HashGrid*> searchers;
-    std::vector<std::vector<unsigned int>> sortedIndex;
-    std::vector<float> checkedRadiuses;
+    std::vector<int> maxRadiusParticleIds;
     float maxRadius = 0, minRadius = 0, avgRadius = 0;
     float infFactor;
-	unsigned int particlesNum;
 
 public:
     MultiLevelSearcher(std::vector<cstoneOctree::Vec3f>* particles, float* bounding, std::vector<float>* radiuses, float inf_factor);
@@ -27,12 +27,11 @@ public:
         }
     };
 
-    inline std::vector<float>* getCheckedRadiuses() {return &checkedRadiuses;}
     inline std::vector<HashGrid*>* getSearchers() {return &searchers;};
+    inline std::vector<int> getMaxRadiusParticleIds() {return maxRadiusParticleIds;};
     inline float getMaxRadius() {return maxRadius;}
     inline float getMinRadius() {return minRadius;}
     inline float getAvgRadius() {return avgRadius;}
-    inline float getParticlesNum() {return particlesNum;}
 
     void GetNeighborsEstimate(const cstoneOctree::Vec3f& pos, int& estimate);
     void GetNeighbors(const cstoneOctree::Vec3f& pos, std::vector<int>& neighbors);
@@ -41,3 +40,5 @@ public:
     void GetInBoxParticles(const cstoneOctree::Vec3f& box1, const cstoneOctree::Vec3f& box2, std::vector<int>& insides);
     void GetInBoxParticles(cstoneOctree::Vec3f box1, cstoneOctree::Vec3f box2, int& numNeighbors, int ngmax, int* insides);
 };
+
+#endif

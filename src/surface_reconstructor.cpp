@@ -2,8 +2,8 @@
 #include <omp.h>
 
 #include "surface_reconstructor.h"
-#include "hash_grid.h"
-// #include "multi_level_researcher.h"
+// #include "hash_grid.h"
+// #include "multi_level_searcher.h"
 // #include "evaluator.h"
 #include "iso_method_ours.h"
 #include "global.h"
@@ -59,52 +59,6 @@ void SurfReconstructor::loadRootBox()
 	}
 }
 
-//void SurfReconstructor::shrinkBox()
-//{
-//	std::vector<int> ids;
-//	ids.resize(_GlobalParticlesNum);
-//	for (size_t i = 0; i < _GlobalParticlesNum; i++)
-//	{
-//		ids[i] = i;
-//	}
-//	_BoundingBox[0] = _GlobalParticles[(*std::min_element(ids.begin(), ids.end(), 
-//	[&] (const int& id1, const int& id2) {
-//		if (getEvaluator()->CheckSplash(id1)) {	return false;	}
-//		if (getEvaluator()->CheckSplash(id2)) {	return true;	}
-//		return getGlobalParticles()->at(id1).x < getGlobalParticles()->at(id2).x;
-//		}))].x;
-//	_BoundingBox[1] = _GlobalParticles[(*std::max_element(ids.begin(), ids.end(), 
-//	[&] (const int& id1, const int& id2) {
-//		if (getEvaluator()->CheckSplash(id2)) {	return false;	}
-//		if (getEvaluator()->CheckSplash(id1)) {	return true;	}
-//		return getGlobalParticles()->at(id1).x < getGlobalParticles()->at(id2).x;
-//		}))].x;
-//	_BoundingBox[2] = _GlobalParticles[(*std::min_element(ids.begin(), ids.end(), 
-//	[&] (const int& id1, const int& id2) {
-//		if (getEvaluator()->CheckSplash(id1)) {	return false;	}
-//		if (getEvaluator()->CheckSplash(id2)) {	return true;	}
-//		return getGlobalParticles()->at(id1).y() < getGlobalParticles()->at(id2).y();
-//		}))].y();
-//	_BoundingBox[3] = _GlobalParticles[(*std::max_element(ids.begin(), ids.end(), 
-//	[&] (const int& id1, const int& id2) {
-//		if (getEvaluator()->CheckSplash(id2)) {	return false;	}
-//		if (getEvaluator()->CheckSplash(id1)) {	return true;	}
-//		return getGlobalParticles()->at(id1).y() < getGlobalParticles()->at(id2).y();
-//		}))].y();
-//	_BoundingBox[4] = _GlobalParticles[(*std::min_element(ids.begin(), ids.end(), 
-//	[&] (const int& id1, const int& id2) {
-//		if (getEvaluator()->CheckSplash(id1)) {	return false;	}
-//		if (getEvaluator()->CheckSplash(id2)) {	return true;	}
-//		return getGlobalParticles()->at(id1).z() < getGlobalParticles()->at(id2).z();
-//		}))].z();
-//	_BoundingBox[5] = _GlobalParticles[(*std::max_element(ids.begin(), ids.end(), 
-//	[&] (const int& id1, const int& id2) {
-//		if (getEvaluator()->CheckSplash(id2)) {	return false;	}
-//		if (getEvaluator()->CheckSplash(id1)) {	return true;	}
-//		return getGlobalParticles()->at(id1).z() < getGlobalParticles()->at(id2).z();
-//		}))].z();
-//}
-
 void SurfReconstructor::resizeRootBoxConstR()
 {
     float maxLen, resizeLen;
@@ -135,7 +89,9 @@ void SurfReconstructor::resizeRootBoxConstR()
 void SurfReconstructor::resizeRootBoxVarR()
 {
 	float maxLen, resizeLen;
-	float minR = _searcher->getMinRadius(), maxR = _searcher->getMaxRadius(), avgR = _searcher->getAvgRadius();
+	float minR = useCPU ? _searcherCPU->getMinRadius() : _searcherGPU->getMinRadius(), 
+		  maxR = useCPU ? _searcherCPU->getMaxRadius() : _searcherGPU->getMaxRadius(),
+		  avgR = useCPU ? _searcherCPU->getAvgRadius() : _searcherGPU->getAvgRadius();
 	maxLen = (std::max)({ 
 		(_BoundingBox[1] - _BoundingBox[0]) , 
 		(_BoundingBox[3] - _BoundingBox[2]) , 
@@ -170,14 +126,14 @@ void SurfReconstructor::checkEmptyAndCalcCurv(std::shared_ptr<TNode> tnode, unsi
 	const cstoneOctree::Vec3f
 	box1 = tnode->center - cstoneOctree::Vec3f(tnode->half_length, tnode->half_length, tnode->half_length),
 	box2 = tnode->center + cstoneOctree::Vec3f(tnode->half_length, tnode->half_length, tnode->half_length);
-	// if (IS_CONST_RADIUS)
-	// {
-	// 	_hashgrid->GetInBoxParticles(box1, box2, insides);
-	// } else {
-	_searcher->GetInBoxEstimate(box1, box2, estiamte);
-	insides.resize(estiamte);
-	_searcher->GetInBoxParticles(box1, box2, real, estiamte, insides.data());
-	// }
+	if (useCPU)
+	{
+		_searcherCPU->GetInBoxParticles(box1, box2, insides);
+	} else {
+		_searcherGPU->GetInBoxEstimate(box1, box2, estiamte);
+		insides.resize(estiamte);
+		_searcherGPU->GetInBoxParticles(box1, box2, real, estiamte, insides.data());
+	}
 	empty = insides.empty();
 	if (!empty)
 	{
@@ -779,13 +735,21 @@ void SurfReconstructor::RunCPU2(float iso_factor, float smooth_factor)
     // 	HashGrid _hashgrid(&_GlobalParticles, _BoundingBox, _GlobalRadiuses[0], 4.0f);
 	// 	IS_CONST_RADIUS = false;
 		// } else {
-		_searcher = std::make_shared<MultiLevelSearcherGPU>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
+		// useCPU = true;
+		// _searcherCPU = std::make_shared<MultiLevelSearcher>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
+		useCPU = false;
+		_searcherGPU = std::make_shared<MultiLevelSearcherGPU>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
 	// }
 	std::cout << "   Build Neighbor Searcher Time = " << t.elapsed() << std::endl;
 	t.reset();
 
     printf("-= Initialize Evaluator =-\n");
-	_evaluator = std::make_shared<Evaluator>(_searcher, &_GlobalParticles, &_GlobalRadiuses, _RADIUS);
+	if (useCPU)
+	{
+		_evaluator = std::make_shared<Evaluator>(_searcherCPU, &_GlobalParticles, &_GlobalRadiuses, _RADIUS);
+	} else {
+		_evaluator = std::make_shared<Evaluator>(_searcherGPU, &_GlobalParticles, &_GlobalRadiuses, _RADIUS);
+	}
 	_evaluator->setSmoothFactor(smooth_factor);
 	_evaluator->setIsoFactor(iso_factor);
 	_evaluator->compute_Gs_xMeans();
@@ -869,9 +833,15 @@ void SurfReconstructor::RunCPU2(float iso_factor, float smooth_factor)
 			// 	insideParticlesIdx.resize(estimateNeighborsNum);
 			// 	_hashgrid->GetInBoxParticles(box1, box2, trueNeighborsNum, estimateNeighborsNum, insideParticlesIdx.data());
 			// } else {
-				_searcher->GetInBoxEstimate(box1, box2, estimateNeighborsNum);
+			if (useCPU)
+			{
+				_searcherCPU->GetInBoxParticles(box1, box2, insideParticlesIdx);
+				trueNeighborsNum = insideParticlesIdx.size();
+			} else {
+				_searcherGPU->GetInBoxEstimate(box1, box2, estimateNeighborsNum);
 				insideParticlesIdx.resize(estimateNeighborsNum);
-				_searcher->GetInBoxParticles(box1, box2, trueNeighborsNum, estimateNeighborsNum, insideParticlesIdx.data());
+				_searcherGPU->GetInBoxParticles(box1, box2, trueNeighborsNum, estimateNeighborsNum, insideParticlesIdx.data());
+			}
 			// }
 			// check empty and calculate curvature implentation below
 			cstoneOctree::Vec3f norms(0, 0, 0);
@@ -1136,13 +1106,13 @@ void SurfReconstructor::Run(float iso_factor, float smooth_factor)
 	// {
     // 	_hashgrid = std::make_shared<HashGrid>(&_GlobalParticles, _BoundingBox, _RADIUS, 4.0f);
 	// } else {
-		_searcher = std::make_shared<MultiLevelSearcherGPU>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
+		_searcherCPU = std::make_shared<MultiLevelSearcher>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
 	// }
 	printf("   Build Neighbor Searcher Time = %f \n", t.elapsed());
 	t.reset();
 
     printf("-= Initialize Evaluator =-\n");
-	_evaluator = std::make_shared<Evaluator>(_searcher, &_GlobalParticles, &_GlobalRadiuses, _RADIUS);
+	_evaluator = std::make_shared<Evaluator>(_searcherCPU, &_GlobalParticles, &_GlobalRadiuses, _RADIUS);
 	_evaluator->setSmoothFactor(smooth_factor);
 	_evaluator->setIsoFactor(iso_factor);
 	_evaluator->compute_Gs_xMeans();

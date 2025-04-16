@@ -5,10 +5,7 @@
 HashGrid::HashGrid(std::vector<cstoneOctree::Vec3f>* particles, float* bounding, float radius, float inf_factor)
 {
 	// assert(IS_CONST_RADIUS);
-	Particles = particles;
-	ParticlesNum = Particles->size();
-
-	Radius = radius;
+	int particlesNum = particles->size();
 	CellSize = radius * inf_factor;	// + 2 * radius
 
 	int i = 0;
@@ -27,28 +24,22 @@ HashGrid::HashGrid(std::vector<cstoneOctree::Vec3f>* particles, float* bounding,
 	XYZCellNum[2] = std::max(int(ceil((Bounding[5] - Bounding[4]) / CellSize)), 1);
 	CellNum = (long long)XYZCellNum[0] * (long long)XYZCellNum[1] * (long long)XYZCellNum[2];
 
-	HashList.resize(ParticlesNum, 0);
-	IndexList.resize(ParticlesNum, 0);
+	HashList.resize(particlesNum, 0);
+	IndexList.resize(particlesNum, 0);
 
-	BuildTable();
+	BuildTable(particlesNum, particles);
 	HashList.clear();
 }
 
 HashGrid::HashGrid(std::vector<cstoneOctree::Vec3f>* particles, std::vector<float>* radiuses,
 	std::vector<unsigned int>& pIndexes, float* bounding, unsigned int radiusId, float inf_factor)
 {
-	Particles = particles;
+	int particlesNum = pIndexes.size();
 	PIndexes.assign(pIndexes.begin(), pIndexes.end());
-	ParticlesNum = PIndexes.size();
-
-	RadiusId = radiusId;
-	Radius = radiuses->at(RadiusId);
-	CellSize = Radius * inf_factor;	// + 2 * Radius
-
+	CellSize = radiuses->at(radiusId) * inf_factor;	// + 2 * Radius
 	int i = 0;
 	float length = 0.0;
 	float center = 0.0;
-
 	for (i = 0; i < 3; i++)
 	{
 		length = ((ceil((bounding[i * 2 + 1] - bounding[i * 2]) / CellSize)) * CellSize);
@@ -61,50 +52,50 @@ HashGrid::HashGrid(std::vector<cstoneOctree::Vec3f>* particles, std::vector<floa
 	XYZCellNum[2] = std::max(int(ceil((Bounding[5] - Bounding[4]) / CellSize)), 1);
 	CellNum = (long long)XYZCellNum[0] * (long long)XYZCellNum[1] * (long long)XYZCellNum[2];
 
-	HashList.resize(ParticlesNum, 0);
-	IndexList.resize(ParticlesNum, 0);
+	HashList.resize(particlesNum, 0);
+	IndexList.resize(particlesNum, 0);
 
-	BuildTable();
+	BuildTable(particlesNum, particles);
 	HashList.clear();
 }
 
-inline void HashGrid::BuildTable()
+inline void HashGrid::BuildTable(const int particlesNum, const std::vector<cstoneOctree::Vec3f>* particles)
 {
-	CalcHashList();
+	CalcHashList(particlesNum, particles);
 	std::sort(IndexList.begin(), IndexList.end(),
 		[&](const int& a, const int& b) {
 			return (HashList[a] < HashList[b]);
 		}
 	);
 	std::vector<long long> temp(HashList);
-	for (int i = 0; i < ParticlesNum; i++)
+	for (int i = 0; i < particlesNum; i++)
 	{
 		HashList[i] = temp[IndexList[i]];
 	}
-	FindStartEnd();
+	FindStartEnd(particlesNum);
 }
 
-inline void HashGrid::CalcHashList()
+inline void HashGrid::CalcHashList(const int particlesNum, const std::vector<cstoneOctree::Vec3f>* particles)
 {
 	cstoneOctree::Vec3i xyzIdx;
-	for (size_t index = 0; index < ParticlesNum; index++)
+	for (size_t index = 0; index < particlesNum; index++)
 	{
 		if (IS_CONST_RADIUS)
 		{
-			CalcXYZIdx(Particles->at(index), xyzIdx);
+			CalcXYZIdx(particles->at(index), xyzIdx);
 		} else {
-			CalcXYZIdx(Particles->at(PIndexes[index]), xyzIdx);
+			CalcXYZIdx(particles->at(PIndexes[index]), xyzIdx);
 		}
 		HashList[index] = CalcCellHash(xyzIdx);
 		IndexList[index] = index;
 	}
 }
 
-inline void HashGrid::FindStartEnd()
+inline void HashGrid::FindStartEnd(const int particlesNum) 
 {
 	int index, hash, count = 0, previous = -1;
 	
-	for (size_t index = 0; index < ParticlesNum; index++)
+	for (size_t index = 0; index < particlesNum; index++)
 	{
 		hash = HashList[index];
 		if (hash < 0)

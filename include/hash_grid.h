@@ -20,10 +20,6 @@ public:
 	HashGrid(std::vector<cstoneOctree::Vec3f>* particles, std::vector<float>* radiuses,
 		std::vector<unsigned int>& pIndexes, float* bounding, unsigned int radiusId, float inf_factor);
 
-	std::vector<cstoneOctree::Vec3f>* Particles;
-	unsigned int ParticlesNum;
-	unsigned int RadiusId;
-	float Radius;
 	float CellSize;
 	float Bounding[6];
 	unsigned int XYZCellNum[3];
@@ -43,9 +39,9 @@ public:
     void GetInBoxParticles(cstoneOctree::Vec3f box1, cstoneOctree::Vec3f box2, std::vector<int>& insides);
     void GetInBoxParticles(cstoneOctree::Vec3f box1, cstoneOctree::Vec3f box2, int& numNeighbors, int ngmax, int* insides);
 private:
-	void BuildTable();
-	void CalcHashList();
-	void FindStartEnd();
+	void BuildTable(const int particlesNum, const std::vector<cstoneOctree::Vec3f>* particles);
+	void CalcHashList(const int particlesNum, const std::vector<cstoneOctree::Vec3f>* particles);
+	void FindStartEnd(const int particlesNum);
 	// void GetNeighborHashs(vect3d* pos, int* neighborHashs);
 };
 

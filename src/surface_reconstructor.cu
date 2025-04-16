@@ -30,13 +30,14 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 	// {
     	// _hashgrid = std::make_shared<HashGrid>(&_GlobalParticles, _BoundingBox, _RADIUS, 4.0f);
 	// } els
-    _searcher = std::make_shared<MultiLevelSearcherGPU>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
+	useCPU = false;
+    _searcherGPU = std::make_shared<MultiLevelSearcherGPU>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
 	// }
 	printf("   Build Neighbor Searcher Time = %f \n", t.elapsed());
 	t.reset();
 
     printf("-= Initialize Evaluator =-\n");
-	_evaluator = std::make_shared<Evaluator>(_searcher, &_GlobalParticles, &_GlobalRadiuses, _RADIUS);
+	_evaluator = std::make_shared<Evaluator>(_searcherGPU, &_GlobalParticles, &_GlobalRadiuses, _RADIUS);
 	_evaluator->setSmoothFactor(smooth_factor);
 	_evaluator->setIsoFactor(iso_factor);
 	_evaluator->compute_Gs_xMeans();
