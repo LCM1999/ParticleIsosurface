@@ -70,8 +70,8 @@ struct HashGridGPU
         IndexList = new int[particlesNum];
         StartList = new int[CellNum];
         EndList = new int[CellNum];
-        std::memset(StartList, -1, CellNum);
-        std::memset(EndList, -1, CellNum);
+        std::memset(StartList, -1, CellNum * sizeof(int));
+        std::memset(EndList, -1, CellNum * sizeof(int));
         // IndexList.resize(particlesNum, 0);
         // StartList.resize(CellNum, -1);
         // EndList.resize(CellNum, -1);
@@ -81,14 +81,14 @@ struct HashGridGPU
         // HashList = nullptr;
     }
 
-    HOST_DEVICE void CalcXYZIdx(const cstoneOctree::Vec3f& pos, cstoneOctree::Vec3i& xyzIdx) 
+    HOST_DEVICE void CalcXYZIdx(const cstoneOctree::Vec3f& pos, cstoneOctree::Vec3i& xyzIdx) const
     {
         xyzIdx.setZero();
         for (int i = 0; i < 3; i++)
             xyzIdx[i] = int((pos[i] - Bounding[i * 2]) / CellSize);
     };
 
-	HOST_DEVICE int64_t CalcCellHash(const cstoneOctree::Vec3i& xyzIdx) 
+	HOST_DEVICE int64_t CalcCellHash(const cstoneOctree::Vec3i& xyzIdx) const
     {
         if (xyzIdx[0] < 0 || xyzIdx[0] >= XYZCellNum[0] ||
             xyzIdx[1] < 0 || xyzIdx[1] >= XYZCellNum[1] ||
@@ -163,7 +163,7 @@ struct HashGridGPU
         }
     };
 	
-	HOST_DEVICE void GetInBoxEstimate(cstoneOctree::Vec3f box1, cstoneOctree::Vec3f box2, int& insides)
+	HOST_DEVICE void GetInBoxEstimate(cstoneOctree::Vec3f box1, cstoneOctree::Vec3f box2, int& insides) const
     {
         cstoneOctree::Vec3i minXyzIdx, maxXyzIdx;
         for (size_t i = 0; i < 3; i++)
