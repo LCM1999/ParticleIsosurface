@@ -1061,7 +1061,10 @@ void SurfReconstructor::RunCPU2(float iso_factor, float smooth_factor)
 	std::vector<unsigned> iso_levels(iso_tree.size() - 1);
 	calculateLeavesLowersAndLevelsCPU(iso_tree, iso_lowers, iso_levels, box);
 
-	iso::generateIso(iso_tree, iso_lowers, iso_levels, scalars, 0.0, _OurMesh);
+	iso::generateIso(iso_tree, iso_lowers, iso_levels, scalars, 0.0, 
+		// _OurMesh
+		"d://data//out.obj"
+	);
 	if (GEN_SPLASH)
 	{
 		printf("-= Generate Splash =-\n");

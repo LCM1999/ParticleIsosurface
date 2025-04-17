@@ -13,7 +13,8 @@ namespace iso {
         const std::vector<unsigned>& levels, 
         const std::vector<float>& scalars,
         const float isoValue,
-        Mesh* mesh
+        // Mesh* mesh
+        const std::string path
     );
 }
 
