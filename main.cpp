@@ -538,8 +538,8 @@ int main(int argc, char **argv)
     case 1:
     default:
         dataDirPath =
-        // "/home/letian/Letian_Xie/work/ParticleIsosurface/test_cases";
-        "D:/data/multiR/mr_csv";
+        "/home/letian/Letian_Xie/work/ParticleIsosurface/test_cases/multiR/mr_csv";
+        // "D:/data/multiR/mr_csv";
         // "D:/data/inWater/particles";
         // "E:/data/geo";
         // "D:/data/3s/20231222-water";
@@ -551,20 +551,20 @@ int main(int argc, char **argv)
         // "D:/data/test";
         // "C:/Users/11379/Desktop/protein";
         outPath = 
-        "D:/data/multiR/mr_csv/out";
+        // "D:/data/multiR/mr_csv/out";
         // "D:/data/inWater/particles/out";
         // "E:/data/geo/out";
         // "D:/data/3s/20231222-water/out";
         // "D:/data/car_render_test_data_2/Fluid/out";
-        "D:/data/damBreak3D-27steps/out";
+        // "D:/data/damBreak3D-27steps/out";
         // "E:/BaiduNetdiskDownload/MultiResolutionResults/damBreak3D/out";
         // "E:/data/ring/csv/out";
         // "E:/data/oil_csv/out";
         // "D:/data/test/out";
         // "C:/Users/11379/Desktop/protein/out";
-        // outPath = "/home/letian/Letian_Xie/work/ParticleIsosurface/test_cases";
+        "/home/letian/Letian_Xie/work/ParticleIsosurface/test_cases/multiR/mr_csv/out";
         loadConfigJson(dataDirPath);
-            runOurs(dataDirPath, outPath);
+        runOurs(dataDirPath, outPath);
         
         break;
     }

@@ -7,11 +7,12 @@
 #include <coord_struct.h>
 #include <thrust/host_vector.h>
 #include "hash_grid_gpu.cuh"
+#include <cfloat>
 
 struct MultiLevelSearcherGPU
 {
-    thrust::host_vector<HashGridGPU*> searchers;
-    thrust::host_vector<int> maxRadiusParticleIds;
+    std::vector<HashGridGPU*> searchers;
+    std::vector<int> maxRadiusParticleIds;
     float maxRadius = 0, minRadius = 0, avgRadius = 0;
     float infFactor;
 
@@ -109,11 +110,18 @@ struct MultiLevelSearcherGPU
         }
     };
 
+    HOST_DEVICE void GetInBoxEstimate(const cstoneOctree::Vec3f& box1, const cstoneOctree::Vec3f& box2, int* estimateNeighborsNum){
+        for(int i = 0; i < searchers.size(); i++){
+            searchers[i]->GetInBoxEstimate(box1, box2, estimateNeighborsNum[i]);
+        }
+    }
+
     HOST_DEVICE void GetInBoxEstimate(const cstoneOctree::Vec3f& box1, const cstoneOctree::Vec3f& box2, int& insides)
     {
         for (auto& searcher : searchers)
         {
             searcher->GetInBoxEstimate(box1, box2, insides);
+            printf("insides: %d\n", insides);
         }
     };
     

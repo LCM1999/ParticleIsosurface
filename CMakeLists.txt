@@ -16,7 +16,7 @@ check_language(CUDA)
 
 if(CMAKE_CUDA_COMPILER)
     message("Rendertoolengine found cuda")
-    set(CUDA_TOOLKIT_ROOT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.6")
+    # set(CUDA_TOOLKIT_ROOT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.6")
     enable_language(CUDA)
     find_package(CUDAToolkit REQUIRED)
     # find_package(Thrust CONFIG)

@@ -5,3 +5,4 @@ build/
 CMakePresets.json
 CMakeUserPresets.json
 CMakeLists.txt
+test_cases/*
