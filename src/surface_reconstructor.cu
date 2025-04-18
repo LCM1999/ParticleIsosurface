@@ -200,9 +200,9 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 		
 		cudaDeviceSynchronize();
 		thrust::host_vector<int> totalInsidesParticlesIdx = d_totalInsideParticlesIdx;
-		for(int i = 0; i < total_estimateNeighborsNum; i++){
-			std::cout << "totalInsideParticlesIdx[" << i << "] = " << totalInsidesParticlesIdx[i] << std::endl;
-		}											
+		// for(int i = 0; i < total_estimateNeighborsNum; i++){
+		// 	std::cout << "totalInsideParticlesIdx[" << i << "] = " << totalInsidesParticlesIdx[i] << std::endl;
+		// }											
 		// for(int i = 0; i < _searcherGPU->searchers.size(); i++){
 		// 	thrust::device_vector<float> d_bounding(_searcherGPU->searchers[i]->Bounding, _searcherGPU->searchers[i]->Bounding + 6);
 		// 	thrust::device_vector<uint64_t> d_XYZCellNum(_searcherGPU->searchers[i]->XYZCellNum, _searcherGPU->searchers[i]->XYZCellNum + 3);
