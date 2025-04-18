@@ -121,7 +121,7 @@ struct MultiLevelSearcherGPU
         for (auto& searcher : searchers)
         {
             searcher->GetInBoxEstimate(box1, box2, insides);
-            printf("insides: %d\n", insides);
+            // printf("insides: %d\n", insides);
         }
     };
     

@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <cuda_def.h>
 #include "evaluator.h"
+#include "evaluatorGPU.cuh"
 #include "multi_level_searcher_gpu.cuh"
 #include "hash_grid.h"
 #include "multi_level_searcher.h"
@@ -125,10 +126,11 @@ __global__ void estimateTotalInfluenceParticlesKernel(uint64_t* d_iso_tree, int 
                                                         Vec3f* d_iso_centers, Vec3f* d_iso_sizes,
                                                     HashGridGPU** d_searchers, int d_searchers_size);
 
-__global__ void calculateSplitsKernel(uint64_t* d_iso_tree, int d_iso_tree_size,
-                                        Vec3f* d_iso_centers, Vec3f* d_iso_sizes,
-                                        HashGridGPU** d_searchers, int d_searchers_size,
-                                        int* d_estimateNeighborsNums, int* d_estimateNeighborsNumsLayout,
+__global__ void calculateSplitsKernel(uint64_t* d_iso_tree, int d_iso_tree_size, int* d_iso_depths,
+                                        float* d_iso_scalars, Vec3f* d_iso_centers, Vec3f* d_iso_sizes,
+                                        HashGridGPU** d_searchers, int d_searchers_size, int d_depth_min, int d_depth_max,
+                                        EvaluatorGPU* d_evaluator,
+                                        int* d_estimateNeighborsNums, int* d_estimateNeighborsNumsLayout, 
                                         int* d_totalInsideParticlesIdx,
                                         int* d_iso_nodeOps);
 

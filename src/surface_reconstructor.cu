@@ -206,12 +206,12 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 		thrust::exclusive_scan(estimateNeighborsNums.begin(), estimateNeighborsNums.end(), estimateNeighborsNumsLayout.begin(), 0);
 		thrust::device_vector<int> d_estimateNeighborsNumsLayout(estimateNeighborsNumsLayout);
 		int* d_estimateNeighborsNumsLayoutPtr = thrust::raw_pointer_cast(d_estimateNeighborsNumsLayout.data());
-		calculateSplitsKernel<<<isoTreeConfig.blocks, isoTreeConfig.threads>>>(d_iso_treePtr, d_iso_tree_size,
-																				d_iso_centersPtr, d_iso_sizesPtr,
-																				d_searcher, HashGridGPUs_size,
-																				d_estimateNeighborsNumPtr, d_estimateNeighborsNumsLayoutPtr,
-																				thrust::raw_pointer_cast(d_totalInsideParticlesIdx.data()),
-																				thrust::raw_pointer_cast(d_iso_nodeOps.data()));
+		// calculateSplitsKernel<<<isoTreeConfig.blocks, isoTreeConfig.threads>>>(d_iso_treePtr, d_iso_tree_size,
+		// 																		d_iso_centersPtr, d_iso_sizesPtr,
+		// 																		d_searcher, HashGridGPUs_size,
+		// 																		d_estimateNeighborsNumPtr, d_estimateNeighborsNumsLayoutPtr,
+		// 																		thrust::raw_pointer_cast(d_totalInsideParticlesIdx.data()),
+		// 																		thrust::raw_pointer_cast(d_iso_nodeOps.data()));
 		
 		cudaDeviceSynchronize();
 		thrust::host_vector<int> totalInsidesParticlesIdx = d_totalInsideParticlesIdx;

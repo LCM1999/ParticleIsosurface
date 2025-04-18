@@ -741,7 +741,7 @@ void Evaluator::compute_Gs_xMeans()
        if (tempNeighbors.size() <= 2)
        {
            Mat3f G(1.0, 1.0, 1.0);
-           GlobalSplash[pIdx] = true;
+        //    GlobalSplash[pIdx] = true;
            if (USE_ANI)
            {
                GlobalGs[pIdx] = G;
@@ -756,7 +756,7 @@ void Evaluator::compute_Gs_xMeans()
        if (neighbors.size() <= 2)
        {
            Mat3f G(1.0, 1.0, 1.0);
-           GlobalSplash[pIdx] = true;
+        //    GlobalSplash[pIdx] = true;
            if (USE_ANI)
            {
                GlobalGs[pIdx] = G;
