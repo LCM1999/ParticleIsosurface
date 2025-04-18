@@ -18,6 +18,47 @@
 using namespace cal;
 using namespace cstoneOctree;
 
+__global__ void estimateTotalInfluenceParticlesKernel(uint64_t* d_iso_tree, int d_iso_tree_size,
+		                                              Vec3f* d_iso_centers, Vec3f* d_iso_sizes,
+													  HashGridGPU** d_searchers, int d_searchers_size,
+													  int* d_estimateNeighborsNums){
+	int tid = blockIdx.x * blockDim.x + threadIdx.x;
+	if(tid >= d_iso_tree_size) return;
+	Vec3f center = d_iso_centers[tid];
+	Vec3f box1 = center - Vec3f(d_iso_sizes[tid].x, d_iso_sizes[tid].y, d_iso_sizes[tid].z);
+	Vec3f box2 = center + Vec3f(d_iso_sizes[tid].x, d_iso_sizes[tid].y, d_iso_sizes[tid].z);
+	// int* curr_estimateNeighborsNumsBegin = d_estimateNeighborsNums + tid * d_searchers_size;
+	for(int i = 0; i < d_searchers_size; i++){
+		HashGridGPU* cur_searcher = d_searchers[i];
+		cur_searcher->GetInBoxEstimateGPU(box1, box2, d_estimateNeighborsNums[tid]);
+	}
+	
+}
+
+
+__global__ void calculateSplitsKernel(uint64_t* d_iso_tree, int d_iso_tree_size,
+										Vec3f* d_iso_centers, Vec3f* d_iso_sizes,
+										HashGridGPU** d_searchers, int d_searchers_size,
+										int* d_estimateNeighborsNums, int* d_estimateNeighborsNumsLayout, 
+										int* d_totalInsideParticlesIdx,
+										int* d_iso_nodeOps){
+	int tid = blockIdx.x * blockDim.x + threadIdx.x;
+	if(tid >= d_iso_tree_size) return;
+	Vec3f center = d_iso_centers[tid];
+	Vec3f box1 = center - Vec3f(d_iso_sizes[tid].x, d_iso_sizes[tid].y, d_iso_sizes[tid].z);
+	Vec3f box2 = center + Vec3f(d_iso_sizes[tid].x, d_iso_sizes[tid].y, d_iso_sizes[tid].z);
+	// int curr_d_estimateNeighborsNumsBeginIdx = tid * d_searchers_size;
+	// int curr_d_estimateNeighborsNumsEndIdx = tid * d_searchers_size + d_searchers_size;
+	int d_particlesBeginIdx = d_estimateNeighborsNumsLayout[tid];
+	
+	int tmp_numNeighbors = 0;
+	for(int i = 0; i < d_searchers_size; i++){
+		HashGridGPU* cur_searcher = d_searchers[i];
+		cur_searcher->GetInBoxParticlesGPU(box1, box2, tmp_numNeighbors, d_totalInsideParticlesIdx + d_particlesBeginIdx);
+	}
+
+}
+
 void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 	timer t;
 
@@ -29,7 +70,7 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 	// if (IS_CONST_RADIUS)
 	// {
     	// _hashgrid = std::make_shared<HashGrid>(&_GlobalParticles, _BoundingBox, _RADIUS, 4.0f);
-	// } els
+	// } else {
 	useCPU = false;
     _searcherGPU = std::make_shared<MultiLevelSearcherGPU>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
 	// }
@@ -115,12 +156,61 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
         calculateLeavesCentersAndSizesKernel<<<isoTreeConfig.blocks, isoTreeConfig.threads>>>(d_iso_treePtr, d_iso_tree_size, d_iso_centersPtr, d_iso_sizesPtr, d_iso_depthsPtr, d_box);
         cudaDeviceSynchronize();
         std::cout << "leaves centers and sizes calculation done" << std::endl;
-        break;
 
         thrust::host_vector<int> iso_nodeOps(d_iso_tree_size, 0); // Store the split decision for each node (the split decision is based on whether the node has isosurface)
-        thrust::device_vector<int> d_iso_nodePos(iso_nodeOps);
+        thrust::device_vector<int> d_iso_nodeOps(iso_nodeOps);
         // ----------------------- begin split calculation ---------------------------
-        
+		// estimate total number of searched particles through each octree node
+		std::cout << "the searcher's size is " << _searcherGPU->searchers.size() << std::endl;
+		thrust::host_vector<int> estimateNeighborsNums(d_iso_tree_size, 0);
+		thrust::device_vector<int> d_estimateNeighborsNums(estimateNeighborsNums);
+		int* d_estimateNeighborsNumPtr = thrust::raw_pointer_cast(d_estimateNeighborsNums.data());
+		
+		// for each resolution particles level, calculate each estimate neighbors number for each octree node
+		int HashGridGPUs_size = _searcherGPU->searchers.size();
+		HashGridGPU** d_searcher;	
+		cudaMalloc(&d_searcher, sizeof(HashGridGPU*) * HashGridGPUs_size);
+		cudaMemcpy(d_searcher, _searcherGPU->searchers.data(), sizeof(HashGridGPU*) * HashGridGPUs_size, cudaMemcpyHostToDevice);
+		// calculate the estimate neighbors number for each octree node
+		estimateTotalInfluenceParticlesKernel<<<isoTreeConfig.blocks, isoTreeConfig.threads>>>(d_iso_treePtr, d_iso_tree_size,
+																								d_iso_centersPtr, d_iso_sizesPtr,
+																								d_searcher, HashGridGPUs_size,
+																								d_estimateNeighborsNumPtr);
+		cudaDeviceSynchronize();
+		std::cout << "estimate neighbors number calculation done" << std::endl;
+		estimateNeighborsNums = d_estimateNeighborsNums;
+
+		for(int i = 0; i < estimateNeighborsNums.size(); i++){
+			int val = estimateNeighborsNums[i];
+			std::cout << "estimateNeighborsNums[" << i << "] = " << val << std::endl;
+		}
+		int total_estimateNeighborsNum = std::accumulate(estimateNeighborsNums.begin(), estimateNeighborsNums.end(), 0);
+		thrust::device_vector<int> d_totalInsideParticlesIdx(total_estimateNeighborsNum, -1);
+		thrust::host_vector<int> estimateNeighborsNumsLayout(estimateNeighborsNums.size(), 0);
+		thrust::exclusive_scan(estimateNeighborsNums.begin(), estimateNeighborsNums.end(), estimateNeighborsNumsLayout.begin(), 0);
+		thrust::device_vector<int> d_estimateNeighborsNumsLayout(estimateNeighborsNumsLayout);
+		int* d_estimateNeighborsNumsLayoutPtr = thrust::raw_pointer_cast(d_estimateNeighborsNumsLayout.data());
+		calculateSplitsKernel<<<isoTreeConfig.blocks, isoTreeConfig.threads>>>(d_iso_treePtr, d_iso_tree_size,
+																				d_iso_centersPtr, d_iso_sizesPtr,
+																				d_searcher, HashGridGPUs_size,
+																				d_estimateNeighborsNumPtr, d_estimateNeighborsNumsLayoutPtr,
+																				thrust::raw_pointer_cast(d_totalInsideParticlesIdx.data()),
+																				thrust::raw_pointer_cast(d_iso_nodeOps.data()));
+		
+		cudaDeviceSynchronize();
+		thrust::host_vector<int> totalInsidesParticlesIdx = d_totalInsideParticlesIdx;
+		// for(int i = 0; i < total_estimateNeighborsNum; i++){
+		// 	std::cout << "totalInsideParticlesIdx[" << i << "] = " << totalInsidesParticlesIdx[i] << std::endl;
+		// }											
+		// for(int i = 0; i < _searcherGPU->searchers.size(); i++){
+		// 	thrust::device_vector<float> d_bounding(_searcherGPU->searchers[i]->Bounding, _searcherGPU->searchers[i]->Bounding + 6);
+		// 	thrust::device_vector<uint64_t> d_XYZCellNum(_searcherGPU->searchers[i]->XYZCellNum, _searcherGPU->searchers[i]->XYZCellNum + 3);
+		// 	thrust::device_vector<unsigned> d_PIndexes(_searcherGPU->searchers[i]->PIndexes, _searcherGPU->searchers[i]->PIndexes + _GlobalParticles.size());
+		// 	thrust::device_vector<int> d_IndexList(_searcherGPU->searchers[i]->IndexList, _searcherGPU->searchers[i]->IndexList + _GlobalParticles.size());
+		// 	thrust::device_vector<int> d_StartList(_searcherGPU->searchers[i]->StartList, _searcherGPU->searchers[i]->StartList + _searcherGPU->searchers[i]->CellNum);
+		// 	thrust::device_vector<int> d_EndList(_searcherGPU->searchers[i]->EndList, _searcherGPU->searchers[i]->EndList + _searcherGPU->searchers[i]->CellNum);
+		// }
+		break;
     }
 	// while(1){
 

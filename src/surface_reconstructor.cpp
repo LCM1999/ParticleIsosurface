@@ -818,7 +818,7 @@ void SurfReconstructor::RunCPU2(float iso_factor, float smooth_factor)
 		scalars = std::vector<float>(iso_tree_size, 0.0); // Stores each tree nodes' scalar value on dual vertices
 		std::vector<uint64_t> iso_nodeOps(iso_tree.size(), 0); // Store the split decision for each node (the split decision is based on whether the node has isosurface)
 					// bool
-		#pragma omp parallel for
+		// #pragma omp parallel for
 		for(int i = 0; i < iso_tree_size; i++) {
 			// begin beforeSampleEval
 			Vec3f center = iso_centers[i];

@@ -40,6 +40,27 @@ struct HashGridGPU
             delete[] EndList;
             EndList = nullptr;
         }
+
+        if(d_PIndexes != nullptr)
+        {
+            cudaFree(d_PIndexes);
+            d_PIndexes = nullptr;
+        }
+        if(d_IndexList != nullptr)
+        {
+            cudaFree(d_IndexList);
+            d_IndexList = nullptr;
+        }
+        if(d_StartList != nullptr)
+        {
+            cudaFree(d_StartList);
+            d_StartList = nullptr;
+        }
+        if(d_EndList != nullptr)
+        {
+            cudaFree(d_EndList);
+            d_EndList = nullptr;
+        }
     };
 
 	/* Constructor for variable radius*/
@@ -47,6 +68,7 @@ struct HashGridGPU
 		std::vector<unsigned>& pIndexes, float* bounding, unsigned radiusId, float inf_factor)
     {
         int particlesNum = pIndexes.size();
+        particlesSize = particlesNum;
         PIndexes = new unsigned[particlesNum];
         // PIndexes.resize(particlesNum);
         std::copy(pIndexes.begin(), pIndexes.end(), PIndexes);
@@ -65,6 +87,7 @@ struct HashGridGPU
         XYZCellNum[1] = std::max(int(ceil((Bounding[3] - Bounding[2]) / CellSize)), 1);
         XYZCellNum[2] = std::max(int(ceil((Bounding[5] - Bounding[4]) / CellSize)), 1);
     	CellNum = XYZCellNum[0] * XYZCellNum[1] * XYZCellNum[2];
+        std::vector<int64_t> HashList;
         // HashList = new int64_t[particlesNum];
         HashList.resize(particlesNum, 0);
         IndexList = new int[particlesNum];
@@ -72,8 +95,17 @@ struct HashGridGPU
         EndList = new int[CellNum];
         std::memset(StartList, -1, CellNum * sizeof(int));
         std::memset(EndList, -1, CellNum * sizeof(int));
-        BuildTable(particlesNum, particles);
-        HashList.clear();
+        BuildTable(HashList, particlesNum, particles);
+
+        // copy data to Device
+        cudaMalloc((void**)&d_PIndexes, particlesNum * sizeof(unsigned));
+        cudaMalloc((void**)&d_IndexList, particlesNum * sizeof(int));
+        cudaMalloc((void**)&d_StartList, CellNum * sizeof(int));
+        cudaMalloc((void**)&d_EndList, CellNum * sizeof(int));
+        cudaMemcpy(d_PIndexes, PIndexes, particlesNum * sizeof(unsigned), cudaMemcpyHostToDevice);
+        cudaMemcpy(d_IndexList, IndexList, particlesNum * sizeof(int), cudaMemcpyHostToDevice);
+        cudaMemcpy(d_StartList, StartList, CellNum * sizeof(int), cudaMemcpyHostToDevice);
+        cudaMemcpy(d_EndList, EndList, CellNum * sizeof(int), cudaMemcpyHostToDevice);
     }
 
     HOST_DEVICE void CalcXYZIdx(const cstoneOctree::Vec3f& pos, cstoneOctree::Vec3i& xyzIdx) const
@@ -194,6 +226,42 @@ struct HashGridGPU
             }
         }
     };
+
+    __device__ void GetInBoxEstimateGPU(cstoneOctree::Vec3f box1, cstoneOctree::Vec3f box2, int& insides) const{
+        cstoneOctree::Vec3i minXyzIdx, maxXyzIdx;
+        for (size_t i = 0; i < 3; i++)
+        {
+            box1[i] = fmaxf(box1[i], Bounding[2*i]);
+            box2[i] = fminf(box2[i], Bounding[2*i+1]);
+        }
+        CalcXYZIdx(box1, minXyzIdx);
+        CalcXYZIdx(box2, maxXyzIdx);
+        int64_t temp_hash;
+        for (int x = (minXyzIdx.x-1); x <= (maxXyzIdx.x+1); x++)
+        {
+            for (int y = (minXyzIdx.y-1); y <= (maxXyzIdx.y+1); y++)
+            {
+                for (int z = (minXyzIdx.z-1); z <= (maxXyzIdx.z+1); z++)
+                {
+                    temp_hash = CalcCellHash(cstoneOctree::Vec3i(x, y, z));
+                    if (temp_hash < 0) {
+                        continue;
+                    }
+                    int startIndex, endIndex;
+                    if ((d_StartList[temp_hash] >= 0) && (d_EndList[temp_hash] >= 0))
+                    {
+                        startIndex = d_StartList[temp_hash];
+                        endIndex = d_EndList[temp_hash];
+                    }
+                    else
+                    {
+                        continue;
+                    }
+                    insides += endIndex - startIndex;
+                }
+            }
+        }
+    }
     
     HOST_DEVICE void GetInBoxParticles(cstoneOctree::Vec3f box1, cstoneOctree::Vec3f box2, int& numNeighbors, int ngmax, int* insides)
     {
@@ -238,10 +306,51 @@ struct HashGridGPU
             }
         }
     };
-	
-    HOST void BuildTable(const int particlesNum, const std::vector<cstoneOctree::Vec3f>* particles)
+
+    HOST_DEVICE void GetInBoxParticlesGPU(cstoneOctree::Vec3f box1, cstoneOctree::Vec3f box2, int& numNeighbors, int* insides)
     {
-        CalcHashList(particlesNum, particles);
+        cstoneOctree::Vec3i minXyzIdx, maxXyzIdx;
+        for (size_t i = 0; i < 3; i++)
+        {
+            box1[i] = fmaxf(box1[i], Bounding[2*i]);
+            box2[i] = fminf(box2[i], Bounding[2*i+1]);
+        }
+        CalcXYZIdx(box1, minXyzIdx);
+        CalcXYZIdx(box2, maxXyzIdx);
+        int64_t temp_hash;
+        for (int x = (minXyzIdx.x-1); x <= (maxXyzIdx.x+1); x++)
+        {
+            for (int y = (minXyzIdx.y-1); y <= (maxXyzIdx.y+1); y++)
+            {
+                for (int z = (minXyzIdx.z-1); z <= (maxXyzIdx.z+1); z++)
+                {
+                    temp_hash = CalcCellHash(cstoneOctree::Vec3i(x, y, z));
+                    if (temp_hash < 0) {
+                        continue;
+                    }
+                    int countIndex, startIndex, endIndex;
+                    if ((d_StartList[temp_hash] >= 0) && (d_EndList[temp_hash] >= 0))
+                    {
+                        startIndex = d_StartList[temp_hash];
+                        endIndex = d_EndList[temp_hash];
+                    }
+                    else
+                    {
+                        continue;
+                    }
+                    for (int countIndex = startIndex; countIndex < endIndex; countIndex++)
+                    {
+                        insides[numNeighbors] = d_PIndexes[d_IndexList[countIndex]];
+                        numNeighbors++;
+                    }
+                }
+            }
+        }
+    };
+	
+    HOST void BuildTable(std::vector<int64_t>& HashList, const int particlesNum, const std::vector<cstoneOctree::Vec3f>* particles)
+    {
+        CalcHashList(HashList, particlesNum, particles);
         std::sort(IndexList, IndexList + particlesNum,
             [&](const int& a, const int& b) {
                 return (HashList[a] < HashList[b]);
@@ -252,10 +361,10 @@ struct HashGridGPU
         {
             HashList[i] = temp[IndexList[i]];
         }
-        FindStartEnd(particlesNum);
+        FindStartEnd(HashList, particlesNum);
     };
 
-	HOST void CalcHashList(const int particlesNum, const std::vector<cstoneOctree::Vec3f>* particles) 
+	HOST void CalcHashList(std::vector<int64_t>& HashList, const int particlesNum, const std::vector<cstoneOctree::Vec3f>* particles) 
     {
         cstoneOctree::Vec3i xyzIdx;
         for (size_t index = 0; index < particlesNum; index++)
@@ -266,7 +375,7 @@ struct HashGridGPU
         }
     };
 
-	HOST void FindStartEnd(const int particlesNum) 
+	HOST void FindStartEnd(std::vector<int64_t>& HashList, const int particlesNum) 
     {
         int index, hash, count = 0, previous = -1;
 	
@@ -290,12 +399,17 @@ struct HashGridGPU
     float CellSize;
     float Bounding[6];
     uint64_t XYZCellNum[3];
-    uint64_t CellNum;
-    unsigned* PIndexes;
-	std::vector<int64_t> HashList;
-	int* IndexList;
-	int* StartList;
-	int* EndList;
+    int CellNum;
+    int particlesSize;  // equals to particlesNum
+    unsigned* PIndexes; // size: particlesNum
+	int* IndexList;     // size: particlesNum
+	int* StartList;     // size: CellNum
+	int* EndList;       // size: CellNum
+
+    unsigned* d_PIndexes;   // size: particlesNum
+    int* d_IndexList;       // size: particlesNum
+    int* d_StartList;       // size: CellNum
+    int* d_EndList;         // size: cellNum
 };
 
 #endif

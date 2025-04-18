@@ -121,4 +121,15 @@ public:
 
 };
 
+__global__ void estimateTotalInfluenceParticlesKernel(uint64_t* d_iso_tree, int d_iso_tree_size,
+                                                        Vec3f* d_iso_centers, Vec3f* d_iso_sizes,
+                                                    HashGridGPU** d_searchers, int d_searchers_size);
+
+__global__ void calculateSplitsKernel(uint64_t* d_iso_tree, int d_iso_tree_size,
+                                        Vec3f* d_iso_centers, Vec3f* d_iso_sizes,
+                                        HashGridGPU** d_searchers, int d_searchers_size,
+                                        int* d_estimateNeighborsNums, int* d_estimateNeighborsNumsLayout,
+                                        int* d_totalInsideParticlesIdx,
+                                        int* d_iso_nodeOps);
+
 #endif
