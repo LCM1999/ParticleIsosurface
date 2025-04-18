@@ -347,8 +347,8 @@ void runOurs(std::string dataDirPath, std::string outPath)
         printf("Particles Number = %zd\n", particles.size());
         SurfReconstructor* constructor = new SurfReconstructor(particles, radiuses, &mesh, RADIUS);
         // constructor->Run(ISO_FACTOR, SMOOTH_FACTOR);
-        constructor->RunCPU2(ISO_FACTOR, SMOOTH_FACTOR);
-        // constructor->RunGPU(ISO_FACTOR, SMOOTH_FACTOR);
+        // constructor->RunCPU2(ISO_FACTOR, SMOOTH_FACTOR);
+        constructor->RunGPU(ISO_FACTOR, SMOOTH_FACTOR);
         std::string output_name = frame.substr(0, frame.find_last_of('.'));
         std::cout << "Output path: " << outPath + "/" + output_name + "." + OUTPUT_TYPE<< std::endl; 
         

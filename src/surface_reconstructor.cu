@@ -27,10 +27,10 @@ __global__ void estimateTotalInfluenceParticlesKernel(uint64_t* d_iso_tree, int 
 	Vec3f center = d_iso_centers[tid];
 	Vec3f box1 = center - Vec3f(d_iso_sizes[tid].x, d_iso_sizes[tid].y, d_iso_sizes[tid].z);
 	Vec3f box2 = center + Vec3f(d_iso_sizes[tid].x, d_iso_sizes[tid].y, d_iso_sizes[tid].z);
-	int* curr_estimateNeighborsNumsBegin = d_estimateNeighborsNums + tid * d_searchers_size;
+	// int* curr_estimateNeighborsNumsBegin = d_estimateNeighborsNums + tid * d_searchers_size;
 	for(int i = 0; i < d_searchers_size; i++){
 		HashGridGPU* cur_searcher = d_searchers[i];
-		cur_searcher->GetInBoxEstimateGPU(box1, box2, *(curr_estimateNeighborsNumsBegin + i));
+		cur_searcher->GetInBoxEstimateGPU(box1, box2, d_estimateNeighborsNums[tid]);
 	}
 	
 }
@@ -49,8 +49,7 @@ __global__ void calculateSplitsKernel(uint64_t* d_iso_tree, int d_iso_tree_size,
 	Vec3f box2 = center + Vec3f(d_iso_sizes[tid].x, d_iso_sizes[tid].y, d_iso_sizes[tid].z);
 	// int curr_d_estimateNeighborsNumsBeginIdx = tid * d_searchers_size;
 	// int curr_d_estimateNeighborsNumsEndIdx = tid * d_searchers_size + d_searchers_size;
-	int d_particlesBeginIdx = d_estimateNeighborsNumsLayout[tid * d_searchers_size];
-	int d_particlesEndIdx = d_estimateNeighborsNumsLayout[tid * d_searchers_size + d_searchers_size];
+	int d_particlesBeginIdx = d_estimateNeighborsNumsLayout[tid];
 	
 	int tmp_numNeighbors = 0;
 	for(int i = 0; i < d_searchers_size; i++){
@@ -163,7 +162,7 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
         // ----------------------- begin split calculation ---------------------------
 		// estimate total number of searched particles through each octree node
 		std::cout << "the searcher's size is " << _searcherGPU->searchers.size() << std::endl;
-		thrust::host_vector<int> estimateNeighborsNums(_searcherGPU->searchers.size() * d_iso_tree_size, 0);
+		thrust::host_vector<int> estimateNeighborsNums(d_iso_tree_size, 0);
 		thrust::device_vector<int> d_estimateNeighborsNums(estimateNeighborsNums);
 		int* d_estimateNeighborsNumPtr = thrust::raw_pointer_cast(d_estimateNeighborsNums.data());
 		
