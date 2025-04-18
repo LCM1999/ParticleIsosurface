@@ -50,7 +50,6 @@ Evaluator::Evaluator(
     }
     
     GlobalSplash.resize(_GlobalParticlesNum, 0);
-    GlobalSurface.resize(_GlobalParticlesNum, 0);
     GlobalxMeans.resize(_GlobalParticlesNum);
     if (USE_ANI)
     {
@@ -104,7 +103,6 @@ Evaluator::Evaluator(
     }
     
     GlobalSplash.resize(_GlobalParticlesNum, 0);
-    GlobalSurface.resize(_GlobalParticlesNum, 0);
     GlobalxMeans.resize(_GlobalParticlesNum);
     if (USE_ANI)
     {
@@ -352,14 +350,14 @@ bool Evaluator::CheckSplash(const int& pIdx)
     return false;
 }
 
-bool Evaluator::CheckSurface(const int& pIdx)
-{
-    if (GlobalSurface[pIdx])
-    {
-        return true;
-    }
-    return false;
-}
+// bool Evaluator::CheckSurface(const int& pIdx)
+// {
+//     if (GlobalSurface[pIdx])
+//     {
+//         return true;
+//     }
+//     return false;
+// }
 
 void Evaluator::CalculateMaxScalarConstR()
 {
@@ -743,7 +741,7 @@ void Evaluator::compute_Gs_xMeans()
        if (tempNeighbors.size() <= 2)
        {
            Mat3f G(1.0, 1.0, 1.0);
-           // GlobalSplash[pIdx] = true;
+           GlobalSplash[pIdx] = true;
            if (USE_ANI)
            {
                GlobalGs[pIdx] = G;
@@ -758,7 +756,7 @@ void Evaluator::compute_Gs_xMeans()
        if (neighbors.size() <= 2)
        {
            Mat3f G(1.0, 1.0, 1.0);
-           // GlobalSplash[pIdx] = true;
+           GlobalSplash[pIdx] = true;
            if (USE_ANI)
            {
                GlobalGs[pIdx] = G;
@@ -767,18 +765,6 @@ void Evaluator::compute_Gs_xMeans()
            GlobalxMeans[pIdx] = xMean;
            continue;
        }
-       // if (closerNeigbors < 1)
-       // {
-       //     G = Eigen::DiagonalMatrix<float, 3>(1.0, 1.0, 1.0);
-       //     GlobalSplash[pIdx] = true;
-       // } 
-       // else
-       // {
-       //     if (USE_ANI)
-       //     {
-       //         compute_G_ours(pIdx, xMean, neighbors, G);
-       //     }
-       // }
        
        GlobalxMeans[pIdx] = Vec3f(xMean);
        // if (USE_ANI)

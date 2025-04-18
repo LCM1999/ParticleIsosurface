@@ -846,7 +846,7 @@ void SurfReconstructor::RunCPU2(float iso_factor, float smooth_factor)
 			// check empty and calculate curvature implentation below
 			cstoneOctree::Vec3f norms(0, 0, 0);
 			float area = 0.0f;
-			min_radiuses[i] = IS_CONST_RADIUS ? _GlobalRadiuses[i] : FLT_MAX;
+			min_radiuses[i] = FLT_MAX;
 			emptys[i] = trueNeighborsNum == 0;
 			if (!emptys[i])
 			{
@@ -897,7 +897,7 @@ void SurfReconstructor::RunCPU2(float iso_factor, float smooth_factor)
 			bool signchange = false;
 			std::vector<float> nodeSamplePoints(pow(2 + 1, 3) * 3);
 			std::vector<float> nodeSampleScalars(pow(2 + 1, 3), 0);
-			std::vector<float> nodeSampleGrads(pow(2+1, 3) * 3);
+			// std::vector<float> nodeSampleGrads(pow(2+1, 3) * 3);
 			for (float z = 0; z <= 2; z++)
 			{
 				for (float y = 0; y <= 2; y++)

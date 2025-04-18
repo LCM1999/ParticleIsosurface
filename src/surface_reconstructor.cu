@@ -2,6 +2,7 @@
 // #include "hash_grid.h"
 #include "multi_level_searcher_gpu.cuh"
 #include "evaluator.h"
+#include "evaluatorGPU.cuh"
 #include "iso_method_ours.h"
 #include "global.h"
 #include "visitorextract.h"
@@ -36,9 +37,10 @@ __global__ void estimateTotalInfluenceParticlesKernel(uint64_t* d_iso_tree, int 
 }
 
 
-__global__ void calculateSplitsKernel(uint64_t* d_iso_tree, int d_iso_tree_size,
-										Vec3f* d_iso_centers, Vec3f* d_iso_sizes,
-										HashGridGPU** d_searchers, int d_searchers_size,
+__global__ void calculateSplitsKernel(uint64_t* d_iso_tree, int d_iso_tree_size, int* d_iso_depths,
+										float* d_iso_scalars, Vec3f* d_iso_centers, Vec3f* d_iso_sizes,
+										HashGridGPU** d_searchers, int d_searchers_size, int d_depth_min, int d_depth_max,
+										EvaluatorGPU* d_evaluator,
 										int* d_estimateNeighborsNums, int* d_estimateNeighborsNumsLayout, 
 										int* d_totalInsideParticlesIdx,
 										int* d_iso_nodeOps){
@@ -57,6 +59,20 @@ __global__ void calculateSplitsKernel(uint64_t* d_iso_tree, int d_iso_tree_size,
 		cur_searcher->GetInBoxParticlesGPU(box1, box2, tmp_numNeighbors, d_totalInsideParticlesIdx + d_particlesBeginIdx);
 	}
 
+	float minRadius = FLT_MAX;
+	bool empty = true;
+	float curv = d_evaluator->EvalInNodeCurv(box1, box2, tmp_numNeighbors, d_totalInsideParticlesIdx + d_particlesBeginIdx, minRadius, empty);
+	if (empty) {
+		d_iso_scalars[tid] = d_evaluator->d_ISO_VALUE;
+		d_iso_nodeOps[tid] = 1;
+		return;
+	}
+	bool isbig = (d_iso_depths[tid] < d_depth_min);
+	if (isbig)
+	{
+		d_iso_nodeOps[tid] = 8;
+		return;
+	}
 }
 
 void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){

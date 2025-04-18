@@ -2,19 +2,12 @@
 #ifndef EVALUATOR_H
 #define EVALUATOR_H
 
-#include "iso_common.h"
-// #include "hash_grid.h"
 #include "multi_level_searcher.h"
 #include "multi_level_searcher_gpu.cuh"
-#include <assert.h>
 #include <iostream>
-#include <vector>
-//#include <Eigen/Dense>
-//#include <Eigen/SVD>
 
 #include <memory>
 #include <box.h>
-#include <octree_func.h>
 #include <coord_struct.h>
 #include <var.h>
 
@@ -37,8 +30,6 @@ public:
 
     bool _USE_XMEAN = true;
     float _XMEAN_DELTA = 0.0;
-
-    float M = 1.05f;
 
     float poly6_kernel(float d2, float h2, float sigma);
     float Bspline_kernel(float ratio, float sigma);
@@ -75,7 +66,7 @@ public:
     float Radius3 = 0;
     float Influnce2 = 0;
     float Sigma = 0;
-    std::vector<bool> GlobalSplash;
+    std::vector<char> GlobalSplash;
     std::vector<bool> GlobalSurface;
     std::vector<Vec3f> PariclesNormals;
 	std::vector<Vec3f> GlobalxMeans;
@@ -133,10 +124,10 @@ public:
     inline float getXMeanDelta() {return _XMEAN_DELTA;}
 
     // variable need for cornerstone octree
-    std::vector<Vec3f>* _GlobalPoses;
-    OctreeNs _octreeNs;
-    Box _box;
-    const int _ngmax = 16;
+    // std::vector<Vec3f>* _GlobalPoses;
+    // OctreeNs _octreeNs;
+    // Box _box;
+    // const int _ngmax = 16;
 };
 
 #endif
