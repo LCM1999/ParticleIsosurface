@@ -1062,8 +1062,7 @@ void SurfReconstructor::RunCPU2(float iso_factor, float smooth_factor)
 	calculateLeavesLowersAndLevelsCPU(iso_tree, iso_lowers, iso_levels, box);
 
 	iso::generateIso(iso_tree, iso_lowers, iso_levels, scalars, 0.0, 
-		// _OurMesh
-		"d://data//out.obj"
+		_OurMesh
 	);
 	if (GEN_SPLASH)
 	{

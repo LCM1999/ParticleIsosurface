@@ -124,7 +124,7 @@ struct EvaluatorGPU
         return (area == 0) ? 1.0 : (norms.norm() / area);
     }
 
-    DEVICE float EvalInNode(const cstoneOctree::Vec3f box1, const cstoneOctree::Vec3f box2, 
+    DEVICE void EvalInNode(const cstoneOctree::Vec3f box1, const cstoneOctree::Vec3f box2, 
         float* nodeSamplePoints, float* nodeSampleScalars, // node samples size is 3 * 3 * 3
         const int numNeighbors, const int* neighbors, bool& signChange) {
         bool originSign = true;
