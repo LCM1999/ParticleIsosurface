@@ -12,6 +12,7 @@
 struct MultiLevelSearcherGPU
 {
     std::vector<HashGridGPU*> searchers;
+    std::vector<HashGridGPU*> h_searchers; // store the HashGridGPU* GPU pointers
     std::vector<int> maxRadiusParticleIds;
     float maxRadius = 0, minRadius = 0, avgRadius = 0;
     float infFactor;
@@ -76,6 +77,44 @@ struct MultiLevelSearcherGPU
             searchers.push_back(new HashGridGPU(particles, radiuses, sortedIndex[i], temp_bounding, binRadiusId, inf_factor));
         }
         printf("   Seachers level: %d.\n", searchers.size());
+
+        // assign data to h_searchers
+        for(int i = 0; i < searchers.size(); i++){
+            HashGridGPU* d_searcher_ptr;
+            cudaMalloc(&d_searcher_ptr, sizeof(HashGridGPU));
+            cudaMemcpy(&(d_searcher_ptr->CellSize), &(searchers[i]->CellSize), sizeof(float), cudaMemcpyHostToDevice);
+            cudaMemcpy(&(d_searcher_ptr->Bounding), &(searchers[i]->Bounding), sizeof(float) * 6, cudaMemcpyHostToDevice);
+            cudaMemcpy(&(d_searcher_ptr->XYZCellNum), &(searchers[i]->XYZCellNum), sizeof(uint64_t) * 3, cudaMemcpyHostToDevice);
+            cudaMemcpy(&(d_searcher_ptr->CellNum), &(searchers[i]->CellNum), sizeof(int), cudaMemcpyHostToDevice);
+            cudaMemcpy(&(d_searcher_ptr->particlesSize), &(searchers[i]->particlesSize), sizeof(int), cudaMemcpyHostToDevice);
+            cudaMemcpy(&(d_searcher_ptr->PIndexes), &(searchers[i]->PIndexes), sizeof(unsigned*), cudaMemcpyHostToDevice);
+            cudaMemcpy(&(d_searcher_ptr->IndexList), &(searchers[i]->IndexList), sizeof(int*), cudaMemcpyHostToDevice);
+            cudaMemcpy(&(d_searcher_ptr->StartList), &(searchers[i]->StartList), sizeof(int*), cudaMemcpyHostToDevice);
+            cudaMemcpy(&(d_searcher_ptr->EndList), &(searchers[i]->EndList), sizeof(int*), cudaMemcpyHostToDevice);
+            cudaMemcpy(&(d_searcher_ptr->d_PIndexes), &(searchers[i]->d_PIndexes), sizeof(unsigned*), cudaMemcpyHostToDevice);
+            cudaMemcpy(&(d_searcher_ptr->d_IndexList), &(searchers[i]->d_IndexList), sizeof(int*), cudaMemcpyHostToDevice);
+            cudaMemcpy(&(d_searcher_ptr->d_StartList), &(searchers[i]->d_StartList), sizeof(int*), cudaMemcpyHostToDevice);
+            cudaMemcpy(&(d_searcher_ptr->d_EndList), &(searchers[i]->d_EndList), sizeof(int*), cudaMemcpyHostToDevice);
+            // d_searcher_ptr->CellSize = searchers[i]->CellSize;
+            // for(int i = 0; i < 5; i++){
+            //     d_searcher_ptr->Bounding[i] = searchers[i]->Bounding[i];
+            // }
+            // for(int i = 0; i < 2; i++){
+            //     d_searcher_ptr->XYZCellNum[i] = searchers[i]->XYZCellNum[i];
+            // }
+            // d_searcher_ptr->CellNum = searchers[i]->CellNum;
+            // d_searcher_ptr->particlesSize = searchers[i]->particlesSize;
+            // d_searcher_ptr->PIndexes = searchers[i]->PIndexes;
+            // d_searcher_ptr->IndexList = searchers[i]->IndexList;
+            // d_searcher_ptr->StartList = searchers[i]->StartList;
+            // d_searcher_ptr->EndList = searchers[i]->EndList;
+            // d_searcher_ptr->d_PIndexes = searchers[i]->d_PIndexes;
+            // d_searcher_ptr->d_IndexList = searchers[i]->d_IndexList;
+            // d_searcher_ptr->d_StartList = searchers[i]->d_StartList;
+            // d_searcher_ptr->d_EndList = searchers[i]->d_EndList;
+
+            h_searchers.push_back(d_searcher_ptr);
+        }
     };
 
     HOST ~MultiLevelSearcherGPU() 
@@ -84,7 +123,9 @@ struct MultiLevelSearcherGPU
         {
             delete searchers[i];
             searchers[i] = 0;
+            cudaFree(h_searchers[i]);
         }
+        
     };
 
     HOST int getSearchersNum() { return searchers.size(); }

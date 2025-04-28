@@ -27,9 +27,9 @@ __global__ void estimateTotalInfluenceParticlesKernel(uint64_t* d_iso_tree, int 
 	Vec3f center = d_iso_centers[tid];
 	Vec3f box1 = center - Vec3f(d_iso_sizes[tid].x, d_iso_sizes[tid].y, d_iso_sizes[tid].z);
 	Vec3f box2 = center + Vec3f(d_iso_sizes[tid].x, d_iso_sizes[tid].y, d_iso_sizes[tid].z);
-	// int* curr_estimateNeighborsNumsBegin = d_estimateNeighborsNums + tid * d_searchers_size;
 	for(int i = 0; i < d_searchers_size; i++){
 		HashGridGPU* cur_searcher = d_searchers[i];
+		// printf("cur_searcher's d_IndexList[0]: %d\n", cur_searcher->d_IndexList[0]);
 		cur_searcher->GetInBoxEstimateGPU(box1, box2, d_estimateNeighborsNums[tid]);
 	}
 	
@@ -161,16 +161,16 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
         thrust::device_vector<int> d_iso_nodeOps(iso_nodeOps);
         // ----------------------- begin split calculation ---------------------------
 		// estimate total number of searched particles through each octree node
-		std::cout << "the searcher's size is " << _searcherGPU->searchers.size() << std::endl;
+		std::cout << "the searcher's size is " << _searcherGPU->h_searchers.size() << std::endl;
 		thrust::host_vector<int> estimateNeighborsNums(d_iso_tree_size, 0);
 		thrust::device_vector<int> d_estimateNeighborsNums(estimateNeighborsNums);
 		int* d_estimateNeighborsNumPtr = thrust::raw_pointer_cast(d_estimateNeighborsNums.data());
 		
 		// for each resolution particles level, calculate each estimate neighbors number for each octree node
-		int HashGridGPUs_size = _searcherGPU->searchers.size();
+		int HashGridGPUs_size = _searcherGPU->h_searchers.size();
 		HashGridGPU** d_searcher;	
 		cudaMalloc(&d_searcher, sizeof(HashGridGPU*) * HashGridGPUs_size);
-		cudaMemcpy(d_searcher, _searcherGPU->searchers.data(), sizeof(HashGridGPU*) * HashGridGPUs_size, cudaMemcpyHostToDevice);
+		cudaMemcpy(d_searcher, _searcherGPU->h_searchers.data(), sizeof(HashGridGPU*) * HashGridGPUs_size, cudaMemcpyHostToDevice);
 		// calculate the estimate neighbors number for each octree node
 		estimateTotalInfluenceParticlesKernel<<<isoTreeConfig.blocks, isoTreeConfig.threads>>>(d_iso_treePtr, d_iso_tree_size,
 																								d_iso_centersPtr, d_iso_sizesPtr,
