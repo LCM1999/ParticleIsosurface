@@ -215,8 +215,14 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 																								d_iso_centersPtr, d_iso_sizesPtr,
 																								d_searcher, HashGridGPUs_size,
 																								d_estimateNeighborsNumPtr);
+		cudaError_t err = cudaGetLastError();
+		if (err != cudaSuccess) {
+			std::cerr << "Kernel error: " << cudaGetErrorString(err) << std::endl;
+		}
 		cudaDeviceSynchronize();
 		std::cout << "estimate neighbors number calculation done" << std::endl;
+		std::cout << "Device vector size: " << d_estimateNeighborsNums.size() 
+          << ", Host vector size: " << estimateNeighborsNums.size() << std::endl;
 		estimateNeighborsNums = d_estimateNeighborsNums;
 
 		for(int i = 0; i < estimateNeighborsNums.size(); i++){
