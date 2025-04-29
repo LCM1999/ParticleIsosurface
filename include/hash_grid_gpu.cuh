@@ -231,47 +231,38 @@ struct HashGridGPU
 
     __device__ void GetInBoxEstimateGPU(cstoneOctree::Vec3f box1, cstoneOctree::Vec3f box2, int& insides) const{
         cstoneOctree::Vec3i minXyzIdx, maxXyzIdx;
-        // for (size_t i = 0; i < 3; i++)
-        // {
-        //     box1[i] = fmaxf(box1[i], Bounding[2*i]);
-        //     box2[i] = fminf(box2[i], Bounding[2*i+1]);
-        // }
-        // printf("Bounding: %f %f %f %f %f %f\n", Bounding[0], Bounding[1], Bounding[2], Bounding[3], Bounding[4], Bounding[5]);
-        minXyzIdx.setZero();
-        printf("CellSize: %f\n", CellSize);
-        // for (int i = 0; i < 3; i++) {
-            // minXyzIdx[i] = int((box1[i] - Bounding[i * 2]) / CellSize);
-        // }
-        // CalcXYZIdx(box1, minXyzIdx);
-        // CalcXYZIdx(box2, maxXyzIdx);
+        for (size_t i = 0; i < 3; i++)
+        {
+            box1[i] = fmaxf(box1[i], Bounding[2*i]);
+            box2[i] = fminf(box2[i], Bounding[2*i+1]);
+        }
+        CalcXYZIdx(box1, minXyzIdx);
+        CalcXYZIdx(box2, maxXyzIdx);
         int64_t temp_hash;
-        // printf("minXyzIdx: %d %d %d\n", minXyzIdx.x, minXyzIdx.y, minXyzIdx.z);
-        // printf("maxXyzIdx: %d %d %d\n", maxXyzIdx.x, maxXyzIdx.y, maxXyzIdx.z);
-        // for (int x = (minXyzIdx.x-1); x <= (maxXyzIdx.x+1); x++)
-        // {
-        //     for (int y = (minXyzIdx.y-1); y <= (maxXyzIdx.y+1); y++)
-        //     {
-        //         for (int z = (minXyzIdx.z-1); z <= (maxXyzIdx.z+1); z++)
-        //         {
-        //             // temp_hash = CalcCellHash(cstoneOctree::Vec3i(x, y, z));
-        //             // if (temp_hash < 0) {
-        //             //     continue;
-        //             // }
-        //             // int startIndex, endIndex;
-        //             // if ((d_StartList[temp_hash] >= 0) && (d_EndList[temp_hash] >= 0))
-        //             // {
-        //             //     startIndex = d_StartList[temp_hash];
-        //             //     endIndex = d_EndList[temp_hash];
-        //             // }
-        //             // else
-        //             // {
-        //             //     continue;
-        //             // }
-        //             // atomicAdd(&insides, endIndex - startIndex);
-        //             // insides += endIndex - startIndex;
-        //         }
-        //     }
-        // }
+        for (int x = (minXyzIdx.x-1); x <= (maxXyzIdx.x+1); x++)
+        {
+            for (int y = (minXyzIdx.y-1); y <= (maxXyzIdx.y+1); y++)
+            {
+                for (int z = (minXyzIdx.z-1); z <= (maxXyzIdx.z+1); z++)
+                {
+                    temp_hash = CalcCellHash(cstoneOctree::Vec3i(x, y, z));
+                    if (temp_hash < 0) {
+                        continue;
+                    }
+                    int startIndex, endIndex;
+                    if ((d_StartList[temp_hash] >= 0) && (d_EndList[temp_hash] >= 0))
+                    {
+                        startIndex = d_StartList[temp_hash];
+                        endIndex = d_EndList[temp_hash];
+                    }
+                    else
+                    {
+                        continue;
+                    }
+                    insides += endIndex - startIndex;
+                }
+            }
+        }
     }
     
     HOST_DEVICE void GetInBoxParticles(cstoneOctree::Vec3f box1, cstoneOctree::Vec3f box2, int& numNeighbors, int ngmax, int* insides)
