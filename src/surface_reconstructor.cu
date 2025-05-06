@@ -58,10 +58,11 @@ __global__ void calculateSplitsKernel(uint64_t* d_iso_tree, int d_iso_tree_size,
 		HashGridGPU* cur_searcher = d_searchers[i];
 		cur_searcher->GetInBoxParticlesGPU(box1, box2, tmp_numNeighbors, d_totalInsideParticlesIdx + d_particlesBeginIdx);
 	}
-
 	float minRadius = FLT_MAX;
 	bool empty = true;
+	printf("iso_value = %f\n", d_evaluator->d_ISO_VALUE);
 	float curv = d_evaluator->EvalInNodeCurv(box1, box2, tmp_numNeighbors, d_totalInsideParticlesIdx + d_particlesBeginIdx, minRadius, empty);
+	printf("curv = %f\n", curv);
 	if (empty) {
 		d_iso_scalars[tid] = d_evaluator->d_ISO_VALUE;
 		d_iso_nodeOps[tid] = 1;
@@ -261,7 +262,7 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 				newInternalNodes += 8;
 			}
 		}
-		std::cout << newInternalNodes << std::endl;
+		std::cout << "newInternalNodes = " << newInternalNodes << std::endl;
 		std::exclusive_scan(iso_nodeOps.begin(), iso_nodeOps.end(), iso_nodeOpsLayout.begin(), 0);
 		uint64_t newTreeNodesNum;	
 		newTreeNodesNum = iso_nodeOpsLayout[iso_tree.size() - 1];

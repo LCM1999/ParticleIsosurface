@@ -50,6 +50,7 @@ struct EvaluatorGPU
         cudaMalloc((void**)&d_GlobalSigma, sizeof(float) * d_GlobalParticlesNum);
         cudaMalloc((void**)&d_GlobalSplash, sizeof(char) * d_GlobalParticlesNum);
         cudaMalloc((void**)&d_PariclesNormals, sizeof(cstoneOctree::Vec3f) * d_GlobalParticlesNum);
+        cudaMalloc((void**)&d_GlobalxMeans, sizeof(cstoneOctree::Vec3f) * d_GlobalParticlesNum);
         cudaMalloc((void**)&d_GlobalGs, sizeof(cstoneOctree::Mat3f) * d_GlobalParticlesNum);
         cudaMalloc((void**)&d_GlobalDeterminant, sizeof(float) * d_GlobalParticlesNum);
         cudaMemcpy(d_GlobalRadiuses, evaluartor.GlobalRadius->data(), sizeof(float) * d_GlobalParticlesNum, cudaMemcpyHostToDevice);
@@ -89,7 +90,11 @@ struct EvaluatorGPU
     };
 
     DEVICE bool CheckSplash(const int& pIdx) {
-        return d_GlobalSplash[pIdx];
+        if (d_GlobalSplash[pIdx])
+        {
+            return true;
+        }
+        return false;
     };
 
     DEVICE float EvalInNodeCurv(const cstoneOctree::Vec3f box1, const cstoneOctree::Vec3f box2, 
@@ -104,14 +109,14 @@ struct EvaluatorGPU
             for (int i = 0; i < numNeighbors; i++)
             {
                 int pIdx = neighbors[i];
-                if (!CheckSplash(pIdx) && 
-                    d_GlobalxMeans[pIdx].x > (box1.x - (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR)) && 
-                    d_GlobalxMeans[pIdx].x < (box2.x + (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR)) &&
-                    d_GlobalxMeans[pIdx].y > (box1.y - (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR)) && 
-                    d_GlobalxMeans[pIdx].y < (box2.y + (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR)) &&
-                    d_GlobalxMeans[pIdx].z > (box1.z - (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR)) && 
-                    d_GlobalxMeans[pIdx].z < (box2.z + (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR))) 
-                {
+                if (!CheckSplash(pIdx) 
+                    && d_GlobalxMeans[pIdx].x > (box1.x - (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR)) 
+                    && d_GlobalxMeans[pIdx].x < (box2.x + (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR)) 
+                    && d_GlobalxMeans[pIdx].y > (box1.y - (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR)) 
+                    && d_GlobalxMeans[pIdx].y < (box2.y + (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR)) 
+                    && d_GlobalxMeans[pIdx].z > (box1.z - (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR)) 
+                    && d_GlobalxMeans[pIdx].z < (box2.z + (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR))
+                ) {
                     allSplash = false;
                     cstoneOctree::Vec3f tempNorm = d_PariclesNormals[pIdx];
 					norms += tempNorm;
