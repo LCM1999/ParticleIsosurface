@@ -197,7 +197,7 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
         cudaDeviceSynchronize();
         std::cout << "leaves centers and sizes calculation done" << std::endl;
 
-        thrust::host_vector<int> iso_nodeOps(d_iso_tree_size, 0); // Store the split decision for each node (the split decision is based on whether the node has isosurface)
+        thrust::host_vector<int> iso_nodeOps(d_iso_tree.size(), 0); // Store the split decision for each node (the split decision is based on whether the node has isosurface)
         thrust::device_vector<int> d_iso_nodeOps(iso_nodeOps);
         // ----------------------- begin split calculation ---------------------------
 		// estimate total number of searched particles through each octree node
@@ -266,6 +266,7 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 		std::exclusive_scan(iso_nodeOps.begin(), iso_nodeOps.end(), iso_nodeOpsLayout.begin(), 0);
 		uint64_t newTreeNodesNum;	
 		newTreeNodesNum = iso_nodeOpsLayout[iso_tree.size() - 1];
+		printf("newTreeNodesNum = %d\n", newTreeNodesNum);
 		std::vector<uint64_t> new_iso_tree(newTreeNodesNum + 1);  // updated tree array
 
 		updateTreeArrayCPU(iso_nodeOpsLayout, iso_tree, new_iso_tree);
@@ -275,7 +276,6 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 
 		iso_count++;
 		if(iso_allOpsSum == iso_nodeOps.size() - 1) break;
-		break;
     }
 	// while(1){
 
