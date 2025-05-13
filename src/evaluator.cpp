@@ -732,11 +732,11 @@ void Evaluator::compute_Gs_xMeans()
        int realNeighbors = 0, estimate = 0;
        if (useCPU)
        {
-           _searcherCPU->GetNeighbors(GlobalPoses->at(pIdx), neighbors);
+           _searcherCPU->GetNeighbors(GlobalPoses->at(pIdx), tempNeighbors);
        } else {
            _searcherGPU->GetNeighborsEstimate(GlobalPoses->at(pIdx), estimate);
-           neighbors.resize(estimate);
-           _searcherGPU->GetNeighbors(GlobalPoses->at(pIdx), realNeighbors, estimate, neighbors.data());
+           tempNeighbors.resize(estimate);
+           _searcherGPU->GetNeighbors(GlobalPoses->at(pIdx), realNeighbors, estimate, tempNeighbors.data());
        }
        if (tempNeighbors.size() <= 2)
        {

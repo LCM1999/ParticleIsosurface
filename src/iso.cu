@@ -34,6 +34,9 @@
 
 #include "iso.cuh"
 
+#include "hash_grid_gpu.cuh"
+#include "evaluatorGPU.cuh"
+
 int divUp(int a, int b) { return (a+b-1)/b; }
 
 void cuda_safe_call(cudaError_t error, const std::string& message = "")
@@ -288,8 +291,6 @@ struct CompareMorton {
 };
 #endif
 
-
-
 // ------------------------------------------------------------------
 // "Fat" Triangle Vertex
 // ------------------------------------------------------------------
@@ -327,15 +328,9 @@ vec3i parseInput(
     const std::vector<unsigned>& levels,
     const std::vector<float>& scalars,
     thrust::host_vector<Cell> &h_cells,
-    // thrust::host_vector<Morton> &h_mortons,
     unsigned &maxLevel
-    // , const std::string &cellFileName,
-    // const std::string &scalarFileName
 ) {
   vec3i coordOrigin(1<<30);
-//   std::ifstream in_cells(cellFileName,std::ios::binary);
-//   std::ifstream in_scalars(scalarFileName,std::ios::binary);
-
   vec3i bounds_lower(1<<30);
   vec3i bounds_upper(-(1<<30));
   
@@ -353,23 +348,6 @@ vec3i parseInput(
     coordOrigin = min(coordOrigin, cell.lower);
   }
   
-//   while (!in_cells.eof()) {
-//     Cell cell;
-//     in_cells.read((char*)&cell,sizeof(CellCoords));
-//     in_scalars.read((char*)&cell.scalar,sizeof(float));
-//     if (!(in_cells.good() && in_scalars.good()))
-//       break;
-//     maxLevel = std::max(maxLevel,cell.level);
-//     h_cells.push_back(cell);
-//     bounds_lower = min(bounds_lower,cell.lower);
-//     bounds_upper = max(bounds_upper,cell.lower+vec3i(1<<cell.level));
-//     coordOrigin = min(coordOrigin,cell.lower);
-//     static size_t nextPing = 1;
-//     if (h_cells.size() >= nextPing) {
-//       std::cout << "read so far : " << h_cells.size() << "..." << std::endl;
-//       nextPing *= 2;
-//     }
-//   }
   std::cout << "done reading, found " << h_cells.size() << " cells" << std::endl;
   std::cout << "bounds " << bounds_lower << ".." << bounds_upper << " logical size " << (bounds_upper-bounds_lower) << std::endl;
   std::cout << "coord origin: " << coordOrigin << std::endl;
@@ -756,9 +734,89 @@ struct IsoExtractor {
   {
     return atomicAdd(p_atomicCounter,1);
   }
+
+  inline void __device__ doMarchingCubesOn( const vec3i mirror,
+                                            const Cell zOrder[2][2][2])
+  {
+    // we have OUR cells in z-order, but VTK case table assumes
+    // everything is is VTK 'hexahedron' ordering, so let's rearrange
+    // ... and while doing so, also make sure that we flip based on
+    // which direction the parent cell created this dual from
+    float4 vertex[8] = {
+    zOrder[0+mirror.z][0+mirror.y][0+mirror.x].asDualVertex(),
+    zOrder[0+mirror.z][0+mirror.y][1-mirror.x].asDualVertex(),
+    zOrder[0+mirror.z][1-mirror.y][1-mirror.x].asDualVertex(),
+    zOrder[0+mirror.z][1-mirror.y][0+mirror.x].asDualVertex(),
+    zOrder[1-mirror.z][0+mirror.y][0+mirror.x].asDualVertex(),
+    zOrder[1-mirror.z][0+mirror.y][1-mirror.x].asDualVertex(),
+    zOrder[1-mirror.z][1-mirror.y][1-mirror.x].asDualVertex(),
+    zOrder[1-mirror.z][1-mirror.y][0+mirror.x].asDualVertex()
+    };
+
+    int index = 0;
+    for (int i=0;i<8;i++)
+      if (vertex[i].w > isoValue)
+        index += (1<<i);
+    if (index == 0 || index == 0xff) return;
+
+    for (const int8_t *edge = &vtkMarchingCubesTriangleCases[index][0];
+      edge[0] > -1;
+      edge += 3 ) {
+      float4 triVertex[3];
+      {
+        for (int ii=0; ii<3; ii++) {
+          const int8_t *vert = vtkMarchingCubes_edges[edge[ii]];
+          float4 v0 = vertex[vert[0]];
+          float4 v1 = vertex[vert[1]];
+          const float t = (isoValue - v0.w) / float(v1.w - v0.w);
+          triVertex[ii] = (1.f-t)*v0+t*v1;
+        }
+
+        if (triVertex[1] == triVertex[0]) continue;
+        if (triVertex[2] == triVertex[0]) continue;
+        if (triVertex[1] == triVertex[2]) continue;
+      }
+      const int triangleID = allocTriangle();
+      if (triangleID >= 3*outputArraySize) continue;
+
+      for (int j=0;j<3;j++) {
+        (int &)triVertex[j].w = (4*triangleID+j);
+        (float4&)outputArray[3*triangleID+j] = triVertex[j];
+      }
+    }
+  }
+
+  inline int __device__ sign(float x) { return (x > 0.f) ? 1 : 0; }
+
+  inline float __device__ invlerp(float x1, float x2, float x)
+  {
+    return (x - x1) / (x2 - x1);
+  }
+
+  inline float4 __device__ lerp(float4 x1, float4 x2, float ratio)
+  {
+    return x1 + (x2 - x1) * ratio;
+  }
+
+  inline void __device__ convertToWorldPos(cstoneOctree::Vec3f& pos, cstoneOctree::Box* box)
+  {
+    int maxCoord = 1u << 21;
+    // smallest octree cell edge length in unit cube
+    float uL = float(1.) / maxCoord;
+    float unitLengthX = uL * box->lx();
+    float unitLengthY = uL * box->ly();
+    float unitLengthZ = uL * box->lz();
+    pos.x = pos.x * unitLengthX + box->xmin(),
+    pos.y = pos.y * unitLengthY + box->ymin(),
+    pos.z = pos.z * unitLengthZ + box->zmin();
+  }
   
   inline void __device__ doMarchingCubesOn(const vec3i mirror,
-                                           const Cell zOrder[2][2][2])
+                                           const Cell zOrder[2][2][2],
+                                           HashGridGPU** d_searchers, int d_searchers_size, EvaluatorGPU* d_evaluator,
+                                           bool needErrorControl, float errorBound,
+                                           cstoneOctree::Box* box
+                                          )
   {
     // we have OUR cells in z-order, but VTK case table assumes
     // everything is is VTK 'hexahedron' ordering, so let's rearrange
@@ -785,18 +843,110 @@ struct IsoExtractor {
          edge[0] > -1;
          edge += 3 ) {
       float4 triVertex[3];
-      for (int ii=0; ii<3; ii++) {
-        const int8_t *vert = vtkMarchingCubes_edges[edge[ii]];
-        const float4 v0 = vertex[vert[0]];
-        const float4 v1 = vertex[vert[1]];
-        const float t = (isoValue - v0.w) / float(v1.w - v0.w);
-        triVertex[ii] = (1.f-t)*v0+t*v1;
+      if (needErrorControl)
+      {
+        for (int ii=0; ii<3; ii++) {
+          const int8_t *vert = vtkMarchingCubes_edges[edge[ii]];
+          cstoneOctree::Vec3f v0(vertex[vert[0]].x, vertex[vert[0]].y, vertex[vert[0]].z);
+          cstoneOctree::Vec3f v1(vertex[vert[1]].x, vertex[vert[1]].y, vertex[vert[1]].z);
+          // printf("iv0: %f %f %f\n", v0.x, v0.y, v0.z);
+          convertToWorldPos(v0, box);
+          // printf("fv0: %f %f %f\n", v0.x, v0.y, v0.z);
+          convertToWorldPos(v1, box);
+          float v0_scalar = vertex[vert[0]].w;
+          float v1_scalar = vertex[vert[1]].w;
+          cstoneOctree::Vec3f temp_pos(0.0f, 0.0f, 0.0f);
+          float temp_scalar = 0.0f;
+          float d = (v1 - v0).norm();
+          while (d > errorBound)
+          {
+            temp_pos[0] =  (v0[0] + v1[0]) / 2;
+            temp_pos[1] =  (v0[1] + v1[1]) / 2;
+            temp_pos[2] =  (v0[2] + v1[2]) / 2;
+            temp_scalar = 0.0f;
+            for (size_t hgi = 0; hgi < d_searchers_size; hgi++)
+            {
+              HashGridGPU* cur_searcher = d_searchers[hgi];
+              cstoneOctree::Vec3i xyzIdx;
+              int64_t neighbor_hash;
+              cur_searcher->CalcXYZIdx(temp_pos, xyzIdx);
+              // printf("xyzIdx: %d %d %d\n", xyzIdx.x, xyzIdx.y, xyzIdx.z);
+              // for (int z = -1; z <= 1; z++)
+              // {
+              //     for (int y = -1; y <= 1; y++)
+              //     {
+              //         for (int x = -1; x <= 1; x++)
+              //         {
+              //             neighbor_hash = cur_searcher->CalcCellHash((xyzIdx + cstoneOctree::Vec3i(x, y, z)));
+              //             if (neighbor_hash < 0) {continue;}
+              //             int countIndex, startIndex, endIndex;
+              //             if ((cur_searcher->StartList[neighbor_hash] >= 0) && (cur_searcher->EndList[neighbor_hash] >= 0))
+              //             {
+              //                 startIndex = cur_searcher->StartList[neighbor_hash];
+              //                 endIndex = cur_searcher->EndList[neighbor_hash];
+              //             }
+              //             else
+              //             {
+              //                 continue;
+              //             }
+              //             for (int countIndex = startIndex; countIndex < endIndex; countIndex++)
+              //             {
+              //                 int pId = cur_searcher->PIndexes[cur_searcher->IndexList[countIndex]];
+              //                 if (d_evaluator->CheckSplash(pId))
+              //                 {
+              //                     continue;
+              //                 }
+              //                 cstoneOctree::Vec3f diff = temp_pos - d_evaluator->d_GlobalxMeans[pId];
+              //                 temp_scalar += d_evaluator->AnisotropicInterpolate(pId, diff);
+              //             }
+              //         }
+              //     }
+              // }
+            }
+            temp_scalar = d_evaluator->d_ISO_VALUE - temp_scalar;
+            printf("temp_scalar: %f\n", temp_scalar);
+            if (sign(temp_scalar) == sign(v0_scalar))
+            {
+              v0.x = temp_pos.x;
+              v0.y = temp_pos.y;
+              v0.z = temp_pos.z;
+              v0_scalar = temp_scalar;
+              temp_pos.setZero();
+              temp_scalar = 0.0f;
+            }
+            else if (sign(temp_scalar) == sign(v1_scalar))
+            {
+              v1.x = temp_pos.x;
+              v1.y = temp_pos.y;
+              v1.z = temp_pos.z;
+              v1_scalar = temp_scalar;
+              temp_pos.setZero();
+              temp_scalar = 0.0f;
+            } else {
+              break;
+            }
+            d /= 2.0f;            
+          }
+          float t = invlerp(v0_scalar, v1_scalar, isoValue);
+          // float t = (isoValue - v0_scalar) / float(v1_scalar - v0_scalar);
+          if (t < 0.1) {
+            triVertex[ii] = make_float4(v0.x, v0.y, v0.z, v0_scalar);
+          } else if (t > 0.9) {
+            triVertex[ii] = make_float4(v1.x, v1.y, v1.z, v1_scalar);
+          } else {
+            const float4 v0v = make_float4(v0.x, v0.y, v0.z, v0_scalar);
+            const float4 v1v = make_float4(v1.x, v1.y, v1.z, v1_scalar);
+            // triVertex[ii] = (1.f-t)*v0v+t*v1v;
+            triVertex[ii] = lerp(v0v, v1v, t);
+          }
+          printf("triVertex[%d]: %f %f %f %f\n", ii, triVertex[ii].x, triVertex[ii].y, triVertex[ii].z, triVertex[ii].w);
+        }
+  
+        if (triVertex[1] == triVertex[0]) continue;
+        if (triVertex[2] == triVertex[0]) continue;
+        if (triVertex[1] == triVertex[2]) continue;
+        
       }
-
-      if (triVertex[1] == triVertex[0]) continue;
-      if (triVertex[2] == triVertex[0]) continue;
-      if (triVertex[1] == triVertex[2]) continue;
-
       const int triangleID = allocTriangle();
       if (triangleID >= 3*outputArraySize) continue;
 
@@ -807,6 +957,31 @@ struct IsoExtractor {
     }
   }
 };
+
+__global__ void parseInputGPU(
+  uint64_t* d_mortons, 
+  int d_iso_tree_size,
+  cstoneOctree::Vec3i* d_lowers,
+  unsigned* d_levels,
+  float* d_scalars,
+  Cell* d_cells,
+  unsigned* d_maxLevel
+  // vec3i* d_coordOrigin
+) {
+  // vec3i bounds_lower(1<<30);
+  // vec3i bounds_upper(-(1<<30));
+  const size_t threadID = threadIdx.x+size_t(blockDim.x)*blockIdx.x;
+  if (threadID >= d_iso_tree_size) return;
+  d_cells[threadID].lower = vec3i(d_lowers[threadID].x, d_lowers[threadID].y, d_lowers[threadID].z);
+  d_cells[threadID].level = d_levels[threadID];
+  d_cells[threadID].scalar = d_scalars[threadID];
+  d_maxLevel[0] = max(d_maxLevel[0], d_cells[threadID].level);
+  // bounds_lower = min(bounds_lower, d_cells[threadID].lower);
+  // bounds_upper = max(bounds_upper, d_cells[threadID].lower + vec3i(1 << d_cells[threadID].level));
+  // d_coordOrigin[0].x = min(d_coordOrigin[0].x, d_cells[threadID].lower.x);
+  // d_coordOrigin[0].y = min(d_coordOrigin[0].y, d_cells[threadID].lower.y);
+  // d_coordOrigin[0].z = min(d_coordOrigin[0].z, d_cells[threadID].lower.z);
+}
 
 
 #if EXPLICIT_MORTON
@@ -822,6 +997,61 @@ __global__ void buildMortonArray(Morton *const __restrict__ mortonArray,
 }
 #endif
 
+__global__ void extractTriangles(
+  #if EXPLICIT_MORTON
+                                   const Morton *const __restrict__ mortonArray,
+  #endif
+                                   const vec3i coordOrigin,
+                                   const Cell  *const __restrict__ cellArray, 
+                                   const int numCells,
+                                   const unsigned maxLevel,
+                                   const float isoValue,
+                                   TriangleVertex *__restrict__ outVertex,
+                                   const int outVertexSize,
+                                   int *p_numGeneratedTriangles)
+  {
+    AMR amr(
+  #if EXPLICIT_MORTON
+            mortonArray,
+  #endif
+            coordOrigin,cellArray,numCells,maxLevel);
+    
+    const size_t threadID = threadIdx.x+size_t(blockDim.x)*blockIdx.x;
+                                    
+    const int workID             = threadID / 8;
+    if (workID >= numCells) return;
+    const int directionID        = threadID % 8;
+    const Cell currentCell = cellArray[workID];
+  
+    const int dz = (directionID & 4) ? 1 : -1;
+    const int dy = (directionID & 2) ? 1 : -1;
+    const int dx = (directionID & 1) ? 1 : -1;
+    
+    Cell corner[2][2][2];
+    for (int iz=0;iz<2;iz++)
+      for (int iy=0;iy<2;iy++)
+        for (int ix=0;ix<2;ix++) {
+          const vec3i delta = vec3i(dx*ix,dy*iy,dz*iz);
+          const CellCoords cornerCoords = currentCell.neighbor(delta);
+            
+          if (!amr.findActual(corner[iz][iy][ix], cornerCoords)) 
+            // corner does not exist - currentcell is on a boundary, and
+            // this is not a dual cell
+            return;
+  
+          if (corner[iz][iy][ix].level < currentCell.level) 
+            // somebody else will generate this same cell from a finer
+            // level...
+            return;
+          
+          if (corner[iz][iy][ix].level == currentCell.level && corner[iz][iy][ix] < currentCell) 
+            // this other cell will generate this dual cell...
+            return;
+        }
+  
+    IsoExtractor isoExtractor(isoValue,outVertex,outVertexSize,p_numGeneratedTriangles);
+    isoExtractor.doMarchingCubesOn({dx==-1,dy==-1,dz==-1},corner);
+  }
 
 __global__ void extractTriangles(
 #if EXPLICIT_MORTON
@@ -834,6 +1064,9 @@ __global__ void extractTriangles(
                                  const float isoValue,
                                  TriangleVertex *__restrict__ outVertex,
                                  const int outVertexSize,
+                                 HashGridGPU** d_searchers, int d_searchers_size, EvaluatorGPU* d_evaluator,
+                                 bool needErrorControl, float errorBound, 
+                                 cstoneOctree::Box* box,
                                  int *p_numGeneratedTriangles)
 {
   AMR amr(
@@ -876,7 +1109,8 @@ __global__ void extractTriangles(
       }
 
   IsoExtractor isoExtractor(isoValue,outVertex,outVertexSize,p_numGeneratedTriangles);
-  isoExtractor.doMarchingCubesOn({dx==-1,dy==-1,dz==-1},corner);
+  isoExtractor.doMarchingCubesOn({dx==-1,dy==-1,dz==-1},corner, 
+    d_searchers, d_searchers_size, d_evaluator, needErrorControl, errorBound, box);
 }
 
 
@@ -1081,6 +1315,221 @@ void generateIso(
                      h_indexArray[i].z + 1));
     }
     mesh->trianglesNum = mesh->tris.size();
+}
+
+void generateIsoDirectGPU(
+  thrust::device_vector<uint64_t>& d_mortons,
+  thrust::device_vector<cstoneOctree::Vec3i>& d_lowers, 
+  thrust::device_vector<unsigned>& d_levels, 
+  thrust::device_vector<float>& d_scalars,
+  const int d_iso_tree_size,
+  HashGridGPU** d_searchers, int d_searchers_size, EvaluatorGPU* d_evaluator,
+  const float isoValue, const float errorBound, 
+  cstoneOctree::Box* d_box,
+  Mesh* mesh
+) {
+  std::cout << "ErrorBound: " << errorBound << std::endl;
+  // thrust::host_vector<Cell>  h_cells;
+  thrust::device_vector<Cell>  d_cells(d_iso_tree_size);
+  thrust::device_vector<unsigned> d_maxLevel(1, 0);
+  // thrust::device_vector<vec3i> d_coordOrigin(1, vec3i(1<<30));
+  // vec3i coordOrigin = parseInput(mortons, lowers, levels, scalars, h_cells, maxLevel);
+  {
+    size_t numJobs = d_iso_tree_size;
+    int blockSize = 512;
+    int numBlocks = (numJobs+blockSize-1)/blockSize;
+    parseInputGPU<<<numBlocks,blockSize>>>
+    (
+        thrust::raw_pointer_cast(d_mortons.data()), 
+        d_iso_tree_size,
+        thrust::raw_pointer_cast(d_lowers.data()),
+        thrust::raw_pointer_cast(d_levels.data()),
+        thrust::raw_pointer_cast(d_scalars.data()),
+        thrust::raw_pointer_cast(d_cells.data()),
+        thrust::raw_pointer_cast(d_maxLevel.data())
+        // thrust::raw_pointer_cast(d_coordOrigin.data())
+    );
+  }
+  cudaDeviceSynchronize();
+  thrust::host_vector<unsigned> h_maxLevel = d_maxLevel;
+  // thrust::host_vector<vec3i> h_coordOrigin = d_coordOrigin;
+  // h_coordOrigin[0].x &= ~((1<<h_maxLevel[0])-1);
+  // h_coordOrigin[0].y &= ~((1<<h_maxLevel[0])-1);
+  // h_coordOrigin[0].z &= ~((1<<h_maxLevel[0])-1);
+  unsigned maxLevel = h_maxLevel[0];
+  vec3i coordOrigin(0, 0, 0);
+  std::cout << "maxLevel: " << maxLevel << std::endl;
+  // std::cout << "coord origin: " << coordOrigin << std::endl;
+  // thrust::device_vector<Cell> d_cells = h_cells;
+  std::cout << "#cells&mortons uploaded" << std::endl;
+  thrust::device_vector<Morton> d_ingo_mortons(d_cells.size());
+  {
+      size_t numJobs = d_iso_tree_size;
+      int blockSize = 512;
+      int numBlocks = (numJobs+blockSize-1)/blockSize;
+      buildMortonArray<<<numBlocks,blockSize>>>
+      (
+          thrust::raw_pointer_cast(d_ingo_mortons.data()),
+          coordOrigin,
+          thrust::raw_pointer_cast(d_cells.data()),
+          d_cells.size()
+      );
+  }
+  cudaDeviceSynchronize();
+  thrust::sort(d_ingo_mortons.begin(), d_ingo_mortons.end(), CompareMorton());
+  cudaDeviceSynchronize();
+  std::cout << "#mortons sorted" << std::endl;
+  // ------------------------------------------------------------------
+  // step 2a: run triangle extraction, count triangles
+  // ------------------------------------------------------------------
+  thrust::device_vector<int> d_atomicCounter(1);
+  thrust::device_vector<TriangleVertex> d_triangleVertices(0);
+  {
+      d_atomicCounter[0] = 0;
+      size_t numJobs   = 8 * d_iso_tree_size;
+      int blockSize = 512;
+      int numBlocks = (numJobs+blockSize-1)/blockSize;
+      // dim3 grid(1024,divUp(numBlocks,1024));
+      // std::cout << "launching with grid " << grid.x << " " << grid.y << " blocksize " << blockSize << std::endl;
+      extractTriangles<<<numBlocks,blockSize>>>
+      (
+          thrust::raw_pointer_cast(d_ingo_mortons.data()),
+          coordOrigin, 
+          thrust::raw_pointer_cast(d_cells.data()),
+          d_iso_tree_size,
+          maxLevel,
+          isoValue,
+          thrust::raw_pointer_cast(d_triangleVertices.data()),d_triangleVertices.size(),
+          d_searchers, d_searchers_size, d_evaluator,
+          false, errorBound, 
+          d_box,
+          thrust::raw_pointer_cast(d_atomicCounter.data())
+      );
+  }
+  cudaDeviceSynchronize();
+  std::cout << "#first pass for counting done" << std::endl;
+
+  // ------------------------------------------------------------------
+  // step 2b: allocate output array, and rerun, this time writing tris
+  // ------------------------------------------------------------------
+  int numTriangles = d_atomicCounter[0];
+  std::cout << "expecting num triangles = " << numTriangles << std::endl;
+  d_triangleVertices.resize(3*numTriangles);
+
+  {
+      d_atomicCounter[0] = 0;
+      size_t numJobs = 8 * d_iso_tree_size;
+      int blockSize  = 512;
+      int numBlocks  = (numJobs+blockSize-1)/blockSize;
+      extractTriangles<<<numBlocks,//dim3(1024,divUp(numBlocks,1024)),
+      blockSize>>>
+      (
+      #if EXPLICIT_MORTON
+          thrust::raw_pointer_cast(d_ingo_mortons.data()),
+      #endif
+          coordOrigin,
+          thrust::raw_pointer_cast(d_cells.data()),
+          d_cells.size(),
+          maxLevel,
+          isoValue,
+          thrust::raw_pointer_cast(d_triangleVertices.data()),d_triangleVertices.size(),
+          d_searchers, d_searchers_size, d_evaluator,
+          true, errorBound, 
+          d_box,
+          thrust::raw_pointer_cast(d_atomicCounter.data())
+      );
+  }
+  cudaDeviceSynchronize();
+  std::cout << "#first pass for actual generation" << std::endl;
+  
+  // ==================================================================
+  // step 3: create vertex array
+  // ==================================================================
+  thrust::host_vector<TriangleVertex> h_triangleVertices = d_triangleVertices;
+  std::ofstream out("D:/data/test.csv",std::ios::binary);
+  out.precision(10);
+  out << "x,y,z" << std::endl;
+  for (int i=0;i<h_triangleVertices.size();i++)
+    out << h_triangleVertices[i].position.x << ","
+        << h_triangleVertices[i].position.y << ","
+        << h_triangleVertices[i].position.z << std::endl;
+  out.close();
+  std::cout << "#triangle vertices written to file" << std::endl;
+  // ------------------------------------------------------------------
+  // step 3a: sort vertex array
+  // ------------------------------------------------------------------
+  thrust::sort(d_triangleVertices.begin(), d_triangleVertices.end(), CompareVertices());
+  cudaDeviceSynchronize();
+  std::cout << "#sorted vertices" << std::endl;
+  
+  // ------------------------------------------------------------------
+  // step 3b: count unique vertices
+  // ------------------------------------------------------------------
+  thrust::device_vector<float3> d_vertexArray(0);
+  thrust::device_vector<int3>   d_indexArray(numTriangles);
+  {
+      d_atomicCounter[0] = 0;
+      int numJobs   = 3*numTriangles;
+      int blockSize = 512;
+      int numBlocks = (numJobs+blockSize-1)/blockSize;
+      createVertexArray<<<numBlocks,blockSize>>>
+      (
+          thrust::raw_pointer_cast(d_atomicCounter.data()),
+          thrust::raw_pointer_cast(d_triangleVertices.data()),
+          d_triangleVertices.size(),
+          thrust::raw_pointer_cast(d_vertexArray.data()),
+          d_vertexArray.size(),
+          thrust::raw_pointer_cast(d_indexArray.data())
+      );
+  }
+  cudaDeviceSynchronize();
+  std::cout << "#counted unique vertices" << std::endl;
+
+  int numVertices = d_atomicCounter[0];
+  std::cout << "expecting num vertices " << numVertices << std::endl;
+
+  // ------------------------------------------------------------------
+  // step 3c: writing vertices
+  // ------------------------------------------------------------------
+  d_vertexArray.resize(numVertices);
+  {
+      d_atomicCounter[0] = 0;
+      int numJobs   = 3*numTriangles;
+      int blockSize = 512;
+      int numBlocks = (numJobs+blockSize-1)/blockSize;
+      createVertexArray<<<numBlocks,blockSize>>>
+      (
+          thrust::raw_pointer_cast(d_atomicCounter.data()),
+          thrust::raw_pointer_cast(d_triangleVertices.data()),
+          d_triangleVertices.size(),
+          thrust::raw_pointer_cast(d_vertexArray.data()),
+          d_vertexArray.size(),
+          thrust::raw_pointer_cast(d_indexArray.data())
+      );
+  }
+  cudaDeviceSynchronize();
+  std::cout << "#generated vertex and index array" << std::endl;
+  // ------------------------------------------------------------------
+  // step 4: download and write out
+  // ------------------------------------------------------------------
+  thrust::host_vector<float3> h_vertexArray = d_vertexArray;
+  thrust::host_vector<int3>   h_indexArray = d_indexArray;
+  for (int i=0;i<h_vertexArray.size();i++)
+  {
+  mesh->vertices.push_back(
+          cstoneOctree::Vec3f(h_vertexArray[i].x, 
+                              h_vertexArray[i].y, 
+                              h_vertexArray[i].z));
+  }
+  mesh->verticesNum = mesh->vertices.size();
+  for (int i=0;i<h_indexArray.size();i++)
+  {
+      mesh->tris.push_back(
+          Triangle(h_indexArray[i].x + 1, 
+                   h_indexArray[i].y + 1,
+                   h_indexArray[i].z + 1));
+  }
+  mesh->trianglesNum = mesh->tris.size();
 }
 
 // int main(int ac, char **av)

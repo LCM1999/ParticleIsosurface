@@ -1059,7 +1059,7 @@ void SurfReconstructor::RunCPU2(float iso_factor, float smooth_factor)
 
 	std::vector<Vec3i> iso_lowers(iso_tree.size() - 1);
 	std::vector<unsigned> iso_levels(iso_tree.size() - 1);
-	calculateLeavesLowersAndLevelsCPU(iso_tree, iso_lowers, iso_levels, box);
+	calculateLeavesLowersAndLevelsCPU(iso_tree, iso_lowers, iso_levels);
 
 	iso::generateIso(iso_tree, iso_lowers, iso_levels, scalars, 0.0, 
 		_OurMesh

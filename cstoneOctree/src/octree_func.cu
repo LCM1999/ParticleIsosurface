@@ -404,6 +404,7 @@ __global__ void calculateLeavesCentersAndSizesKernel(uint64_t* d_iso_tree, int d
         uint64_t curr = d_iso_tree[tid];
 
         unsigned level = treeLevel(d_iso_tree[tid + 1] - curr);
+        d_iso_depths[tid] = level;
         const int maxCoord = 1u << 21;
         unsigned cubeLength = (1u << (21 - level));
 
@@ -411,6 +412,17 @@ __global__ void calculateLeavesCentersAndSizesKernel(uint64_t* d_iso_tree, int d
 
         IBox nodeBox(ivec.x, ivec.x + cubeLength, ivec.y, ivec.y + cubeLength, ivec.z, ivec.z + cubeLength);
         cal::tie(d_iso_centers[tid], d_iso_sizes[tid]) = centerAndSizeGPU(&nodeBox, d_box);
+    }
+}
+
+__global__ void calculateLeavesLowersAndLevelsKernel(uint64_t* d_iso_tree, int d_iso_tree_size, Vec3i* d_lowers, unsigned* d_levels, Box* d_box){
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tid < d_iso_tree_size){
+        uint64_t curr = d_iso_tree[tid];
+        
+        unsigned level = treeLevel(d_iso_tree[tid + 1] - curr);
+        d_levels[tid] = 21 - level;
+        d_lowers[tid] = decodeMorton(curr);
     }
 }
 

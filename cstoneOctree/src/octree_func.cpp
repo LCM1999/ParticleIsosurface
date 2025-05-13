@@ -350,16 +350,16 @@ void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves,
 }
 
 void calculateLeavesLowersAndLevelsCPU(std::vector<uint64_t>& leaves, 
-    std::vector<Vec3i>& lowers, std::vector<unsigned>& levels, Box& box)
+    std::vector<Vec3i>& lowers, std::vector<unsigned>& levels)
 {
     #pragma omp parallel for
     for(int i = 0; i < leaves.size() - 1; i++){
-        calculateLeavesLowersAndLevelsCPU(leaves, lowers, levels, box, i);
+        calculateLeavesLowersAndLevelsCPU(leaves, lowers, levels, i);
     }
 }
 
 void calculateLeavesLowersAndLevelsCPU(std::vector<uint64_t>& leaves, 
-    std::vector<Vec3i>& lowers, std::vector<unsigned>& levels, Box& box, int idx)
+    std::vector<Vec3i>& lowers, std::vector<unsigned>& levels, int idx)
 {
     uint64_t curr = leaves[idx];
     levels[idx] = 21 - treeLevel(leaves[idx + 1] - curr);

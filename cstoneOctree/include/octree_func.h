@@ -188,9 +188,9 @@ void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves, std::vecto
 
 void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves, std::vector<Vec3f>& centers, std::vector<Vec3f>& sizes, std::vector<unsigned>& depths, Box& box, int idx);
 
-void calculateLeavesLowersAndLevelsCPU(std::vector<uint64_t>& leaves, std::vector<Vec3i>& lowers, std::vector<unsigned>& levels, Box& box);
+void calculateLeavesLowersAndLevelsCPU(std::vector<uint64_t>& leaves, std::vector<Vec3i>& lowers, std::vector<unsigned>& levels);
 
-void calculateLeavesLowersAndLevelsCPU(std::vector<uint64_t>& leaves, std::vector<Vec3i>& lowers, std::vector<unsigned>& levels, Box& box, int idx);
+void calculateLeavesLowersAndLevelsCPU(std::vector<uint64_t>& leaves, std::vector<Vec3i>& lowers, std::vector<unsigned>& levels, int idx);
 
 void findNeighborsCPU(std::vector<Vec3f>& particles, std::vector<float>& radiuses, OctreeNs& octreeNs, Box& box, int ngmax, std::vector<int>& neighbors, std::vector<int>& numNeighbors);
 
@@ -219,6 +219,8 @@ __global__ void linkOctreeKernel(uint64_t* prefixesDevice, int numInternalNodes,
 __global__ void calculateNodeCentersAndSizesKernel(uint64_t* prefixesDevice, int prefixesDeviceSize, Vec3f* centersDevice, Vec3f* sizesDevice, Box* boxDevice);
 
 __global__ void calculateLeavesCentersAndSizesKernel(uint64_t* d_iso_tree, int d_iso_tree_size, Vec3f* d_iso_centers, Vec3f* d_iso_sizes, unsigned* d_iso_depths, Box* d_box);
+
+__global__ void calculateLeavesLowersAndLevelsKernel(uint64_t* d_iso_tree, int d_iso_tree_size, Vec3i* d_lowers, unsigned* d_levels, Box* d_box);
 
 __global__ void findNeighborsKernel(Vec3f* coordsDevice, int coords_size, float* radiusesDevice, OctreeNs* octreeNs, Box* boxDevice, int ngmax, int* neighborsDevice, int* numNeighborsDevice);
 
