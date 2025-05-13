@@ -871,37 +871,39 @@ struct IsoExtractor {
               int64_t neighbor_hash;
               cur_searcher->CalcXYZIdx(temp_pos, xyzIdx);
               // printf("xyzIdx: %d %d %d\n", xyzIdx.x, xyzIdx.y, xyzIdx.z);
-              // for (int z = -1; z <= 1; z++)
-              // {
-              //     for (int y = -1; y <= 1; y++)
-              //     {
-              //         for (int x = -1; x <= 1; x++)
-              //         {
-              //             neighbor_hash = cur_searcher->CalcCellHash((xyzIdx + cstoneOctree::Vec3i(x, y, z)));
-              //             if (neighbor_hash < 0) {continue;}
-              //             int countIndex, startIndex, endIndex;
-              //             if ((cur_searcher->StartList[neighbor_hash] >= 0) && (cur_searcher->EndList[neighbor_hash] >= 0))
-              //             {
-              //                 startIndex = cur_searcher->StartList[neighbor_hash];
-              //                 endIndex = cur_searcher->EndList[neighbor_hash];
-              //             }
-              //             else
-              //             {
-              //                 continue;
-              //             }
-              //             for (int countIndex = startIndex; countIndex < endIndex; countIndex++)
-              //             {
-              //                 int pId = cur_searcher->PIndexes[cur_searcher->IndexList[countIndex]];
-              //                 if (d_evaluator->CheckSplash(pId))
-              //                 {
-              //                     continue;
-              //                 }
-              //                 cstoneOctree::Vec3f diff = temp_pos - d_evaluator->d_GlobalxMeans[pId];
-              //                 temp_scalar += d_evaluator->AnisotropicInterpolate(pId, diff);
-              //             }
-              //         }
-              //     }
-              // }
+              for (int z = -1; z <= 1; z++)
+              {
+                  for (int y = -1; y <= 1; y++)
+                  {
+                      for (int x = -1; x <= 1; x++)
+                      {
+                          neighbor_hash = cur_searcher->CalcCellHash((xyzIdx + cstoneOctree::Vec3i(x, y, z)));
+                          if (neighbor_hash < 0) {continue;}
+                          int countIndex, startIndex, endIndex;
+                          if ((cur_searcher->StartList[neighbor_hash] >= 0) && (cur_searcher->EndList[neighbor_hash] >= 0))
+                          {
+                              startIndex = cur_searcher->StartList[neighbor_hash];
+                              endIndex = cur_searcher->EndList[neighbor_hash];
+                              printf("neighbor_hash: %d, startIndex: %d, endIndex: %d\n", neighbor_hash, startIndex, endIndex);
+                          }
+                          else
+                          {
+                              // printf("0 \n");
+                              continue;
+                          }
+                          // for (int countIndex = startIndex; countIndex < endIndex; countIndex++)
+                          // {
+                          //     int pId = cur_searcher->PIndexes[cur_searcher->IndexList[countIndex]];
+                          //     if (d_evaluator->CheckSplash(pId))
+                          //     {
+                          //         continue;
+                          //     }
+                          //     cstoneOctree::Vec3f diff = temp_pos - d_evaluator->d_GlobalxMeans[pId];
+                          //     temp_scalar += d_evaluator->AnisotropicInterpolate(pId, diff);
+                          // }
+                      }
+                  }
+              }
             }
             temp_scalar = d_evaluator->d_ISO_VALUE - temp_scalar;
             printf("temp_scalar: %f\n", temp_scalar);
