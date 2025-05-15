@@ -23,6 +23,7 @@ namespace iso {
 
     void generateIsoDirectGPU(
         thrust::device_vector<uint64_t>& d_mortons,
+        thrust::device_vector<cstoneOctree::Vec3f>& d_centers,
         thrust::device_vector<cstoneOctree::Vec3i>& d_lowers, 
         thrust::device_vector<unsigned>& d_levels, 
         thrust::device_vector<float>& d_scalars,

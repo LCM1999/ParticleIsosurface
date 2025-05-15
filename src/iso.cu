@@ -261,9 +261,11 @@ inline __host__ __device__ bool operator==(const CellCoords &a, const CellCoords
 struct Cell : public CellCoords {
   inline __device__ __host__ float4 asDualVertex() const
   {
-    return make_float4(center().x,center().y,center().z,scalar);
+    // return make_float4(center().x,center().y,center().z,scalar);
+    return make_float4(center.x, center.y, center.z, scalar);
   }
   float      scalar;
+  float3     center;
 };
 
 inline __host__ __device__ bool operator==(const Cell &a, const Cell &b)
@@ -849,10 +851,6 @@ struct IsoExtractor {
           const int8_t *vert = vtkMarchingCubes_edges[edge[ii]];
           cstoneOctree::Vec3f v0(vertex[vert[0]].x, vertex[vert[0]].y, vertex[vert[0]].z);
           cstoneOctree::Vec3f v1(vertex[vert[1]].x, vertex[vert[1]].y, vertex[vert[1]].z);
-          // printf("iv0: %f %f %f\n", v0.x, v0.y, v0.z);
-          convertToWorldPos(v0, box);
-          // printf("fv0: %f %f %f\n", v0.x, v0.y, v0.z);
-          convertToWorldPos(v1, box);
           float v0_scalar = vertex[vert[0]].w;
           float v1_scalar = vertex[vert[1]].w;
           cstoneOctree::Vec3f temp_pos(0.0f, 0.0f, 0.0f);
@@ -860,17 +858,14 @@ struct IsoExtractor {
           float d = (v1 - v0).norm();
           while (d > errorBound)
           {
-            temp_pos[0] =  (v0[0] + v1[0]) / 2;
-            temp_pos[1] =  (v0[1] + v1[1]) / 2;
-            temp_pos[2] =  (v0[2] + v1[2]) / 2;
+            temp_pos = (v0 + v1) / 2.0f;
             temp_scalar = 0.0f;
-            for (size_t hgi = 0; hgi < d_searchers_size; hgi++)
+            for (int hgi = 0; hgi < d_searchers_size; hgi++)
             {
               HashGridGPU* cur_searcher = d_searchers[hgi];
               cstoneOctree::Vec3i xyzIdx;
               int64_t neighbor_hash;
               cur_searcher->CalcXYZIdx(temp_pos, xyzIdx);
-              // printf("xyzIdx: %d %d %d\n", xyzIdx.x, xyzIdx.y, xyzIdx.z);
               for (int z = -1; z <= 1; z++)
               {
                   for (int y = -1; y <= 1; y++)
@@ -880,57 +875,52 @@ struct IsoExtractor {
                           neighbor_hash = cur_searcher->CalcCellHash((xyzIdx + cstoneOctree::Vec3i(x, y, z)));
                           if (neighbor_hash < 0) {continue;}
                           int countIndex, startIndex, endIndex;
-                          if ((cur_searcher->StartList[neighbor_hash] >= 0) && (cur_searcher->EndList[neighbor_hash] >= 0))
+                          if ((cur_searcher->d_StartList[neighbor_hash] >= 0) && (cur_searcher->d_EndList[neighbor_hash] >= 0))
                           {
-                              startIndex = cur_searcher->StartList[neighbor_hash];
-                              endIndex = cur_searcher->EndList[neighbor_hash];
-                              printf("neighbor_hash: %d, startIndex: %d, endIndex: %d\n", neighbor_hash, startIndex, endIndex);
+                              startIndex = cur_searcher->d_StartList[neighbor_hash];
+                              endIndex = cur_searcher->d_EndList[neighbor_hash];
                           }
                           else
                           {
-                              // printf("0 \n");
                               continue;
                           }
-                          // for (int countIndex = startIndex; countIndex < endIndex; countIndex++)
-                          // {
-                          //     int pId = cur_searcher->PIndexes[cur_searcher->IndexList[countIndex]];
-                          //     if (d_evaluator->CheckSplash(pId))
-                          //     {
-                          //         continue;
-                          //     }
-                          //     cstoneOctree::Vec3f diff = temp_pos - d_evaluator->d_GlobalxMeans[pId];
-                          //     temp_scalar += d_evaluator->AnisotropicInterpolate(pId, diff);
-                          // }
+                          for (int countIndex = startIndex; countIndex < endIndex; countIndex++)
+                          {
+                              int pId = cur_searcher->d_PIndexes[cur_searcher->d_IndexList[countIndex]];
+                              if (d_evaluator->CheckSplash(pId))
+                              {
+                                  continue;
+                              }
+                              cstoneOctree::Vec3f diff = temp_pos - d_evaluator->d_GlobalxMeans[pId];
+                              temp_scalar += d_evaluator->AnisotropicInterpolate(pId, diff);
+                          }
                       }
                   }
               }
             }
             temp_scalar = d_evaluator->d_ISO_VALUE - temp_scalar;
-            printf("temp_scalar: %f\n", temp_scalar);
+            // printf("temp_scalar: %f\n", temp_scalar);
             if (sign(temp_scalar) == sign(v0_scalar))
             {
-              v0.x = temp_pos.x;
-              v0.y = temp_pos.y;
-              v0.z = temp_pos.z;
+              v0 = temp_pos;
               v0_scalar = temp_scalar;
               temp_pos.setZero();
               temp_scalar = 0.0f;
             }
             else if (sign(temp_scalar) == sign(v1_scalar))
             {
-              v1.x = temp_pos.x;
-              v1.y = temp_pos.y;
-              v1.z = temp_pos.z;
+              v1 = temp_pos;
               v1_scalar = temp_scalar;
               temp_pos.setZero();
               temp_scalar = 0.0f;
             } else {
               break;
             }
-            d /= 2.0f;            
+            d /= 2.0f;
           }
-          float t = invlerp(v0_scalar, v1_scalar, isoValue);
-          // float t = (isoValue - v0_scalar) / float(v1_scalar - v0_scalar);
+          // float t = invlerp(v0_scalar, v1_scalar, isoValue);
+          // printf("v0_scalar: %f, v1_scalar: %f, t: %f\n", v0_scalar, v1_scalar, t);
+          float t = (isoValue - v0_scalar) / float(v1_scalar - v0_scalar);
           if (t < 0.1) {
             triVertex[ii] = make_float4(v0.x, v0.y, v0.z, v0_scalar);
           } else if (t > 0.9) {
@@ -938,20 +928,17 @@ struct IsoExtractor {
           } else {
             const float4 v0v = make_float4(v0.x, v0.y, v0.z, v0_scalar);
             const float4 v1v = make_float4(v1.x, v1.y, v1.z, v1_scalar);
-            // triVertex[ii] = (1.f-t)*v0v+t*v1v;
-            triVertex[ii] = lerp(v0v, v1v, t);
+            // triVertex[ii] = lerp(v0v, v1v, t);
+            triVertex[ii] = (1.f-t)*v0v+t*v1v;
           }
-          printf("triVertex[%d]: %f %f %f %f\n", ii, triVertex[ii].x, triVertex[ii].y, triVertex[ii].z, triVertex[ii].w);
         }
   
         if (triVertex[1] == triVertex[0]) continue;
         if (triVertex[2] == triVertex[0]) continue;
         if (triVertex[1] == triVertex[2]) continue;
-        
       }
       const int triangleID = allocTriangle();
       if (triangleID >= 3*outputArraySize) continue;
-
       for (int j=0;j<3;j++) {
         (int &)triVertex[j].w = (4*triangleID+j);
         (float4&)outputArray[3*triangleID+j] = triVertex[j];
@@ -963,6 +950,7 @@ struct IsoExtractor {
 __global__ void parseInputGPU(
   uint64_t* d_mortons, 
   int d_iso_tree_size,
+  cstoneOctree::Vec3f* d_centers,
   cstoneOctree::Vec3i* d_lowers,
   unsigned* d_levels,
   float* d_scalars,
@@ -974,6 +962,7 @@ __global__ void parseInputGPU(
   // vec3i bounds_upper(-(1<<30));
   const size_t threadID = threadIdx.x+size_t(blockDim.x)*blockIdx.x;
   if (threadID >= d_iso_tree_size) return;
+  d_cells[threadID].center = make_float3(d_centers[threadID].x, d_centers[threadID].y, d_centers[threadID].z);
   d_cells[threadID].lower = vec3i(d_lowers[threadID].x, d_lowers[threadID].y, d_lowers[threadID].z);
   d_cells[threadID].level = d_levels[threadID];
   d_cells[threadID].scalar = d_scalars[threadID];
@@ -1321,6 +1310,7 @@ void generateIso(
 
 void generateIsoDirectGPU(
   thrust::device_vector<uint64_t>& d_mortons,
+  thrust::device_vector<cstoneOctree::Vec3f>& d_centers, 
   thrust::device_vector<cstoneOctree::Vec3i>& d_lowers, 
   thrust::device_vector<unsigned>& d_levels, 
   thrust::device_vector<float>& d_scalars,
@@ -1344,6 +1334,7 @@ void generateIsoDirectGPU(
     (
         thrust::raw_pointer_cast(d_mortons.data()), 
         d_iso_tree_size,
+        thrust::raw_pointer_cast(d_centers.data()),
         thrust::raw_pointer_cast(d_lowers.data()),
         thrust::raw_pointer_cast(d_levels.data()),
         thrust::raw_pointer_cast(d_scalars.data()),
@@ -1447,16 +1438,16 @@ void generateIsoDirectGPU(
   // ==================================================================
   // step 3: create vertex array
   // ==================================================================
-  thrust::host_vector<TriangleVertex> h_triangleVertices = d_triangleVertices;
-  std::ofstream out("D:/data/test.csv",std::ios::binary);
-  out.precision(10);
-  out << "x,y,z" << std::endl;
-  for (int i=0;i<h_triangleVertices.size();i++)
-    out << h_triangleVertices[i].position.x << ","
-        << h_triangleVertices[i].position.y << ","
-        << h_triangleVertices[i].position.z << std::endl;
-  out.close();
-  std::cout << "#triangle vertices written to file" << std::endl;
+  // thrust::host_vector<TriangleVertex> h_triangleVertices = d_triangleVertices;
+  // std::ofstream out("D:/data/test.csv",std::ios::binary);
+  // out.precision(10);
+  // out << "x,y,z" << std::endl;
+  // for (int i=0;i<h_triangleVertices.size();i++)
+  //   out << h_triangleVertices[i].position.x << ","
+  //       << h_triangleVertices[i].position.y << ","
+  //       << h_triangleVertices[i].position.z << std::endl;
+  // out.close();
+  // std::cout << "#triangle vertices written to file" << std::endl;
   // ------------------------------------------------------------------
   // step 3a: sort vertex array
   // ------------------------------------------------------------------

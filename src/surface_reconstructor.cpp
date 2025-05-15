@@ -112,7 +112,8 @@ void SurfReconstructor::resizeRootBoxVarR()
 		_RootCenter[i] = center;
 	}
 
-	_DEPTH_MIN = std::min(int(std::ceil(std::log2(std::ceil(maxLen / maxR)))) - 1, _DEPTH_MAX-2); //, _DEPTH_MAX - int(_DEPTH_MAX / 3));
+	// _DEPTH_MIN = std::min(int(std::ceil(std::log2(std::ceil(maxLen / maxR)))) - 1, _DEPTH_MAX-2); //, _DEPTH_MAX - int(_DEPTH_MAX / 3));
+	_DEPTH_MIN = (_DEPTH_MAX - (SINGLE_LAYER ? 1 : 2));
 }
 
 void SurfReconstructor::checkEmptyAndCalcCurv(std::shared_ptr<TNode> tnode, unsigned char& empty, float& curv, float& min_radius)

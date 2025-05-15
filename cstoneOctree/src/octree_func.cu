@@ -415,14 +415,29 @@ __global__ void calculateLeavesCentersAndSizesKernel(uint64_t* d_iso_tree, int d
     }
 }
 
-__global__ void calculateLeavesLowersAndLevelsKernel(uint64_t* d_iso_tree, int d_iso_tree_size, Vec3i* d_lowers, unsigned* d_levels, Box* d_box){
+__global__ void calculateLeavesLowersAndLevelsKernel(uint64_t* d_iso_tree, int d_iso_tree_size, Vec3f* d_iso_centers, Vec3i* d_lowers, unsigned* d_levels, Box* d_box){
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if(tid < d_iso_tree_size){
         uint64_t curr = d_iso_tree[tid];
         
         unsigned level = treeLevel(d_iso_tree[tid + 1] - curr);
         d_levels[tid] = 21 - level;
-        d_lowers[tid] = decodeMorton(curr);
+        Vec3<int> ivec = decodeMorton(curr);
+        d_lowers[tid] = ivec;
+        unsigned cubeLength = (1u << (21 - level));
+
+        IBox ibox(ivec.x, ivec.x + cubeLength, ivec.y, ivec.y + cubeLength, ivec.z, ivec.z + cubeLength);
+        int maxCoord = 1u << 21;
+        // smallest octree cell edge length in unit cube
+        float uL = float(1.) / maxCoord;
+    
+        float halfUnitLengthX = float(0.5) * uL * d_box->lx();
+        float halfUnitLengthY = float(0.5) * uL * d_box->ly();
+        float halfUnitLengthZ = float(0.5) * uL * d_box->lz();
+        d_iso_centers[tid] = {d_box->xmin() + (ibox.xmax() + ibox.xmin()) * halfUnitLengthX,
+                              d_box->ymin() + (ibox.ymax() + ibox.ymin()) * halfUnitLengthY,
+                              d_box->zmin() + (ibox.zmax() + ibox.zmin()) * halfUnitLengthZ};
+
     }
 }
 
