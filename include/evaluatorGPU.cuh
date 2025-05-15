@@ -169,64 +169,6 @@ struct EvaluatorGPU
             {
                 signChange = originSign ^ (nodeSampleScalars[j] >= 0);
             }
-            // int index, next_idx, last_idx;
-            // for (int z = 0; z <= 2; z++)
-            // {
-            // 	for (int y = 0; y <= 2; y++)
-            // 	{
-            // 		for (int x = 0; x <= 2; x++)
-            // 		{
-            // 			index = (z * (2 + 1) * (2 + 1) + y * (2 + 1) + x);
-            // 			Vec3f gradient(0.0f, 0.0f, 0.0f);
-            // 			next_idx = (z * (2 + 1) * (2 + 1) + y * (2 + 1) + (x + 1));
-            // 			last_idx = (z * (2 + 1) * (2 + 1) + y * (2 + 1) + (x - 1));
-            // 			if (x == 0)
-            // 			{
-            // 				gradient[0] = (nodeSampleScalars[index] - nodeSampleScalars[next_idx]) / step;
-            // 			}
-            // 			else if (x == 2)
-            // 			{
-            // 				gradient[0] = (nodeSampleScalars[last_idx] - nodeSampleScalars[index]) / step;
-            // 			}
-            // 			else
-            // 			{
-            // 				gradient[0] = (nodeSampleScalars[last_idx] - nodeSampleScalars[next_idx]) / (step * 2);
-            // 			}
-            // 			next_idx = (z * (2 + 1) * (2 + 1) + (y + 1) * (2 + 1) + x);
-            // 			last_idx = (z * (2 + 1) * (2 + 1) + (y - 1) * (2 + 1) + x);
-            // 			if (y == 0)
-            // 			{
-            // 				gradient[1] = (nodeSampleScalars[index] - nodeSampleScalars[next_idx]) / step;
-            // 			}
-            // 			else if (y == 2)
-            // 			{
-            // 				gradient[1] = (nodeSampleScalars[last_idx] - nodeSampleScalars[index]) / step;
-            // 			}
-            // 			else
-            // 			{
-            // 				gradient[1] = (nodeSampleScalars[last_idx] - nodeSampleScalars[next_idx]) / (step * 2);
-            // 			}
-            // 			next_idx = ((z + 1) * (2 + 1) * (2 + 1) + y * (2 + 1) + x);
-            // 			last_idx = ((z - 1) * (2 + 1) * (2 + 1) + y * (2 + 1) + x);
-            // 			if (z == 0)
-            // 			{
-            // 				gradient[2] = (nodeSampleScalars[index] - nodeSampleScalars[next_idx]) / step;
-            // 			}
-            // 			else if (z == 2)
-            // 			{
-            // 				gradient[2] = (nodeSampleScalars[last_idx] - nodeSampleScalars[index]) / step;
-            // 			}
-            // 			else
-            // 			{
-            // 				gradient[2] = (nodeSampleScalars[last_idx] - nodeSampleScalars[next_idx]) / (step * 2);
-            // 			}
-            // 			gradient.normalize();
-            // 			nodeSampleGrads[index * 3 + 0] = std::isnan(gradient[0]) ? 0.0f : gradient[0];
-            // 			nodeSampleGrads[index * 3 + 1] = std::isnan(gradient[1]) ? 0.0f : gradient[1];
-            // 			nodeSampleGrads[index * 3 + 2] = std::isnan(gradient[2]) ? 0.0f : gradient[2];
-            // 		}
-            // 	}
-            // }
         }
     }
 };

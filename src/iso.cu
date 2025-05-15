@@ -853,70 +853,70 @@ struct IsoExtractor {
           cstoneOctree::Vec3f v1(vertex[vert[1]].x, vertex[vert[1]].y, vertex[vert[1]].z);
           float v0_scalar = vertex[vert[0]].w;
           float v1_scalar = vertex[vert[1]].w;
-          cstoneOctree::Vec3f temp_pos(0.0f, 0.0f, 0.0f);
-          float temp_scalar = 0.0f;
-          float d = (v1 - v0).norm();
-          while (d > errorBound)
+          if (d_searchers_size == 1)
           {
-            temp_pos = (v0 + v1) / 2.0f;
-            temp_scalar = 0.0f;
-            for (int hgi = 0; hgi < d_searchers_size; hgi++)
+            cstoneOctree::Vec3f temp_pos(0.0f, 0.0f, 0.0f);
+            float temp_scalar = 0.0f;
+            float d = (v1 - v0).norm();
+            while (d > errorBound)
             {
-              HashGridGPU* cur_searcher = d_searchers[hgi];
-              cstoneOctree::Vec3i xyzIdx;
-              int64_t neighbor_hash;
-              cur_searcher->CalcXYZIdx(temp_pos, xyzIdx);
-              for (int z = -1; z <= 1; z++)
+              temp_pos = (v0 + v1) / 2.0f;
+              temp_scalar = 0.0f;
+              for (int hgi = 0; hgi < d_searchers_size; hgi++)
               {
-                  for (int y = -1; y <= 1; y++)
-                  {
-                      for (int x = -1; x <= 1; x++)
-                      {
-                          neighbor_hash = cur_searcher->CalcCellHash((xyzIdx + cstoneOctree::Vec3i(x, y, z)));
-                          if (neighbor_hash < 0) {continue;}
-                          int countIndex, startIndex, endIndex;
-                          if ((cur_searcher->d_StartList[neighbor_hash] >= 0) && (cur_searcher->d_EndList[neighbor_hash] >= 0))
-                          {
-                              startIndex = cur_searcher->d_StartList[neighbor_hash];
-                              endIndex = cur_searcher->d_EndList[neighbor_hash];
-                          }
-                          else
-                          {
-                              continue;
-                          }
-                          for (int countIndex = startIndex; countIndex < endIndex; countIndex++)
-                          {
-                              int pId = cur_searcher->d_PIndexes[cur_searcher->d_IndexList[countIndex]];
-                              if (d_evaluator->CheckSplash(pId))
-                              {
-                                  continue;
-                              }
-                              cstoneOctree::Vec3f diff = temp_pos - d_evaluator->d_GlobalxMeans[pId];
-                              temp_scalar += d_evaluator->AnisotropicInterpolate(pId, diff);
-                          }
-                      }
-                  }
+                HashGridGPU* cur_searcher = d_searchers[hgi];
+                cstoneOctree::Vec3i xyzIdx;
+                int64_t neighbor_hash;
+                cur_searcher->CalcXYZIdx(temp_pos, xyzIdx);
+                for (int z = -1; z <= 1; z++)
+                {
+                    for (int y = -1; y <= 1; y++)
+                    {
+                        for (int x = -1; x <= 1; x++)
+                        {
+                            neighbor_hash = cur_searcher->CalcCellHash((xyzIdx + cstoneOctree::Vec3i(x, y, z)));
+                            if (neighbor_hash < 0) {continue;}
+                            int countIndex, startIndex, endIndex;
+                            if ((cur_searcher->d_StartList[neighbor_hash] >= 0) && (cur_searcher->d_EndList[neighbor_hash] >= 0))
+                            {
+                                startIndex = cur_searcher->d_StartList[neighbor_hash];
+                                endIndex = cur_searcher->d_EndList[neighbor_hash];
+                            }
+                            else
+                            {
+                                continue;
+                            }
+                            for (int countIndex = startIndex; countIndex < endIndex; countIndex++)
+                            {
+                                int pId = cur_searcher->d_PIndexes[cur_searcher->d_IndexList[countIndex]];
+                                if (d_evaluator->CheckSplash(pId))
+                                {
+                                    continue;
+                                }
+                                cstoneOctree::Vec3f diff = temp_pos - d_evaluator->d_GlobalxMeans[pId];
+                                temp_scalar += d_evaluator->AnisotropicInterpolate(pId, diff);
+                            }
+                        }
+                    }
+                }
               }
+              temp_scalar = d_evaluator->d_ISO_VALUE - temp_scalar;
+              // printf("temp_scalar: %f\n", temp_scalar);
+              if (sign(temp_scalar) == sign(v1_scalar))
+              {
+                v0 = temp_pos;
+                v0_scalar = temp_scalar;
+              }
+              else if (sign(temp_scalar) == sign(v0_scalar))
+              {
+                v1 = temp_pos;
+                v1_scalar = temp_scalar;
+              } else {
+                break;
+              }
+              d /= 2.0f;
+              // d = (v1 - v0).norm();
             }
-            temp_scalar = d_evaluator->d_ISO_VALUE - temp_scalar;
-            // printf("temp_scalar: %f\n", temp_scalar);
-            if (sign(temp_scalar) == sign(v0_scalar))
-            {
-              v0 = temp_pos;
-              v0_scalar = temp_scalar;
-              temp_pos.setZero();
-              temp_scalar = 0.0f;
-            }
-            else if (sign(temp_scalar) == sign(v1_scalar))
-            {
-              v1 = temp_pos;
-              v1_scalar = temp_scalar;
-              temp_pos.setZero();
-              temp_scalar = 0.0f;
-            } else {
-              break;
-            }
-            d /= 2.0f;
           }
           // float t = invlerp(v0_scalar, v1_scalar, isoValue);
           // printf("v0_scalar: %f, v1_scalar: %f, t: %f\n", v0_scalar, v1_scalar, t);
