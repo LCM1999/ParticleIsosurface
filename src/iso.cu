@@ -868,11 +868,11 @@ struct IsoExtractor {
                 cstoneOctree::Vec3i xyzIdx;
                 int64_t neighbor_hash;
                 cur_searcher->CalcXYZIdx(temp_pos, xyzIdx);
-                for (int z = -1; z <= 1; z++)
+                for (int z = -1; z <= 2; z++)
                 {
-                    for (int y = -1; y <= 1; y++)
+                    for (int y = -1; y <= 2; y++)
                     {
-                        for (int x = -1; x <= 1; x++)
+                        for (int x = -1; x <= 2; x++)
                         {
                             neighbor_hash = cur_searcher->CalcCellHash((xyzIdx + cstoneOctree::Vec3i(x, y, z)));
                             if (neighbor_hash < 0) {continue;}
@@ -901,13 +901,12 @@ struct IsoExtractor {
                 }
               }
               temp_scalar = d_evaluator->d_ISO_VALUE - temp_scalar;
-              // printf("temp_scalar: %f\n", temp_scalar);
-              if (sign(temp_scalar) == sign(v1_scalar))
+              if (sign(temp_scalar) == sign(v0_scalar))
               {
                 v0 = temp_pos;
                 v0_scalar = temp_scalar;
               }
-              else if (sign(temp_scalar) == sign(v0_scalar))
+              else if (sign(temp_scalar) == sign(v1_scalar))
               {
                 v1 = temp_pos;
                 v1_scalar = temp_scalar;
@@ -918,19 +917,20 @@ struct IsoExtractor {
               // d = (v1 - v0).norm();
             }
           }
-          // float t = invlerp(v0_scalar, v1_scalar, isoValue);
-          // printf("v0_scalar: %f, v1_scalar: %f, t: %f\n", v0_scalar, v1_scalar, t);
-          float t = (isoValue - v0_scalar) / float(v1_scalar - v0_scalar);
-          if (t < 0.1) {
-            triVertex[ii] = make_float4(v0.x, v0.y, v0.z, v0_scalar);
-          } else if (t > 0.9) {
-            triVertex[ii] = make_float4(v1.x, v1.y, v1.z, v1_scalar);
-          } else {
+          float t = invlerp(v0_scalar, v1_scalar, isoValue);
+          // float t = (isoValue - v0_scalar) / float(v1_scalar - v0_scalar);
+          t = max(0.f, min(1.f, t));
+          // if (t < 0.1) {
+          //   triVertex[ii] = make_float4(v0.x, v0.y, v0.z, v0_scalar);
+          // } else if (t > 0.9) {
+          //   triVertex[ii] = make_float4(v1.x, v1.y, v1.z, v1_scalar);
+          // } else {
             const float4 v0v = make_float4(v0.x, v0.y, v0.z, v0_scalar);
             const float4 v1v = make_float4(v1.x, v1.y, v1.z, v1_scalar);
-            // triVertex[ii] = lerp(v0v, v1v, t);
-            triVertex[ii] = (1.f-t)*v0v+t*v1v;
-          }
+            triVertex[ii] = lerp(v0v, v1v, t);
+            
+            // triVertex[ii] = (1.f-t)*v0v+t*v1v;
+          // }
         }
   
         if (triVertex[1] == triVertex[0]) continue;
@@ -1230,7 +1230,16 @@ void generateIso(
     // ==================================================================
     // step 3: create vertex array
     // ==================================================================
-    
+    thrust::host_vector<TriangleVertex> h_triangleVertices = d_triangleVertices;
+    std::ofstream out("D:/data/test.csv",std::ios::binary);
+    out.precision(10);
+    out << "x,y,z" << std::endl;
+    for (int i=0;i<h_triangleVertices.size();i++)
+      out << h_triangleVertices[i].position.x << ","
+          << h_triangleVertices[i].position.y << ","
+          << h_triangleVertices[i].position.z << std::endl;
+    out.close();
+    std::cout << "#triangle vertices written to file" << std::endl;
     // ------------------------------------------------------------------
     // step 3a: sort vertex array
     // ------------------------------------------------------------------

@@ -258,6 +258,8 @@ void loadParticlesFromCSV(std::string &csvPath,
         if (!IS_CONST_RADIUS)
         {
             radiuses.push_back(elements[radiusIdx]);
+        } else {
+            radiuses.push_back(RADIUS);
         }
         getline(ifn, line);
     }
@@ -335,7 +337,7 @@ void runOurs(std::string dataDirPath, std::string outPath)
         } else if (".h5" == SUFFIX) {
             readShonDyParticleData(dataPath, particles, radiuses);
         }
-
+        IS_CONST_RADIUS = false;
         // if (!IS_CONST_RADIUS)
         // {
         //     if (abs(*std::max_element(radiuses.begin(), radiuses.end()) - *std::min_element(radiuses.begin(), radiuses.end())) < 1e-7)
@@ -539,14 +541,16 @@ int main(int argc, char **argv)
     default:
         dataDirPath =
         // "/home/letian/Letian_Xie/work/ParticleIsosurface/test_cases/multiR/mr_csv";
-        "D:/data/multiR/mr_csv";
+        // "D:/data/multiR/mr_csv";
+        "D:/data/oil_csv";
         // "D:/data/inWater/particles";
         // "D:/data/3s/20231222-water";
         // "D:/data/car_render_test_data_2/Fluid";
         // "D:/data/damBreak3D-27steps";
         // "D:/data/test";
         outPath = 
-        "D:/data/multiR/mr_csv/out";
+        // "D:/data/multiR/mr_csv/out";
+        "D:/data/oil_csv/out";
         // "D:/data/inWater/particles/out";
         // "D:/data/3s/20231222-water/out";
         // "D:/data/car_render_test_data_2/Fluid/out";

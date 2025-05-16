@@ -14,7 +14,7 @@ struct MultiLevelSearcherGPU
     std::vector<HashGridGPU*> searchers;
     std::vector<HashGridGPU*> h_searchers; // store the HashGridGPU* GPU pointers
     std::vector<int> maxRadiusParticleIds;
-    float maxRadius = 0, minRadius = 0, avgRadius = 0;
+    float maxRadius = 0, minRadius = 0;
     float infFactor;
 
     HOST MultiLevelSearcherGPU() {};
@@ -24,36 +24,40 @@ struct MultiLevelSearcherGPU
         minRadius = *std::min_element(radiuses->begin(), radiuses->end());   // * 0.99
         infFactor = inf_factor;
         int particlesNum = particles->size();
-        std::vector<std::pair<float, float>> bin_bounds;
         float bin_extent = minRadius * 0.5;
         int bins = std::max(int(ceil((maxRadius - minRadius) / bin_extent)), 1);
         bin_extent = (maxRadius - minRadius) / bins;
-        for (size_t i = 0; i < bins; i++)
-        {
-            bin_bounds.push_back(
-                std::pair<float, float>(
-                    minRadius+(i*bin_extent), 
-                    std::min(minRadius+((i+1)*bin_extent), maxRadius)));
-        }
-        auto whichBin = [&](const float r)
-        {
-            for (auto tit = bin_bounds.begin(); tit < bin_bounds.end(); tit++)
-            {
-                if (r >= tit->first && r <= tit->second)
-                    return static_cast<int>(std::distance(bin_bounds.begin(), tit));
-            }
-            return -1;
-        };
         std::vector<std::vector<unsigned>>sortedIndex(bins);
-    
-        for (int i = 0; i < radiuses->size(); i++)
+        if (bins == 1 || bin_extent == 0.0f)
         {
-            sortedIndex[whichBin(radiuses->at(i))].push_back(i);
-            avgRadius += radiuses->at(i);
+            for (int i = 0; i < radiuses->size(); i++)
+            {
+                sortedIndex[0].push_back(i);
+            }
+        } else {
+            std::vector<std::pair<float, float>> bin_bounds;
+            for (size_t i = 0; i < bins; i++)
+            {
+                bin_bounds.push_back(
+                    std::pair<float, float>(
+                        minRadius+(i*bin_extent), 
+                        std::min(minRadius+((i+1)*bin_extent), maxRadius)));
+            }
+            auto whichBin = [&](const float r)
+            {
+                for (auto tit = bin_bounds.begin(); tit < bin_bounds.end(); tit++)
+                {
+                    if (r >= tit->first && r <= tit->second)
+                        return static_cast<int>(std::distance(bin_bounds.begin(), tit));
+                }
+                return -1;
+            };
+        
+            for (int i = 0; i < radiuses->size(); i++)
+            {
+                sortedIndex[whichBin(radiuses->at(i))].push_back(i);
+            }
         }
-        avgRadius /= radiuses->size();
-        if (avgRadius < minRadius) avgRadius = minRadius;
-        if (avgRadius > maxRadius) avgRadius = maxRadius;
         for (int i = 0; i < bins; i++)
         {
             if (sortedIndex[i].size() == 0) continue;
@@ -133,7 +137,6 @@ struct MultiLevelSearcherGPU
     HOST std::vector<int> getMaxRadiusPaticleIds() {return std::vector<int>(maxRadiusParticleIds.begin(), maxRadiusParticleIds.end());}
     HOST_DEVICE float getMaxRadius() {return maxRadius;}
     HOST_DEVICE float getMinRadius() {return minRadius;}
-    HOST_DEVICE float getAvgRadius() {return avgRadius;}
 
     HOST_DEVICE void GetNeighborsEstimate(const cstoneOctree::Vec3f& pos, int& estimate) 
     {

@@ -162,6 +162,7 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 	
 	cstoneOctree::Box box(_BoundingBox[0], _BoundingBox[1], _BoundingBox[2], 
 						  _BoundingBox[3], _BoundingBox[4], _BoundingBox[5]);
+	std::cout << "box: " << box.xmin() << ", " << box.xmax() << ", " << box.ymin() << ", " << box.ymax() << ", " << box.zmin() << ", " << box.zmax() << std::endl;
 	cstoneOctree::Box* d_box;
 	cudaMalloc(&d_box, sizeof(cstoneOctree::Box));
 	cudaMemcpy(d_box, &box, sizeof(cstoneOctree::Box), cudaMemcpyHostToDevice);
@@ -295,12 +296,9 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 																						  thrust::raw_pointer_cast(d_iso_lowers.data()),
 																						  thrust::raw_pointer_cast(d_iso_levels.data()), d_box);
 	thrust::device_vector<float> d_scalars(iso_scalars);
-	// std::vector<float> scalars(iso_scalars.size());
-	// std::copy(iso_scalars.begin(), iso_scalars.end(), scalars.begin());
-	// std::cout << "box: " << box.xmin() << ", " << box.xmax() << ", " << box.ymin() << ", " << box.ymax() << ", " << box.zmin() << ", " << box.zmax() << std::endl;
 	iso::generateIsoDirectGPU(d_iso_tree, d_iso_centers, d_iso_lowers, d_iso_levels, d_scalars, d_iso_tree_size, 
 		d_searcher, HashGridGPUs_size, d_evaluator, 
-		0.0, _searcherGPU->minRadius / 2.0f,
+		0.0, _searcherGPU->minRadius,
 		d_box, 
 		_OurMesh
 	);

@@ -90,8 +90,7 @@ void SurfReconstructor::resizeRootBoxVarR()
 {
 	float maxLen, resizeLen;
 	float minR = useCPU ? _searcherCPU->getMinRadius() : _searcherGPU->getMinRadius(), 
-		  maxR = useCPU ? _searcherCPU->getMaxRadius() : _searcherGPU->getMaxRadius(),
-		  avgR = useCPU ? _searcherCPU->getAvgRadius() : _searcherGPU->getAvgRadius();
+		  maxR = useCPU ? _searcherCPU->getMaxRadius() : _searcherGPU->getMaxRadius();
 	maxLen = (std::max)({ 
 		(_BoundingBox[1] - _BoundingBox[0]) , 
 		(_BoundingBox[3] - _BoundingBox[2]) , 
@@ -112,8 +111,8 @@ void SurfReconstructor::resizeRootBoxVarR()
 		_RootCenter[i] = center;
 	}
 
-	// _DEPTH_MIN = std::min(int(std::ceil(std::log2(std::ceil(maxLen / maxR)))) - 1, _DEPTH_MAX-2); //, _DEPTH_MAX - int(_DEPTH_MAX / 3));
-	_DEPTH_MIN = (_DEPTH_MAX - (SINGLE_LAYER ? 1 : 2));
+	_DEPTH_MIN = std::min(int(std::ceil(std::log2(std::ceil(maxLen / maxR)))) - 1, _DEPTH_MAX-2); //, _DEPTH_MAX - int(_DEPTH_MAX / 3));
+	// _DEPTH_MIN = (_DEPTH_MAX - (SINGLE_LAYER ? 1 : 2));
 }
 
 void SurfReconstructor::checkEmptyAndCalcCurv(std::shared_ptr<TNode> tnode, unsigned char& empty, float& curv, float& min_radius)
@@ -321,7 +320,8 @@ void SurfReconstructor::genIsoOurs()
 		emptys.resize(queue_flag);
 		{
 			{
-				for (size_t i = 0; i < queue_flag; i++)
+		// #pragma omp parallel for
+				for (int i = 0; i < queue_flag; i++)
 				{
 						beforeSampleEval(*ProcessArray[i], cuvrs[i], min_raiduses[i], emptys[i]);
 				}
@@ -342,7 +342,8 @@ void SurfReconstructor::genIsoOurs()
 		//TODO: Sampling
 		{
 			{
-				for (size_t i = 0; i < queue_flag; i++)
+		// #pragma omp parallel for
+				for (int i = 0; i < queue_flag; i++)
 				{
 					if (!emptys[i])
 					{
@@ -736,10 +737,10 @@ void SurfReconstructor::RunCPU2(float iso_factor, float smooth_factor)
     // 	HashGrid _hashgrid(&_GlobalParticles, _BoundingBox, _GlobalRadiuses[0], 4.0f);
 	// 	IS_CONST_RADIUS = false;
 		// } else {
-		// useCPU = true;
-		// _searcherCPU = std::make_shared<MultiLevelSearcher>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
-		useCPU = false;
-		_searcherGPU = std::make_shared<MultiLevelSearcherGPU>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
+		useCPU = true;
+		_searcherCPU = std::make_shared<MultiLevelSearcher>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
+		// useCPU = false;
+		// _searcherGPU = std::make_shared<MultiLevelSearcherGPU>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
 	// }
 	std::cout << "   Build Neighbor Searcher Time = " << t.elapsed() << std::endl;
 	t.reset();
@@ -819,7 +820,7 @@ void SurfReconstructor::RunCPU2(float iso_factor, float smooth_factor)
 		scalars = std::vector<float>(iso_tree_size, 0.0); // Stores each tree nodes' scalar value on dual vertices
 		std::vector<uint64_t> iso_nodeOps(iso_tree.size(), 0); // Store the split decision for each node (the split decision is based on whether the node has isosurface)
 					// bool
-		#pragma omp parallel for
+		// #pragma omp parallel for
 		for(int i = 0; i < iso_tree_size; i++) {
 			// begin beforeSampleEval
 			Vec3f center = iso_centers[i];
@@ -931,13 +932,6 @@ void SurfReconstructor::RunCPU2(float iso_factor, float smooth_factor)
 					}
 					diff = samplePoint - _evaluator->GlobalxMeans[pIdx];
 					nodeSampleScalars[j] += _evaluator->AnisotropicInterpolate(pIdx, diff);
-					// if (USE_ANI)
-					// {
-					// }
-					// else {
-					// 	diff = pos - (*GlobalPoses)[pIdx];
-					// 	scalar += IsotropicInterpolate(pIdx, diff.squaredNorm());
-					// }
 				}
 				nodeSampleScalars[j] = _evaluator->getIsoValue() - nodeSampleScalars[j];
 				origin_sign = (nodeSampleScalars[0] >= 0);
@@ -945,64 +939,6 @@ void SurfReconstructor::RunCPU2(float iso_factor, float smooth_factor)
 				{
 					signchange = origin_sign ^ (nodeSampleScalars[j] >= 0);
 				}
-				// int index, next_idx, last_idx;
-				// for (int z = 0; z <= 2; z++)
-				// {
-				// 	for (int y = 0; y <= 2; y++)
-				// 	{
-				// 		for (int x = 0; x <= 2; x++)
-				// 		{
-				// 			index = (z * (2 + 1) * (2 + 1) + y * (2 + 1) + x);
-				// 			Vec3f gradient(0.0f, 0.0f, 0.0f);
-				// 			next_idx = (z * (2 + 1) * (2 + 1) + y * (2 + 1) + (x + 1));
-				// 			last_idx = (z * (2 + 1) * (2 + 1) + y * (2 + 1) + (x - 1));
-				// 			if (x == 0)
-				// 			{
-				// 				gradient[0] = (nodeSampleScalars[index] - nodeSampleScalars[next_idx]) / step;
-				// 			}
-				// 			else if (x == 2)
-				// 			{
-				// 				gradient[0] = (nodeSampleScalars[last_idx] - nodeSampleScalars[index]) / step;
-				// 			}
-				// 			else
-				// 			{
-				// 				gradient[0] = (nodeSampleScalars[last_idx] - nodeSampleScalars[next_idx]) / (step * 2);
-				// 			}
-				// 			next_idx = (z * (2 + 1) * (2 + 1) + (y + 1) * (2 + 1) + x);
-				// 			last_idx = (z * (2 + 1) * (2 + 1) + (y - 1) * (2 + 1) + x);
-				// 			if (y == 0)
-				// 			{
-				// 				gradient[1] = (nodeSampleScalars[index] - nodeSampleScalars[next_idx]) / step;
-				// 			}
-				// 			else if (y == 2)
-				// 			{
-				// 				gradient[1] = (nodeSampleScalars[last_idx] - nodeSampleScalars[index]) / step;
-				// 			}
-				// 			else
-				// 			{
-				// 				gradient[1] = (nodeSampleScalars[last_idx] - nodeSampleScalars[next_idx]) / (step * 2);
-				// 			}
-				// 			next_idx = ((z + 1) * (2 + 1) * (2 + 1) + y * (2 + 1) + x);
-				// 			last_idx = ((z - 1) * (2 + 1) * (2 + 1) + y * (2 + 1) + x);
-				// 			if (z == 0)
-				// 			{
-				// 				gradient[2] = (nodeSampleScalars[index] - nodeSampleScalars[next_idx]) / step;
-				// 			}
-				// 			else if (z == 2)
-				// 			{
-				// 				gradient[2] = (nodeSampleScalars[last_idx] - nodeSampleScalars[index]) / step;
-				// 			}
-				// 			else
-				// 			{
-				// 				gradient[2] = (nodeSampleScalars[last_idx] - nodeSampleScalars[next_idx]) / (step * 2);
-				// 			}
-				// 			gradient.normalize();
-				// 			nodeSampleGrads[index * 3 + 0] = std::isnan(gradient[0]) ? 0.0f : gradient[0];
-				// 			nodeSampleGrads[index * 3 + 1] = std::isnan(gradient[1]) ? 0.0f : gradient[1];
-				// 			nodeSampleGrads[index * 3 + 2] = std::isnan(gradient[2]) ? 0.0f : gradient[2];
-				// 		}
-				// 	}
-				// }
 			}
 			// after process
 			if ((cellSize - min_radiuses[i]) < 1e-8)
@@ -1136,6 +1072,11 @@ void SurfReconstructor::Run(float iso_factor, float smooth_factor)
 	
 	IS_CONST_RADIUS ? _evaluator->RecommendIsoValueConstR() : _evaluator->RecommendIsoValueVarR();
     printf("   Recommend Iso Value = %f\n", _evaluator->getIsoValue());
+
+	// float ts = 0;
+	// _evaluator->SingleEval(cstoneOctree::Vec3f(0.241679, 0.283861, 0.116774), ts);
+	// std::cout << "SingleEval: " << ts << std::endl;
+	// exit(0);
 
 	if (CALC_P_NORMAL)
 	{

@@ -352,7 +352,7 @@ void calculateLeavesCentersAndSizesCPU(std::vector<uint64_t>& leaves,
 void calculateLeavesLowersAndLevelsCPU(std::vector<uint64_t>& leaves, 
     std::vector<Vec3i>& lowers, std::vector<unsigned>& levels)
 {
-    #pragma omp parallel for
+    // #pragma omp parallel for
     for(int i = 0; i < leaves.size() - 1; i++){
         calculateLeavesLowersAndLevelsCPU(leaves, lowers, levels, i);
     }

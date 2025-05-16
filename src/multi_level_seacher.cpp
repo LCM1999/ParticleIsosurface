@@ -34,11 +34,7 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<cstoneOctree::Vec3f>* particl
     for (int i = 0; i < radiuses->size(); i++)
     {
         sortedIndex[whichBin(radiuses->at(i))].push_back(i);
-        avgRadius += radiuses->at(i);
     }
-    avgRadius /= radiuses->size();
-    if (avgRadius < minRadius) avgRadius = minRadius;
-    if (avgRadius > maxRadius) avgRadius = maxRadius;
     for (int i = 0; i < bins; i++)
     {
         if (sortedIndex[i].size() == 0) continue;

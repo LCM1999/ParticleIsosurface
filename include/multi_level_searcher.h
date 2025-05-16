@@ -13,7 +13,7 @@ class MultiLevelSearcher
 private:
     std::vector<HashGrid*> searchers;
     std::vector<int> maxRadiusParticleIds;
-    float maxRadius = 0, minRadius = 0, avgRadius = 0;
+    float maxRadius = 0, minRadius = 0;
     float infFactor;
 
 public:
@@ -31,7 +31,6 @@ public:
     inline std::vector<int> getMaxRadiusParticleIds() {return maxRadiusParticleIds;};
     inline float getMaxRadius() {return maxRadius;}
     inline float getMinRadius() {return minRadius;}
-    inline float getAvgRadius() {return avgRadius;}
 
     void GetNeighborsEstimate(const cstoneOctree::Vec3f& pos, int& estimate);
     void GetNeighbors(const cstoneOctree::Vec3f& pos, std::vector<int>& neighbors);
