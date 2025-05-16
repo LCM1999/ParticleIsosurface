@@ -98,7 +98,7 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 	timer t;
 
 	printf("-= Box =-\n");
-	loadRootBox();
+	loadRootBox(*std::max_element(_GlobalRadiuses.begin(), _GlobalRadiuses.end()));
 
 	int particles_size = _GlobalParticles.size();
 	printf("-= Build Neighbor Searcher =-\n");
@@ -120,12 +120,12 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 	printf("   Initialize Evaluator Time = %f \n", t.elapsed());
 	t.reset();
 	printf("-= Resize Box =-\n");
-	if (IS_CONST_RADIUS)
-	{
-		resizeRootBoxConstR();
-	} else {
-		resizeRootBoxVarR();
-	}
+	// if (IS_CONST_RADIUS)
+	// {
+	// 	resizeRootBoxConstR();
+	// } else {
+	// }
+	resizeRootBoxVarR();
 	printf("   MAX_DEPTH = %d, MIN_DEPTH = %d\n", _DEPTH_MAX, _DEPTH_MIN);
 
 	_evaluator->CalculateMaxScalarVarR();

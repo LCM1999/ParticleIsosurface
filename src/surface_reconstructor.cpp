@@ -38,7 +38,7 @@ SurfReconstructor::SurfReconstructor(
 	_OurMesh = mesh;
 }
 
-void SurfReconstructor::loadRootBox()
+void SurfReconstructor::loadRootBox(float r)
 {
 	_BoundingBox[0] = _BoundingBox[2] = _BoundingBox[4] = FLT_MAX;
 	_BoundingBox[1] = _BoundingBox[3] = _BoundingBox[5] = -FLT_MAX;
@@ -56,6 +56,11 @@ void SurfReconstructor::loadRootBox()
 		_BoundingBox[4] == _BoundingBox[5])
 	{
 		SINGLE_LAYER = true;
+	}
+	for (size_t i = 0; i < 3; i++)
+	{
+		_BoundingBox[i * 2] -= r;
+		_BoundingBox[i * 2 + 1] += r;
 	}
 }
 
@@ -111,8 +116,8 @@ void SurfReconstructor::resizeRootBoxVarR()
 		_RootCenter[i] = center;
 	}
 
-	_DEPTH_MIN = std::min(int(std::ceil(std::log2(std::ceil(maxLen / maxR)))) - 1, _DEPTH_MAX-2); //, _DEPTH_MAX - int(_DEPTH_MAX / 3));
-	// _DEPTH_MIN = (_DEPTH_MAX - (SINGLE_LAYER ? 1 : 2));
+	// _DEPTH_MIN = std::min(int(std::ceil(std::log2(std::ceil(maxLen / maxR)))) - 1, _DEPTH_MAX-2); //, _DEPTH_MAX - int(_DEPTH_MAX / 3));
+	_DEPTH_MIN = (_DEPTH_MAX - (SINGLE_LAYER ? 1 : 2));
 }
 
 void SurfReconstructor::checkEmptyAndCalcCurv(std::shared_ptr<TNode> tnode, unsigned char& empty, float& curv, float& min_radius)
@@ -380,355 +385,12 @@ void SurfReconstructor::genIsoOurs()
 	_STATE++;
 }
 
-/**
- * @brief Execute the surface extraction in cornerstone octree method on CPU
- * 
- * @param iso_factor 
- * @param smooth_factor 
- */
-// void SurfReconstructor::RunCPU(float iso_factor, float smooth_factor){
-
-// 	_OurMesh->reset();
-
-// 	printf("-= Run =-\n");
-// 	timer t;
-
-// 	loadRootBox();
-
-
-// 	// ===========1.1 Re-assign particles to Vec3f type============
-// 	_particles.resize(_GlobalParticles.size());
-// 	for(int i = 0; i < _GlobalParticles.size(); i++){
-// 		_particles[i] = Vec3f(_GlobalParticles[i].x, _GlobalParticles[i].y, _GlobalParticles[i].z);
-// 	}
-// 	_GlobalParticles.clear();
-// 	int particle_size = _particles.size();
-
-// 	// float min_num = cal::min(_BoundingBox[0], cal::min(_BoundingBox[2], _BoundingBox[4]));
-// 	// float max_num = cal::max(_BoundingBox[1], cal::max(_BoundingBox[3], _BoundingBox[5]));
-// 	// std::cout << "The box min num: " << min_num << std::endl;
-// 	// std::cout << "The box max num: " << max_num << std::endl;
-// 	// Box box(min_num, max_num);
-// 	// --- Freeze the box only for this dam project test --- 
-// 	cstoneOctree::Box box(1.0526, 3.6126, -0.780035, 1.77996, -1.01442, 1.54558);
-	
-// 	// ============1.2 Calculate the morton code for each particle and sort the outputs===========
-// 	_mortonCodes.resize(particle_size);
-// 	calMortonCodeCPU(_particles, _mortonCodes, box);
-
-// 	std::vector<size_t> indices(particle_size);
-// 	for (size_t i = 0; i < indices.size(); ++i) {
-// 		indices[i] = i;
-// 	}
-// 	std::sort(indices.begin(), indices.end(),
-//               [&](size_t i, size_t j) { return _mortonCodes[i] < _mortonCodes[j]; });
-// 	std::vector<Vec3f> particleSorted(particle_size);
-// 	std::vector<float> rSorted(particle_size);
-// 	std::vector<uint64_t> mortonCodesSorted(_mortonCodes.size());
-// 	for (size_t i = 0; i < indices.size(); ++i) {
-//         particleSorted[i] = _particles[indices[i]];
-// 		if(IS_CONST_RADIUS){
-// 			rSorted[i] = _RADIUS;
-// 		}
-// 		else{
-// 			rSorted[i] = _GlobalRadiuses[indices[i]];
-// 		}
-// 		mortonCodesSorted[i] = _mortonCodes[indices[i]];
-//     }
-// 	_particles = particleSorted;
-// 	_GlobalRadiuses = rSorted;
-// 	_mortonCodes = mortonCodesSorted;	
-// 	particleSorted.clear();
-// 	rSorted.clear();
-// 	mortonCodesSorted.clear();
-
-// 	_GlobalParticles = std::vector<cstoneOctree::Vec3f>(_particles.size());
-// 	for(int i = 0; i < _particles.size(); i++){
-// 		_GlobalParticles[i] = cstoneOctree::Vec3f(_particles[i].x, _particles[i].y, _particles[i].z);
-// 	}
-
-// 	_tree.resize(1 + 1);
-// 	cal::fill_data_cpu(_tree.data(), 1, 0);
-// 	cal::fill_data_cpu(_tree.data() + 1, 1, uint64_t(1) << 63);
-
-// 	int bucket_size = 8;
-// 	_counts.resize(1);
-// 	cal::fill_data_cpu(_counts.data(), 1, particle_size);
-// 	int max_count = std::numeric_limits<int>::max();
-// 	int count = 0;
-	
-// 	// ========================2 octree karray(leaf) construction loop start======================
-// 	while(1){
-// 		std::vector<uint64_t> nodeOps(_tree.size()); // Store the split decision for each node (dynamically during makeSplitDecision function). 
-// 													// Start from (one root node + 1) size for scan.
-// 		cal::fill_data_cpu(nodeOps.data(), nodeOps.size(), 0);
-// 		makeSplitsDecisionsCPU(_tree, _counts, bucket_size, nodeOps);
-
-// 		std::cout << "tree size in loop " << count << ": " << _tree.size() << std::endl;
-
-// 		uint64_t allOpsSum = std::accumulate(nodeOps.begin(), nodeOps.end(), 0);
-
-// 		// exclusive_csan ops to get new octree indices
-// 		std::vector<uint64_t> nodeOpsLayout(nodeOps.size());
-// 		std::exclusive_scan(nodeOps.begin(), nodeOps.end(), nodeOpsLayout.begin(), 0);
-// 		uint64_t newTreeNodesNum;	
-// 		newTreeNodesNum = nodeOpsLayout[_tree.size() - 1];
-// 		std::vector<uint64_t> newTree(newTreeNodesNum + 1);  // updated tree array
-
-// 		updateTreeArrayCPU(nodeOpsLayout, _tree, newTree);
-
-// 		std::copy_n(_tree.data() + _tree.size() - 1, 1, newTree.data() + newTree.size() - 1);
-// 		std::swap(newTree, _tree);
-
-// 		// update node counts
-// 		_counts.resize(_tree.size() - 1);
-// 		std::vector<uint64_t> coverNodes(2);	
-// 		findCoverNodesCPU(_tree, _mortonCodes, coverNodes);	
-
-// 		// set the out of bound nodes (absolutely does not contain coordinates) to minCount(0).
-// 		cal::fill_data_cpu(_counts.data(), coverNodes[0], 0);
-// 		cal::fill_data_cpu(_counts.data() + coverNodes[1], _tree.size() - coverNodes[1] - 1, 0);
-
-// 		updateNodeCountsCPU(_tree, _mortonCodes, _counts, coverNodes);
-
-// 		count++;
-// 		if(allOpsSum == nodeOps.size() - 1) break;
-// 	}
-// 	// ========================2 octree karray(leaf) construction loop end======================
-
-// 	// ========================3 octree internal nodes construction start======================
-// 	// construct octree internal nodes, which is equal to buildOctreeCpu() in cornerstone octree source code
-// 	int numLeafNodes = _tree.size() - 1; // tree size minus 1 because the range end variable is added before.
-//     int numInternalNodes = (numLeafNodes - 1) / 7; // number of nodes which is not leaf nodes
-//     int numNodes         = numLeafNodes + numInternalNodes; // total number of nodes (leaf nodes + internal nodes)
-// 	std::vector<uint64_t> prefixes;  // used to delete the righthand side 0 bits for each morton code
-//     std::vector<TreeNodeIndex> internalToLeaf;
-//     std::vector<TreeNodeIndex> leafToInternal;
-//     std::vector<TreeNodeIndex> childOffsets;
-// 	prefixes.resize(numNodes);
-// 	internalToLeaf.resize(numNodes);
-//     leafToInternal.resize(numNodes);
-//     childOffsets.resize(numNodes + 1);
-//     std::vector<TreeNodeIndex> parents;
-//     std::vector<int> levelRange;
-//     parents.resize(std::max(1, (numNodes - 1) / 8));
-//     levelRange.resize(21 + 2);	
-
-	
-// 	// combine internal and leaf tree parts into a single array with the nodeKey prefixes
-// 	createUnsortedLayoutCPU(_tree, numInternalNodes, numLeafNodes, prefixes, internalToLeaf);	
-	
-
-// 	cal::sort_by_key_cpu(prefixes.data(), prefixes.data() + prefixes.size(), internalToLeaf.data());
-
-// 	invertOrderCPU(internalToLeaf, leafToInternal, numNodes, numInternalNodes);
-// 	// Calculate node range for each tree level
-// 	getLevelRangeCPU(prefixes, numNodes, levelRange);
-// 	cal::fill_data_cpu(childOffsets.data(), numNodes + 1, 0);
-
-// 	linkOctreeCPU(prefixes,
-// 				numInternalNodes,
-// 				leafToInternal,
-// 				levelRange,
-// 				childOffsets,
-// 				parents);
-	
-// 	// ========================3 octree internal nodes construction end======================
-
-// 	// calculate centers and sizes for each node
-// 	std::cout << "end" << std::endl;	
-// 	std::vector<Vec3f> centers(numNodes);
-// 	std::vector<Vec3f> sizes(numNodes);
-// 	calculateNodeCentersAndSizesCPU(prefixes, centers, sizes, box);
-
-// 	// ========================4 neighbor search start======================
-	
-//     std::vector<int> layout(numLeafNodes + 1); // index of first particle for each leaf node
-//     std::exclusive_scan(_counts.begin(), _counts.end(), layout.begin(), 0);
-	
-// 	int ngmax = 16; 
-// 	_box = box;
-// 	OctreeNs octreeNs(prefixes.data(), childOffsets.data(), internalToLeaf.data(), levelRange.data(), layout.data(), centers.data(), sizes.data());
-// 	_octreeNs = octreeNs;
-
-// 	_evaluator = std::make_shared<Evaluator>(&_particles, &_GlobalRadiuses, _octreeNs, _box, ngmax);
-// 	_evaluator->setSmoothFactor(smooth_factor);
-// 	_evaluator->setIsoFactor(iso_factor);
-// 	//_evaluator->compute_Gs_xMeansCPU();
-
-// 	printf("   Initialize Evaluator Time = %f \n", t.elapsed());
-// 	t.reset();	
-
-// 	printf("-= Resize Box =-\n");
-// 	// shrinkBox();
-// 	if (IS_CONST_RADIUS)
-// 	{
-// 		resizeRootBoxConstR();
-// 	} else {
-// 		resizeRootBoxVarR();
-// 	}
-// 	printf("   MAX_DEPTH = %d, MIN_DEPTH = %d\n", _DEPTH_MAX, _DEPTH_MIN);
-
-// 	IS_CONST_RADIUS ? _evaluator->CalculateMaxScalarConstR() : _evaluator->CalculateMaxScalarVarR();
-//     printf("   Max Scalar Value = %f\n", _evaluator->getMaxScalar());
-	
-// 	IS_CONST_RADIUS ? _evaluator->RecommendIsoValueConstR() : _evaluator->RecommendIsoValueVarR();
-//     printf("   Recommend Iso Value = %f\n", _evaluator->getIsoValue());
-
-// 	if (CALC_P_NORMAL)
-// 	{
-// 		_evaluator->CalcParticlesNormal();
-// 		printf("   Calculate Particals Normal Time = %f\n", t.elapsed());
-// 		t.reset();
-// 	}
-
-// 	// ----------- generating iso surface octree ---------
-// 	std::vector<uint64_t> iso_tree;
-// 	// iso_tree.assign(_tree.begin(), _tree.end());
-// 	iso_tree.resize(1 + 1);
-// 	cal::fill_data_cpu(iso_tree.data(), 1, 0);
-// 	cal::fill_data_cpu(iso_tree.data() + 1, 1, uint64_t(1) << 63);
-
-// 	int iso_count = 0;
-// 	std::vector<float> scalars; // used to store each leaf nodes' scalar value on dual vertices. important for isosurface generation
-	
-// 	while(1){
-// 		// ---- iso octree's info calculation ----
-// 		int iso_tree_size = iso_tree.size() - 1;
-// 		std::cout << "tree size in loop " << iso_count << ": " << iso_tree_size << std::endl;
-// 		std::vector<uint64_t> iso_prefixes(iso_tree_size);
-
-// 		// calculate prefixes for each node
-// 		// for(int i = 0; i < iso_tree_size; i++){
-// 		// 	uint64_t curr_key = iso_tree[i];
-// 		// 	if(!isPowerOf8(iso_tree[i + 1] - curr_key)) printf("The index %d is not the power of 8\n", i);
-//     	// 	unsigned curr_level = treeLevel(iso_tree[i + 1] - curr_key);
-//     	// 	iso_prefixes[i] = encodePlaceholderBit(curr_key, 3 * curr_level);	
-// 		// }
-// 		std::vector<Vec3f> iso_centers(iso_tree_size);
-// 		std::vector<Vec3f> iso_sizes(iso_tree_size);
-// 		// calculateLeavesCentersAndSizesCPU(iso_tree, iso_centers, iso_sizes, box);
-
-// 		// ---- iso surface split decision making ----
-// 		std::vector<float> sample_points(int(std::pow(getOverSampleQEF() + 1, 3) * 4 * iso_tree_size));
-// 		std::vector<float> sample_grads(int(std::pow(getOverSampleQEF() + 1, 3) * 4 * iso_tree_size));
-// 		std::vector<float> curvs(iso_tree_size);
-// 		std::vector<float> min_radiuses(iso_tree_size);	
-// 		std::vector<unsigned char> emptys(iso_tree_size);
-// 		// std::vector<float> iso_values(iso_tree_size);
-// 		std::vector<int> nodes_type(iso_tree_size, 1);
-// 		scalars = std::vector<float>(iso_tree_size, 0.0); // Stores each tree nodes' scalar value on dual vertices
-// 		std::vector<uint64_t> iso_nodeOps(iso_tree.size(), 0); // Store the split decision for each node (the split decision is based on whether the node has isosurface)
-// 					// bool
-// 		// #pragma omp parallel for
-// 		for(int i = 0; i < iso_tree_size; i++) {
-// 			// begin beforeSampleEval
-// 			Vec3f center = iso_centers[i];
-// 			Vec3f box1 = center - Vec3f(iso_sizes[i].x, iso_sizes[i].y, iso_sizes[i].z);
-// 			Vec3f box2 = center + Vec3f(iso_sizes[i].x, iso_sizes[i].y, iso_sizes[i].z);
-// 			std::vector<int> insideParticlesIdx;
-// 			// check empty and calculate curvature implentation below
-// 			cstoneOctree::Vec3f norms(0, 0, 0);
-// 			float area = 0.0f;
-// 			std::vector<int> insides;
-// 			min_radiuses[i] = IS_CONST_RADIUS ? _GlobalRadiuses[i] : FLT_MAX;
-// 			int mortonCodesSize = _mortonCodes.size();
-// 			uint64_t nodeStartVal = iso_tree[i];
-// 			uint64_t nodeEndVal = iso_tree[i + 1];
-// 			// here, a better method could be estimate neighbors size by counting leaves which covered by box.
-// 			// however, i dont know how to get leaf info in searching tree
-// 			// so, TODO()
-// 			auto rangeStart = cal::lower_bound(_mortonCodes.data(), _mortonCodes.data() + mortonCodesSize, nodeStartVal);
-// 			auto rangeEnd = cal::lower_bound(_mortonCodes.data(), _mortonCodes.data() + mortonCodesSize, nodeEndVal);
-// 			int index_start = std::distance(_mortonCodes.data(), rangeStart);
-// 			int index_end = std::distance(_mortonCodes.data(), rangeEnd);
-// 			for(int index = index_start; index < index_end; index++){
-// 				insideParticlesIdx.push_back(index);
-// 			}
-// 			emptys[i] = insideParticlesIdx.empty();
-// 			curvs[i] = (area == 0) ? 1.0 : (norms.norm() / area);
-// 			if(emptys[i]){
-// 				scalars[i] = _evaluator->getIsoValue();
-// 				nodes_type[i] = 0;
-// 			}
-// 		}
-// 		//
-		
-// 		//
-// 		uint64_t iso_allOpsSum = std::accumulate(iso_nodeOps.begin(), iso_nodeOps.end(), 0);
-// 		// exclusive_csan ops to get new octree indices
-// 		std::vector<uint64_t> iso_nodeOpsLayout(iso_nodeOps.size());
-// 		for(int i = 0; i < iso_nodeOps.size(); i++){
-// 			int val = iso_nodeOps[i] - 1;
-// 			if(val != 0 && val != 7){
-// 				std::cout << "error in iso_nodeOps, " << i << "th value is " << val << std::endl;
-// 			}
-// 		}
-// 		std::exclusive_scan(iso_nodeOps.begin(), iso_nodeOps.end(), iso_nodeOpsLayout.begin(), 0);
-// 		uint64_t newTreeNodesNum;	
-// 		newTreeNodesNum = iso_nodeOpsLayout[iso_tree.size() - 1];
-// 		std::vector<uint64_t> new_iso_tree(newTreeNodesNum + 1);  // updated tree array
-
-// 		updateTreeArrayCPU(iso_nodeOpsLayout, iso_tree, new_iso_tree);
-
-// 		std::copy_n(iso_tree.data() + iso_tree.size() - 1, 1, new_iso_tree.data() + new_iso_tree.size() - 1);
-// 		std::swap(new_iso_tree, iso_tree);
-
-// 		iso_count++;
-// 		if(iso_allOpsSum == iso_nodeOps.size() - 1) break;
-// 	} // end octree generation loop
-
-// 	// //  ---  link iso octree (tree node and internal node) ---
-// 	// int iso_numLeafNodes = iso_tree.size() - 1; // tree size minus 1 because the range end variable is added before.
-//     // int iso_numInternalNodes = (iso_numLeafNodes - 1) / 7; // number of nodes which is not leaf nodes
-//     // int iso_numNodes         = iso_numLeafNodes + iso_numInternalNodes; // total number of nodes (leaf nodes + internal nodes)
-// 	// std::vector<uint64_t> iso_prefixes;  // used to delete the righthand side 0 bits for each morton code
-//     // std::vector<TreeNodeIndex> iso_internalToLeaf;
-//     // std::vector<TreeNodeIndex> iso_leafToInternal;
-//     // std::vector<TreeNodeIndex> iso_childOffsets;
-// 	// iso_prefixes.resize(iso_numNodes);
-// 	// iso_internalToLeaf.resize(iso_numNodes);
-//     // iso_leafToInternal.resize(iso_numNodes);
-//     // iso_childOffsets.resize(iso_numNodes + 1);
-//     // std::vector<TreeNodeIndex> iso_parents;
-//     // std::vector<int> iso_levelRange;
-//     // iso_parents.resize(std::max(1, (iso_numNodes - 1) / 8));
-//     // iso_levelRange.resize(21 + 2);
-
-// 	// createUnsortedLayoutCPU(iso_tree, iso_numInternalNodes, iso_numLeafNodes, iso_prefixes, iso_internalToLeaf);	
-// 	// cal::sort_by_key_cpu(iso_prefixes.data(), iso_prefixes.data() + iso_prefixes.size(), iso_internalToLeaf.data());
-
-// 	// invertOrderCPU(iso_internalToLeaf, iso_leafToInternal, iso_numNodes, iso_numInternalNodes);
-// 	// // Calculate node range for each tree level
-// 	// getLevelRangeCPU(iso_prefixes, iso_numNodes, iso_levelRange);
-// 	// cal::fill_data_cpu(iso_childOffsets.data(), iso_numNodes + 1, 0);
-
-// 	// linkOctreeCPU(iso_prefixes,
-// 	// 			iso_numInternalNodes,
-// 	// 			iso_leafToInternal,
-// 	// 			iso_levelRange,
-// 	// 			iso_childOffsets,
-// 	// 			iso_parents);
-	
-// 	// std::vector<Vec3f> iso_centers(iso_numNodes);
-// 	// std::vector<Vec3f> iso_sizes(iso_numNodes);
-// 	// calculateNodeCentersAndSizesCPU(iso_prefixes, iso_centers, iso_sizes, box);
-// 	// std::cout << "iso centers[0]: " << iso_centers[0].x << ", " << iso_centers[0].y << ", " << iso_centers[0].z << std::endl;
-// 	// std::cout << "iso size[0]: " << iso_sizes[0].x << ", " << iso_sizes[0].y << ", " << iso_sizes[0].z << std::endl;
-
-//     // std::vector<int> iso_layout(iso_numLeafNodes + 1); // particle layout. This is not used in iso octree
-// 	// IsoOctreeNs iso_octreeNs(iso_prefixes.data(), iso_childOffsets.data(), iso_leafToInternal.data(), iso_internalToLeaf.data(), iso_levelRange.data(), scalars.data(), iso_centers.data(), iso_sizes.data());
-
-// 	// extract the isosurface value
-	
-// }
-
 void SurfReconstructor::RunCPU2(float iso_factor, float smooth_factor)
 {
 	timer t;
 
 	std::cout << "-= Box =-" << std::endl;
-	loadRootBox();
+	loadRootBox(*std::max_element(_GlobalRadiuses.begin(), _GlobalRadiuses.end()));
 
 	std::cout << "-= Build Neighbor Searcher =-" << std::endl;
 	// if (IS_CONST_RADIUS)
@@ -1038,7 +700,7 @@ void SurfReconstructor::Run(float iso_factor, float smooth_factor)
 	timer t;
 
 	printf("-= Box =-\n");
-	loadRootBox();
+	loadRootBox(*std::max_element(_GlobalRadiuses.begin(), _GlobalRadiuses.end()));
 
 	printf("-= Build Neighbor Searcher =-\n");
 	// if (IS_CONST_RADIUS)

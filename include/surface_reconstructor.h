@@ -76,7 +76,7 @@ private:
     cstoneOctree::OctreeNs _octreeNs;
 
 protected:
-    void loadRootBox();
+    void loadRootBox(float r);
 
     void shrinkBox();
 
