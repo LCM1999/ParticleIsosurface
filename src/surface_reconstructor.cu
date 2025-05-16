@@ -162,7 +162,7 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 	
 	cstoneOctree::Box box(_BoundingBox[0], _BoundingBox[1], _BoundingBox[2], 
 						  _BoundingBox[3], _BoundingBox[4], _BoundingBox[5]);
-	std::cout << "box: " << box.xmin() << ", " << box.xmax() << ", " << box.ymin() << ", " << box.ymax() << ", " << box.zmin() << ", " << box.zmax() << std::endl;
+	// std::cout << "box: " << box.xmin() << ", " << box.xmax() << ", " << box.ymin() << ", " << box.ymax() << ", " << box.zmin() << ", " << box.zmax() << std::endl;
 	cstoneOctree::Box* d_box;
 	cudaMalloc(&d_box, sizeof(cstoneOctree::Box));
 	cudaMemcpy(d_box, &box, sizeof(cstoneOctree::Box), cudaMemcpyHostToDevice);
@@ -287,16 +287,20 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 	thrust::device_vector<uint64_t> d_iso_tree(iso_tree);
 	int d_iso_tree_size = d_iso_tree.size() - 1;
 	DeviceConfig isoTreeConfig(d_iso_tree_size);
-	thrust::device_vector<Vec3f> d_iso_centers(d_iso_tree_size);
+	// thrust::device_vector<Vec3f> d_iso_centers(d_iso_tree_size);
 	thrust::device_vector<Vec3i> d_iso_lowers(d_iso_tree_size);
 	thrust::device_vector<unsigned> d_iso_levels(d_iso_tree_size);
 	// calculateLeavesLowersAndLevelsCPU(iso_tree, iso_lowers, iso_levels);
 	calculateLeavesLowersAndLevelsKernel<<<isoTreeConfig.blocks, isoTreeConfig.threads>>>(thrust::raw_pointer_cast(d_iso_tree.data()), d_iso_tree_size,
-																						  thrust::raw_pointer_cast(d_iso_centers.data()),
+																						//   thrust::raw_pointer_cast(d_iso_centers.data()),
 																						  thrust::raw_pointer_cast(d_iso_lowers.data()),
-																						  thrust::raw_pointer_cast(d_iso_levels.data()), d_box);
+																						  thrust::raw_pointer_cast(d_iso_levels.data())
+																						//   , d_box
+																						);
 	thrust::device_vector<float> d_scalars(iso_scalars);
-	iso::generateIsoDirectGPU(d_iso_tree, d_iso_centers, d_iso_lowers, d_iso_levels, d_scalars, d_iso_tree_size, 
+	iso::generateIsoDirectGPU(d_iso_tree
+		// , d_iso_centers
+		, d_iso_lowers, d_iso_levels, d_scalars, d_iso_tree_size, 
 		d_searcher, HashGridGPUs_size, d_evaluator, 
 		0.0, _searcherGPU->minRadius,
 		d_box, 

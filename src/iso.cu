@@ -261,11 +261,11 @@ inline __host__ __device__ bool operator==(const CellCoords &a, const CellCoords
 struct Cell : public CellCoords {
   inline __device__ __host__ float4 asDualVertex() const
   {
-    // return make_float4(center().x,center().y,center().z,scalar);
-    return make_float4(center.x, center.y, center.z, scalar);
+    return make_float4(center().x,center().y,center().z,scalar);
+    // return make_float4(center.x, center.y, center.z, scalar);
   }
   float      scalar;
-  float3     center;
+  // float3     center;
 };
 
 inline __host__ __device__ bool operator==(const Cell &a, const Cell &b)
@@ -816,7 +816,7 @@ struct IsoExtractor {
   inline void __device__ doMarchingCubesOn(const vec3i mirror,
                                            const Cell zOrder[2][2][2],
                                            HashGridGPU** d_searchers, int d_searchers_size, EvaluatorGPU* d_evaluator,
-                                           bool needErrorControl, float errorBound,
+                                           float errorBound,
                                            cstoneOctree::Box* box
                                           )
   {
@@ -845,12 +845,13 @@ struct IsoExtractor {
          edge[0] > -1;
          edge += 3 ) {
       float4 triVertex[3];
-      if (needErrorControl)
       {
         for (int ii=0; ii<3; ii++) {
           const int8_t *vert = vtkMarchingCubes_edges[edge[ii]];
           cstoneOctree::Vec3f v0(vertex[vert[0]].x, vertex[vert[0]].y, vertex[vert[0]].z);
           cstoneOctree::Vec3f v1(vertex[vert[1]].x, vertex[vert[1]].y, vertex[vert[1]].z);
+          convertToWorldPos(v0, box);
+          convertToWorldPos(v1, box);
           float v0_scalar = vertex[vert[0]].w;
           float v1_scalar = vertex[vert[1]].w;
           if (d_searchers_size == 1)
@@ -927,9 +928,8 @@ struct IsoExtractor {
           // } else {
             const float4 v0v = make_float4(v0.x, v0.y, v0.z, v0_scalar);
             const float4 v1v = make_float4(v1.x, v1.y, v1.z, v1_scalar);
-            triVertex[ii] = lerp(v0v, v1v, t);
-            
-            // triVertex[ii] = (1.f-t)*v0v+t*v1v;
+            // triVertex[ii] = lerp(v0v, v1v, t);
+            triVertex[ii] = (1.f-t)*v0v+t*v1v;
           // }
         }
   
@@ -950,7 +950,7 @@ struct IsoExtractor {
 __global__ void parseInputGPU(
   uint64_t* d_mortons, 
   int d_iso_tree_size,
-  cstoneOctree::Vec3f* d_centers,
+  // cstoneOctree::Vec3f* d_centers,
   cstoneOctree::Vec3i* d_lowers,
   unsigned* d_levels,
   float* d_scalars,
@@ -962,7 +962,7 @@ __global__ void parseInputGPU(
   // vec3i bounds_upper(-(1<<30));
   const size_t threadID = threadIdx.x+size_t(blockDim.x)*blockIdx.x;
   if (threadID >= d_iso_tree_size) return;
-  d_cells[threadID].center = make_float3(d_centers[threadID].x, d_centers[threadID].y, d_centers[threadID].z);
+  // d_cells[threadID].center = make_float3(d_centers[threadID].x, d_centers[threadID].y, d_centers[threadID].z);
   d_cells[threadID].lower = vec3i(d_lowers[threadID].x, d_lowers[threadID].y, d_lowers[threadID].z);
   d_cells[threadID].level = d_levels[threadID];
   d_cells[threadID].scalar = d_scalars[threadID];
@@ -1056,7 +1056,7 @@ __global__ void extractTriangles(
                                  TriangleVertex *__restrict__ outVertex,
                                  const int outVertexSize,
                                  HashGridGPU** d_searchers, int d_searchers_size, EvaluatorGPU* d_evaluator,
-                                 bool needErrorControl, float errorBound, 
+                                 float errorBound, 
                                  cstoneOctree::Box* box,
                                  int *p_numGeneratedTriangles)
 {
@@ -1101,7 +1101,7 @@ __global__ void extractTriangles(
 
   IsoExtractor isoExtractor(isoValue,outVertex,outVertexSize,p_numGeneratedTriangles);
   isoExtractor.doMarchingCubesOn({dx==-1,dy==-1,dz==-1},corner, 
-    d_searchers, d_searchers_size, d_evaluator, needErrorControl, errorBound, box);
+    d_searchers, d_searchers_size, d_evaluator, errorBound, box);
 }
 
 
@@ -1230,16 +1230,16 @@ void generateIso(
     // ==================================================================
     // step 3: create vertex array
     // ==================================================================
-    thrust::host_vector<TriangleVertex> h_triangleVertices = d_triangleVertices;
-    std::ofstream out("D:/data/test.csv",std::ios::binary);
-    out.precision(10);
-    out << "x,y,z" << std::endl;
-    for (int i=0;i<h_triangleVertices.size();i++)
-      out << h_triangleVertices[i].position.x << ","
-          << h_triangleVertices[i].position.y << ","
-          << h_triangleVertices[i].position.z << std::endl;
-    out.close();
-    std::cout << "#triangle vertices written to file" << std::endl;
+    // thrust::host_vector<TriangleVertex> h_triangleVertices = d_triangleVertices;
+    // std::ofstream out("D:/data/test.csv",std::ios::binary);
+    // out.precision(10);
+    // out << "x,y,z" << std::endl;
+    // for (int i=0;i<h_triangleVertices.size();i++)
+    //   out << h_triangleVertices[i].position.x << ","
+    //       << h_triangleVertices[i].position.y << ","
+    //       << h_triangleVertices[i].position.z << std::endl;
+    // out.close();
+    // std::cout << "#triangle vertices written to file" << std::endl;
     // ------------------------------------------------------------------
     // step 3a: sort vertex array
     // ------------------------------------------------------------------
@@ -1319,7 +1319,7 @@ void generateIso(
 
 void generateIsoDirectGPU(
   thrust::device_vector<uint64_t>& d_mortons,
-  thrust::device_vector<cstoneOctree::Vec3f>& d_centers, 
+  // thrust::device_vector<cstoneOctree::Vec3f>& d_centers, 
   thrust::device_vector<cstoneOctree::Vec3i>& d_lowers, 
   thrust::device_vector<unsigned>& d_levels, 
   thrust::device_vector<float>& d_scalars,
@@ -1343,7 +1343,7 @@ void generateIsoDirectGPU(
     (
         thrust::raw_pointer_cast(d_mortons.data()), 
         d_iso_tree_size,
-        thrust::raw_pointer_cast(d_centers.data()),
+        // thrust::raw_pointer_cast(d_centers.data()),
         thrust::raw_pointer_cast(d_lowers.data()),
         thrust::raw_pointer_cast(d_levels.data()),
         thrust::raw_pointer_cast(d_scalars.data()),
@@ -1402,9 +1402,9 @@ void generateIsoDirectGPU(
           maxLevel,
           isoValue,
           thrust::raw_pointer_cast(d_triangleVertices.data()),d_triangleVertices.size(),
-          d_searchers, d_searchers_size, d_evaluator,
-          false, errorBound, 
-          d_box,
+          // d_searchers, d_searchers_size, d_evaluator,
+          // false, errorBound, 
+          // d_box,
           thrust::raw_pointer_cast(d_atomicCounter.data())
       );
   }
@@ -1436,7 +1436,7 @@ void generateIsoDirectGPU(
           isoValue,
           thrust::raw_pointer_cast(d_triangleVertices.data()),d_triangleVertices.size(),
           d_searchers, d_searchers_size, d_evaluator,
-          true, errorBound, 
+          errorBound, 
           d_box,
           thrust::raw_pointer_cast(d_atomicCounter.data())
       );
@@ -1451,12 +1451,19 @@ void generateIsoDirectGPU(
   // std::ofstream out("D:/data/test.csv",std::ios::binary);
   // out.precision(10);
   // out << "x,y,z" << std::endl;
-  // for (int i=0;i<h_triangleVertices.size();i++)
+  // for (int i=0;i<h_triangleVertices.size();i++) {
+  //   // if (h_triangleVertices[i].position.x == 0.f && 
+  //   //     h_triangleVertices[i].position.y == 0.f && 
+  //   //     h_triangleVertices[i].position.z == 0.f)
+  //   // {
+  //   //   printf("h_triangleVertices[%d] = %f %f %f\n", i, h_triangleVertices[i].position.x, h_triangleVertices[i].position.y, h_triangleVertices[i].position.z);
+  //   // }
   //   out << h_triangleVertices[i].position.x << ","
   //       << h_triangleVertices[i].position.y << ","
   //       << h_triangleVertices[i].position.z << std::endl;
+  // }
   // out.close();
-  // std::cout << "#triangle vertices written to file" << std::endl;
+  std::cout << "#triangle vertices written to file" << std::endl;
   // ------------------------------------------------------------------
   // step 3a: sort vertex array
   // ------------------------------------------------------------------

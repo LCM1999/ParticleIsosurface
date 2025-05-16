@@ -220,7 +220,11 @@ __global__ void calculateNodeCentersAndSizesKernel(uint64_t* prefixesDevice, int
 
 __global__ void calculateLeavesCentersAndSizesKernel(uint64_t* d_iso_tree, int d_iso_tree_size, Vec3f* d_iso_centers, Vec3f* d_iso_sizes, unsigned* d_iso_depths, Box* d_box);
 
-__global__ void calculateLeavesLowersAndLevelsKernel(uint64_t* d_iso_tree, int d_iso_tree_size, Vec3f* d_iso_centers, Vec3i* d_lowers, unsigned* d_levels, Box* d_box);
+__global__ void calculateLeavesLowersAndLevelsKernel(uint64_t* d_iso_tree, int d_iso_tree_size
+    // , Vec3f* d_iso_centers
+    , Vec3i* d_lowers, unsigned* d_levels
+    // , Box* d_box
+);
 
 __global__ void findNeighborsKernel(Vec3f* coordsDevice, int coords_size, float* radiusesDevice, OctreeNs* octreeNs, Box* boxDevice, int ngmax, int* neighborsDevice, int* numNeighborsDevice);
 
