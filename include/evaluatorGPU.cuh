@@ -110,12 +110,12 @@ struct EvaluatorGPU
             {
                 int pIdx = neighbors[i];
                 if (!CheckSplash(pIdx) 
-                    && d_GlobalxMeans[pIdx].x > (box1.x - (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR)) 
-                    && d_GlobalxMeans[pIdx].x < (box2.x + (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR)) 
-                    && d_GlobalxMeans[pIdx].y > (box1.y - (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR)) 
-                    && d_GlobalxMeans[pIdx].y < (box2.y + (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR)) 
-                    && d_GlobalxMeans[pIdx].z > (box1.z - (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR)) 
-                    && d_GlobalxMeans[pIdx].z < (box2.z + (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR))
+                    && d_GlobalxMeans[pIdx].x > (box1.x - (d_GlobalRadiuses[pIdx] * d_NEIGHBOR_FACTOR)) 
+                    && d_GlobalxMeans[pIdx].x < (box2.x + (d_GlobalRadiuses[pIdx] * d_NEIGHBOR_FACTOR)) 
+                    && d_GlobalxMeans[pIdx].y > (box1.y - (d_GlobalRadiuses[pIdx] * d_NEIGHBOR_FACTOR)) 
+                    && d_GlobalxMeans[pIdx].y < (box2.y + (d_GlobalRadiuses[pIdx] * d_NEIGHBOR_FACTOR)) 
+                    && d_GlobalxMeans[pIdx].z > (box1.z - (d_GlobalRadiuses[pIdx] * d_NEIGHBOR_FACTOR)) 
+                    && d_GlobalxMeans[pIdx].z < (box2.z + (d_GlobalRadiuses[pIdx] * d_NEIGHBOR_FACTOR))
                 ) {
                     allSplash = false;
                     cstoneOctree::Vec3f tempNorm = d_PariclesNormals[pIdx];
