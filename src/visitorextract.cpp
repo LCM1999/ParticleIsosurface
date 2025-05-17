@@ -57,8 +57,10 @@ void VisitorExtract::calc_vertices()
 				r = (IS_CONST_RADIUS ? constructor->getConstRadius() : 
 					(constructor->getUseCPU() ? constructor->getSearcherCPU()->getMinRadius() : 
 					 							constructor->getSearcherGPU()->getMinRadius())) / 2;
+				int count = 0;
 				while (d > r)
 				{
+					count++;
 					tmpv[0] =  (tmpv1[0] + tmpv2[0]) / 2;
 					tmpv[1] =  (tmpv1[1] + tmpv2[1]) / 2;
 					tmpv[2] =  (tmpv1[2] + tmpv2[2]) / 2;
@@ -81,6 +83,7 @@ void VisitorExtract::calc_vertices()
 					}
 					d /= 2;
 				}
+				std::cout << "count = " << count << std::endl;
 				ratio = invlerp(v1s, v2s, 0.0f);
 				if (ratio < 0.1)
 					tmpv = tmpv1;

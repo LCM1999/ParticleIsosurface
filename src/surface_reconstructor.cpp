@@ -116,8 +116,8 @@ void SurfReconstructor::resizeRootBoxVarR()
 		_RootCenter[i] = center;
 	}
 
-	// _DEPTH_MIN = std::min(int(std::ceil(std::log2(std::ceil(maxLen / maxR)))) - 1, _DEPTH_MAX-2); //, _DEPTH_MAX - int(_DEPTH_MAX / 3));
-	_DEPTH_MIN = (_DEPTH_MAX - (SINGLE_LAYER ? 1 : 2));
+	_DEPTH_MIN = std::min(int(std::ceil(std::log2(std::ceil(maxLen / maxR)))) - 1, _DEPTH_MAX-2); //, _DEPTH_MAX - int(_DEPTH_MAX / 3));
+	// _DEPTH_MIN = (_DEPTH_MAX - (SINGLE_LAYER ? 1 : 2));
 }
 
 void SurfReconstructor::checkEmptyAndCalcCurv(std::shared_ptr<TNode> tnode, unsigned char& empty, float& curv, float& min_radius)
@@ -325,7 +325,7 @@ void SurfReconstructor::genIsoOurs()
 		emptys.resize(queue_flag);
 		{
 			{
-		// #pragma omp parallel for
+		#pragma omp parallel for
 				for (int i = 0; i < queue_flag; i++)
 				{
 						beforeSampleEval(*ProcessArray[i], cuvrs[i], min_raiduses[i], emptys[i]);
@@ -347,7 +347,7 @@ void SurfReconstructor::genIsoOurs()
 		//TODO: Sampling
 		{
 			{
-		// #pragma omp parallel for
+		#pragma omp parallel for
 				for (int i = 0; i < queue_flag; i++)
 				{
 					if (!emptys[i])
@@ -734,11 +734,6 @@ void SurfReconstructor::Run(float iso_factor, float smooth_factor)
 	
 	IS_CONST_RADIUS ? _evaluator->RecommendIsoValueConstR() : _evaluator->RecommendIsoValueVarR();
     printf("   Recommend Iso Value = %f\n", _evaluator->getIsoValue());
-
-	// float ts = 0;
-	// _evaluator->SingleEval(cstoneOctree::Vec3f(0.241679, 0.283861, 0.116774), ts);
-	// std::cout << "SingleEval: " << ts << std::endl;
-	// exit(0);
 
 	if (CALC_P_NORMAL)
 	{

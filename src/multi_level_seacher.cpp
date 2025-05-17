@@ -13,42 +13,54 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<cstoneOctree::Vec3f>* particl
     float bin_extent = minRadius * 0.5;
     int bins = std::max(int(ceil((maxRadius - minRadius) / bin_extent)), 1);
     bin_extent = (maxRadius - minRadius) / bins;
-    for (size_t i = 0; i < bins; i++)
-    {
-        bin_bounds.push_back(
-            std::pair<float, float>(
-                minRadius+(i*bin_extent), 
-                std::min(minRadius+((i+1)*bin_extent), maxRadius)));
-    }
-    auto whichBin = [&](const float r)
-    {
-        for (auto tit = bin_bounds.begin(); tit < bin_bounds.end(); tit++)
-        {
-            if (r >= tit->first && r <= tit->second)
-                return static_cast<int>(std::distance(bin_bounds.begin(), tit));
-        }
-        return -1;
-    };
     std::vector<std::vector<unsigned>>sortedIndex(bins);
-
-    for (int i = 0; i < radiuses->size(); i++)
+    if (bins == 1 || bin_extent == 0.0f)
     {
-        sortedIndex[whichBin(radiuses->at(i))].push_back(i);
+        for (int i = 0; i < radiuses->size(); i++)
+        {
+            sortedIndex[0].push_back(i);
+        }
+    } else {
+        for (size_t i = 0; i < bins; i++)
+        {
+            bin_bounds.push_back(
+                std::pair<float, float>(
+                    minRadius+(i*bin_extent), 
+                    std::min(minRadius+((i+1)*bin_extent), maxRadius)));
+        }
+        auto whichBin = [&](const float r)
+        {
+            for (auto tit = bin_bounds.begin(); tit < bin_bounds.end(); tit++)
+            {
+                if (r >= tit->first && r <= tit->second)
+                    return static_cast<int>(std::distance(bin_bounds.begin(), tit));
+            }
+            return -1;
+        };
+    
+        for (int i = 0; i < radiuses->size(); i++)
+        {
+            sortedIndex[whichBin(radiuses->at(i))].push_back(i);
+        }
     }
     for (int i = 0; i < bins; i++)
     {
         if (sortedIndex[i].size() == 0) continue;
         float temp_bounding [6] = {0.0f};
-        temp_bounding[0] = temp_bounding[2] = temp_bounding[4] = FLT_MAX;
-        temp_bounding[1] = temp_bounding[3] = temp_bounding[5] = -FLT_MAX;
+        for (size_t j = 0; j < 6; j++)
+        {
+            temp_bounding[j] = bounding[j];
+        }
+        // temp_bounding[0] = temp_bounding[2] = temp_bounding[4] = FLT_MAX;
+        // temp_bounding[1] = temp_bounding[3] = temp_bounding[5] = -FLT_MAX;
         for (auto pI: sortedIndex[i])
         {
-            if (particles->at(pI).x < temp_bounding[0]) temp_bounding[0] = particles->at(pI).x;
-            if (particles->at(pI).x > temp_bounding[1]) temp_bounding[1] = particles->at(pI).x;
-            if (particles->at(pI).y < temp_bounding[2]) temp_bounding[2] = particles->at(pI).y;
-            if (particles->at(pI).y > temp_bounding[3]) temp_bounding[3] = particles->at(pI).y;
-            if (particles->at(pI).z < temp_bounding[4]) temp_bounding[4] = particles->at(pI).z;
-            if (particles->at(pI).z > temp_bounding[5]) temp_bounding[5] = particles->at(pI).z;
+            temp_bounding[0] = std::min(temp_bounding[0], particles->at(pI).x);
+            temp_bounding[1] = std::max(temp_bounding[1], particles->at(pI).x);
+            temp_bounding[2] = std::min(temp_bounding[2], particles->at(pI).y);
+            temp_bounding[3] = std::max(temp_bounding[3], particles->at(pI).y);
+            temp_bounding[4] = std::min(temp_bounding[4], particles->at(pI).z);
+            temp_bounding[5] = std::max(temp_bounding[5], particles->at(pI).z);
         }
         unsigned int binRadiusId = *std::max_element(sortedIndex[i].begin(), sortedIndex[i].end(), 
             [&](unsigned int& a, unsigned int& b) {

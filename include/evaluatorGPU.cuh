@@ -110,12 +110,12 @@ struct EvaluatorGPU
             {
                 int pIdx = neighbors[i];
                 if (!CheckSplash(pIdx) 
-                    && d_GlobalxMeans[pIdx].x > (box1.x - (d_GlobalRadiuses[pIdx] * d_NEIGHBOR_FACTOR)) 
-                    && d_GlobalxMeans[pIdx].x < (box2.x + (d_GlobalRadiuses[pIdx] * d_NEIGHBOR_FACTOR)) 
-                    && d_GlobalxMeans[pIdx].y > (box1.y - (d_GlobalRadiuses[pIdx] * d_NEIGHBOR_FACTOR)) 
-                    && d_GlobalxMeans[pIdx].y < (box2.y + (d_GlobalRadiuses[pIdx] * d_NEIGHBOR_FACTOR)) 
-                    && d_GlobalxMeans[pIdx].z > (box1.z - (d_GlobalRadiuses[pIdx] * d_NEIGHBOR_FACTOR)) 
-                    && d_GlobalxMeans[pIdx].z < (box2.z + (d_GlobalRadiuses[pIdx] * d_NEIGHBOR_FACTOR))
+                    && d_GlobalxMeans[pIdx].x > (box1.x - (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR)) 
+                    && d_GlobalxMeans[pIdx].x < (box2.x + (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR)) 
+                    && d_GlobalxMeans[pIdx].y > (box1.y - (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR)) 
+                    && d_GlobalxMeans[pIdx].y < (box2.y + (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR)) 
+                    && d_GlobalxMeans[pIdx].z > (box1.z - (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR)) 
+                    && d_GlobalxMeans[pIdx].z < (box2.z + (d_GlobalRadiuses[pIdx] * d_SMOOTH_FACTOR))
                 ) {
                     allSplash = false;
                     cstoneOctree::Vec3f tempNorm = d_PariclesNormals[pIdx];
@@ -140,11 +140,11 @@ struct EvaluatorGPU
                 for (int x = 0; x <= 2; x++)
                 {
                     nodeSamplePoints[(z * (2+1) * (2+1) + y * (2+1) + x) * 3 + 0] = 
-                    box1[0] * (1 - x / 2) + box2[0] * (x / 2);
+                    box1[0] * (1 - float(x) / 2) + box2[0] * (float(x) / 2);
                     nodeSamplePoints[(z * (2+1) * (2+1) + y * (2+1) + x) * 3 + 1] = 
-                    box1[1] * (1 - y / 2) + box2[1] * (y / 2);
+                    box1[1] * (1 - float(y) / 2) + box2[1] * (float(y) / 2);
                     nodeSamplePoints[(z * (2+1) * (2+1) + y * (2+1) + x) * 3 + 2] = 
-                    box1[2] * (1 - z / 2) + box2[2] * (z / 2);
+                    box1[2] * (1 - float(z) / 2) + box2[2] * (float(z) / 2);
                 }
             }
         }
@@ -153,6 +153,7 @@ struct EvaluatorGPU
         {
             Vec3f diff;
             Vec3f samplePoint(nodeSamplePoints[j * 3 + 0], nodeSamplePoints[j * 3 + 1], nodeSamplePoints[j * 3 + 2]);
+            nodeSampleScalars[j] = 0.0f;
             for (int k = 0; k < numNeighbors; k++)
             {
                 int pIdx = neighbors[k];
@@ -163,6 +164,7 @@ struct EvaluatorGPU
                 diff = samplePoint - d_GlobalxMeans[pIdx];
                 nodeSampleScalars[j] += AnisotropicInterpolate(pIdx, diff);
             }
+
             nodeSampleScalars[j] = d_ISO_VALUE - nodeSampleScalars[j];
             originSign = (nodeSampleScalars[0] >= 0);
             if (!signChange)

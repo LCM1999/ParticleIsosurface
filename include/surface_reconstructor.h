@@ -40,7 +40,7 @@ private:
     int _DEPTH_MAX = 8; // 7
     int _DEPTH_MIN = 6; // 4
 
-    bool useCPU;
+    bool useCPU = true;
     // std::shared_ptr<HashGrid> _hashgrid;
     std::shared_ptr<MultiLevelSearcher> _searcherCPU;
     std::shared_ptr<MultiLevelSearcherGPU> _searcherGPU;

@@ -30,7 +30,7 @@ namespace iso {
         int d_iso_tree_size,
         HashGridGPU** d_searchers, int d_searchers_size, EvaluatorGPU* d_evaluator, 
         const float isoValue, const float errorBound, 
-        cstoneOctree::Box* d_box, 
+        cstoneOctree::Box* d_box, cstoneOctree::Box* h_box,
         Mesh* mesh
     );
 }

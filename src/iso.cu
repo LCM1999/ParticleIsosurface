@@ -46,45 +46,6 @@ void cuda_safe_call(cudaError_t error, const std::string& message = "")
 }
 
 #define EXPLICIT_MORTON 1
-// struct timer
-// {
-//   cudaEvent_t start;
-//   cudaEvent_t end;
-
-//   timer(void)
-//   {
-//     cuda_safe_call(cudaEventCreate(&start));
-//     cuda_safe_call(cudaEventCreate(&end));
-//     restart();
-//   }
-
-//   ~timer(void)
-//   {
-//     cuda_safe_call(cudaEventDestroy(start));
-//     cuda_safe_call(cudaEventDestroy(end));
-//   }
-
-//   void restart(void)
-//   {
-//     cuda_safe_call(cudaEventRecord(start, 0));
-//   }
-
-//   double elapsed(void)
-//   {
-//     cuda_safe_call(cudaEventRecord(end, 0));
-//     cuda_safe_call(cudaEventSynchronize(end));
-
-//     float ms_elapsed;
-//     cuda_safe_call(cudaEventElapsedTime(&ms_elapsed, start, end));
-//     return ms_elapsed / 1e3;
-//   }
-
-//   double epsilon(void)
-//   {
-//     return 0.5e-6;
-//   }
-// };
-
 // ------------------------------------------------------------------
 // vec3i
 // ------------------------------------------------------------------
@@ -788,7 +749,7 @@ struct IsoExtractor {
     }
   }
 
-  inline int __device__ sign(float x) { return (x > 0.f) ? 1 : 0; }
+  inline int __device__ sign(float x) { return x > 0 ? 1 : -1; }
 
   inline float __device__ invlerp(float x1, float x2, float x)
   {
@@ -854,26 +815,26 @@ struct IsoExtractor {
           convertToWorldPos(v1, box);
           float v0_scalar = vertex[vert[0]].w;
           float v1_scalar = vertex[vert[1]].w;
-          if (d_searchers_size == 1)
           {
-            cstoneOctree::Vec3f temp_pos(0.0f, 0.0f, 0.0f);
-            float temp_scalar = 0.0f;
             float d = (v1 - v0).norm();
+            int count = 0;
             while (d > errorBound)
             {
-              temp_pos = (v0 + v1) / 2.0f;
-              temp_scalar = 0.0f;
+              count++;
+              cstoneOctree::Vec3f temp_pos = (v0 + v1) / 2.0f;
+              float temp_scalar = 0.0f;
+              int n_count = 0;
               for (int hgi = 0; hgi < d_searchers_size; hgi++)
               {
                 HashGridGPU* cur_searcher = d_searchers[hgi];
                 cstoneOctree::Vec3i xyzIdx;
-                int64_t neighbor_hash;
+                int64_t neighbor_hash = -1;
                 cur_searcher->CalcXYZIdx(temp_pos, xyzIdx);
-                for (int z = -1; z <= 2; z++)
+                for (int z = -1; z <= 1; z++)
                 {
-                    for (int y = -1; y <= 2; y++)
+                    for (int y = -1; y <= 1; y++)
                     {
-                        for (int x = -1; x <= 2; x++)
+                        for (int x = -1; x <= 1; x++)
                         {
                             neighbor_hash = cur_searcher->CalcCellHash((xyzIdx + cstoneOctree::Vec3i(x, y, z)));
                             if (neighbor_hash < 0) {continue;}
@@ -915,22 +876,13 @@ struct IsoExtractor {
                 break;
               }
               d /= 2.0f;
-              // d = (v1 - v0).norm();
             }
           }
           float t = invlerp(v0_scalar, v1_scalar, isoValue);
-          // float t = (isoValue - v0_scalar) / float(v1_scalar - v0_scalar);
           t = max(0.f, min(1.f, t));
-          // if (t < 0.1) {
-          //   triVertex[ii] = make_float4(v0.x, v0.y, v0.z, v0_scalar);
-          // } else if (t > 0.9) {
-          //   triVertex[ii] = make_float4(v1.x, v1.y, v1.z, v1_scalar);
-          // } else {
-            const float4 v0v = make_float4(v0.x, v0.y, v0.z, v0_scalar);
-            const float4 v1v = make_float4(v1.x, v1.y, v1.z, v1_scalar);
-            // triVertex[ii] = lerp(v0v, v1v, t);
-            triVertex[ii] = (1.f-t)*v0v+t*v1v;
-          // }
+          const float4 v0v = make_float4(v0.x, v0.y, v0.z, v0_scalar);
+          const float4 v1v = make_float4(v1.x, v1.y, v1.z, v1_scalar);
+          triVertex[ii] = (1.f-t)*v0v+t*v1v;
         }
   
         if (triVertex[1] == triVertex[0]) continue;
@@ -950,28 +902,18 @@ struct IsoExtractor {
 __global__ void parseInputGPU(
   uint64_t* d_mortons, 
   int d_iso_tree_size,
-  // cstoneOctree::Vec3f* d_centers,
   cstoneOctree::Vec3i* d_lowers,
   unsigned* d_levels,
   float* d_scalars,
   Cell* d_cells,
   unsigned* d_maxLevel
-  // vec3i* d_coordOrigin
 ) {
-  // vec3i bounds_lower(1<<30);
-  // vec3i bounds_upper(-(1<<30));
   const size_t threadID = threadIdx.x+size_t(blockDim.x)*blockIdx.x;
   if (threadID >= d_iso_tree_size) return;
-  // d_cells[threadID].center = make_float3(d_centers[threadID].x, d_centers[threadID].y, d_centers[threadID].z);
   d_cells[threadID].lower = vec3i(d_lowers[threadID].x, d_lowers[threadID].y, d_lowers[threadID].z);
   d_cells[threadID].level = d_levels[threadID];
   d_cells[threadID].scalar = d_scalars[threadID];
   d_maxLevel[0] = max(d_maxLevel[0], d_cells[threadID].level);
-  // bounds_lower = min(bounds_lower, d_cells[threadID].lower);
-  // bounds_upper = max(bounds_upper, d_cells[threadID].lower + vec3i(1 << d_cells[threadID].level));
-  // d_coordOrigin[0].x = min(d_coordOrigin[0].x, d_cells[threadID].lower.x);
-  // d_coordOrigin[0].y = min(d_coordOrigin[0].y, d_cells[threadID].lower.y);
-  // d_coordOrigin[0].z = min(d_coordOrigin[0].z, d_cells[threadID].lower.z);
 }
 
 
@@ -1230,16 +1172,7 @@ void generateIso(
     // ==================================================================
     // step 3: create vertex array
     // ==================================================================
-    // thrust::host_vector<TriangleVertex> h_triangleVertices = d_triangleVertices;
-    // std::ofstream out("D:/data/test.csv",std::ios::binary);
-    // out.precision(10);
-    // out << "x,y,z" << std::endl;
-    // for (int i=0;i<h_triangleVertices.size();i++)
-    //   out << h_triangleVertices[i].position.x << ","
-    //       << h_triangleVertices[i].position.y << ","
-    //       << h_triangleVertices[i].position.z << std::endl;
-    // out.close();
-    // std::cout << "#triangle vertices written to file" << std::endl;
+
     // ------------------------------------------------------------------
     // step 3a: sort vertex array
     // ------------------------------------------------------------------
@@ -1326,15 +1259,13 @@ void generateIsoDirectGPU(
   const int d_iso_tree_size,
   HashGridGPU** d_searchers, int d_searchers_size, EvaluatorGPU* d_evaluator,
   const float isoValue, const float errorBound, 
-  cstoneOctree::Box* d_box,
+  cstoneOctree::Box* d_box, cstoneOctree::Box* h_box,
   Mesh* mesh
 ) {
   std::cout << "ErrorBound: " << errorBound << std::endl;
   // thrust::host_vector<Cell>  h_cells;
   thrust::device_vector<Cell>  d_cells(d_iso_tree_size);
   thrust::device_vector<unsigned> d_maxLevel(1, 0);
-  // thrust::device_vector<vec3i> d_coordOrigin(1, vec3i(1<<30));
-  // vec3i coordOrigin = parseInput(mortons, lowers, levels, scalars, h_cells, maxLevel);
   {
     size_t numJobs = d_iso_tree_size;
     int blockSize = 512;
@@ -1343,26 +1274,18 @@ void generateIsoDirectGPU(
     (
         thrust::raw_pointer_cast(d_mortons.data()), 
         d_iso_tree_size,
-        // thrust::raw_pointer_cast(d_centers.data()),
         thrust::raw_pointer_cast(d_lowers.data()),
         thrust::raw_pointer_cast(d_levels.data()),
         thrust::raw_pointer_cast(d_scalars.data()),
         thrust::raw_pointer_cast(d_cells.data()),
         thrust::raw_pointer_cast(d_maxLevel.data())
-        // thrust::raw_pointer_cast(d_coordOrigin.data())
     );
   }
   cudaDeviceSynchronize();
   thrust::host_vector<unsigned> h_maxLevel = d_maxLevel;
-  // thrust::host_vector<vec3i> h_coordOrigin = d_coordOrigin;
-  // h_coordOrigin[0].x &= ~((1<<h_maxLevel[0])-1);
-  // h_coordOrigin[0].y &= ~((1<<h_maxLevel[0])-1);
-  // h_coordOrigin[0].z &= ~((1<<h_maxLevel[0])-1);
   unsigned maxLevel = h_maxLevel[0];
   vec3i coordOrigin(0, 0, 0);
   std::cout << "maxLevel: " << maxLevel << std::endl;
-  // std::cout << "coord origin: " << coordOrigin << std::endl;
-  // thrust::device_vector<Cell> d_cells = h_cells;
   std::cout << "#cells&mortons uploaded" << std::endl;
   thrust::device_vector<Morton> d_ingo_mortons(d_cells.size());
   {
@@ -1391,8 +1314,6 @@ void generateIsoDirectGPU(
       size_t numJobs   = 8 * d_iso_tree_size;
       int blockSize = 512;
       int numBlocks = (numJobs+blockSize-1)/blockSize;
-      // dim3 grid(1024,divUp(numBlocks,1024));
-      // std::cout << "launching with grid " << grid.x << " " << grid.y << " blocksize " << blockSize << std::endl;
       extractTriangles<<<numBlocks,blockSize>>>
       (
           thrust::raw_pointer_cast(d_ingo_mortons.data()),
@@ -1402,9 +1323,6 @@ void generateIsoDirectGPU(
           maxLevel,
           isoValue,
           thrust::raw_pointer_cast(d_triangleVertices.data()),d_triangleVertices.size(),
-          // d_searchers, d_searchers_size, d_evaluator,
-          // false, errorBound, 
-          // d_box,
           thrust::raw_pointer_cast(d_atomicCounter.data())
       );
   }
@@ -1447,22 +1365,6 @@ void generateIsoDirectGPU(
   // ==================================================================
   // step 3: create vertex array
   // ==================================================================
-  // thrust::host_vector<TriangleVertex> h_triangleVertices = d_triangleVertices;
-  // std::ofstream out("D:/data/test.csv",std::ios::binary);
-  // out.precision(10);
-  // out << "x,y,z" << std::endl;
-  // for (int i=0;i<h_triangleVertices.size();i++) {
-  //   // if (h_triangleVertices[i].position.x == 0.f && 
-  //   //     h_triangleVertices[i].position.y == 0.f && 
-  //   //     h_triangleVertices[i].position.z == 0.f)
-  //   // {
-  //   //   printf("h_triangleVertices[%d] = %f %f %f\n", i, h_triangleVertices[i].position.x, h_triangleVertices[i].position.y, h_triangleVertices[i].position.z);
-  //   // }
-  //   out << h_triangleVertices[i].position.x << ","
-  //       << h_triangleVertices[i].position.y << ","
-  //       << h_triangleVertices[i].position.z << std::endl;
-  // }
-  // out.close();
   std::cout << "#triangle vertices written to file" << std::endl;
   // ------------------------------------------------------------------
   // step 3a: sort vertex array
@@ -1540,198 +1442,5 @@ void generateIsoDirectGPU(
   }
   mesh->trianglesNum = mesh->tris.size();
 }
-
-// int main(int ac, char **av)
-// {
-//   if (ac != 5)
-//     throw std::runtime_error("cudaAmrIso in.cells in.scalars isoValue outFile.obj");
-  
-//   const std::string cellFileName   = av[1];
-//   const std::string scalarFileName = av[2];
-//   const float isoValue             = std::stof(av[3]);
-//   const std::string outFileName    = av[4];
-  
-//   int maxLevel=0;
-//   thrust::host_vector<Cell>  h_cells;
-//   timer time;
-//   const vec3i coordOrigin = readInput(h_cells,maxLevel,cellFileName,scalarFileName);
-//   std::cout << "#input read, took " << time.elapsed() << "s" << std::endl;
-//   timer totalRuntime;
-  
-//   // ------------------------------------------------------------------
-//   // step 1: upload cells to device, and sort
-//   // ------------------------------------------------------------------
-//   time.restart();
-//   thrust::device_vector<Cell> d_cells = h_cells;
-//   cudaDeviceSynchronize();
-//   std::cout << "#cells uploaded, took " << time.elapsed() << "s" << std::endl;
-
-//   time.restart();
-// #if EXPLICIT_MORTON
-//   thrust::device_vector<Morton> d_mortonArray(h_cells.size());
-//   {
-//     size_t numJobs   = h_cells.size();
-//     int blockSize = 512;
-//     int numBlocks = (numJobs+blockSize-1)/blockSize;
-//     buildMortonArray<<<numBlocks,blockSize>>>
-//       (thrust::raw_pointer_cast(d_mortonArray.data()),
-//        coordOrigin,
-//        thrust::raw_pointer_cast(d_cells.data()),
-//        d_cells.size());
-//   }
-//   cudaDeviceSynchronize();
-//   thrust::sort(d_mortonArray.begin(), d_mortonArray.end(), CompareMorton());
-// #else
-//   thrust::sort(d_cells.begin(), d_cells.end(), CompareByCoordsLowerOnly(coordOrigin));
-// #endif
-//   cudaDeviceSynchronize();
-//   std::cout << "#sorted, took " << time.elapsed() << "s" << std::endl;
-
-//   // ------------------------------------------------------------------
-//   // step 2a: run triangle extraction, count triangles
-//   // ------------------------------------------------------------------
-//   thrust::device_vector<int> d_atomicCounter(1);
-//   thrust::device_vector<TriangleVertex> d_triangleVertices(0);
-
-//   time.restart();
-//   {
-//     d_atomicCounter[0] = 0;
-//     size_t numJobs   = 8 * h_cells.size();
-//     int blockSize = 512;
-//     int numBlocks = (numJobs+blockSize-1)/blockSize;
-//     // dim3 grid(1024,divUp(numBlocks,1024));
-//     // std::cout << "launching with grid " << grid.x << " " << grid.y << " blocksize " << blockSize << std::endl;
-//     extractTriangles<<<numBlocks,blockSize>>>
-//       (
-// #if EXPLICIT_MORTON
-//        thrust::raw_pointer_cast(d_mortonArray.data()),
-// #endif
-//        coordOrigin,
-//        thrust::raw_pointer_cast(d_cells.data()),
-//        d_cells.size(),
-//        maxLevel,
-//        isoValue,
-//        thrust::raw_pointer_cast(d_triangleVertices.data()),d_triangleVertices.size(),
-//        thrust::raw_pointer_cast(d_atomicCounter.data())
-//        );
-//   }
-//   cudaDeviceSynchronize();
-//   std::cout << "#first pass for counting done, took " << time.elapsed() << "s" << std::endl;
-
-//   // ------------------------------------------------------------------
-//   // step 2b: allocate output array, and rerun, this time writing tris
-//   // ------------------------------------------------------------------
-//   int numTriangles = d_atomicCounter[0];
-//   std::cout << "expecting num triangles = " << numTriangles << std::endl;
-//   d_triangleVertices.resize(3*numTriangles);
-
-//   time.restart();
-//   {
-//     d_atomicCounter[0] = 0;
-//     size_t numJobs = 8 * h_cells.size();
-//     int blockSize  = 512;
-//     int numBlocks  = (numJobs+blockSize-1)/blockSize;
-//     extractTriangles<<<numBlocks,//dim3(1024,divUp(numBlocks,1024)),
-//       blockSize>>>
-//       (
-// #if EXPLICIT_MORTON
-//        thrust::raw_pointer_cast(d_mortonArray.data()),
-// #endif
-//        coordOrigin,
-//        thrust::raw_pointer_cast(d_cells.data()),
-//        d_cells.size(),
-//        maxLevel,
-//        isoValue,
-//        thrust::raw_pointer_cast(d_triangleVertices.data()),d_triangleVertices.size(),
-//        thrust::raw_pointer_cast(d_atomicCounter.data())
-//       );
-//   }
-//   cudaDeviceSynchronize();
-//   std::cout << "#first pass for actual generation, took " << time.elapsed() << "s" << std::endl;
-
-//   // ==================================================================
-//   // step 3: create vertex array
-//   // ==================================================================
-  
-//   // ------------------------------------------------------------------
-//   // step 3a: sort vertex array
-//   // ------------------------------------------------------------------
-//   time.restart();
-//   thrust::sort(d_triangleVertices.begin(), d_triangleVertices.end(), CompareVertices());
-//   cudaDeviceSynchronize();
-//   std::cout << "#sorted vertices, took " << time.elapsed() << "s" << std::endl;
-  
-//   // ------------------------------------------------------------------
-//   // step 3b: count unique vertices
-//   // ------------------------------------------------------------------
-//   thrust::device_vector<float3> d_vertexArray(0);
-//   thrust::device_vector<int3>   d_indexArray(numTriangles);
-//   {
-//     d_atomicCounter[0] = 0;
-//     int numJobs   = 3*numTriangles;
-//     int blockSize = 512;
-//     int numBlocks = (numJobs+blockSize-1)/blockSize;
-//     createVertexArray<<<numBlocks,blockSize>>>
-//       (thrust::raw_pointer_cast(d_atomicCounter.data()),
-//        thrust::raw_pointer_cast(d_triangleVertices.data()),
-//        d_triangleVertices.size(),
-//        thrust::raw_pointer_cast(d_vertexArray.data()),
-//        d_vertexArray.size(),
-//        thrust::raw_pointer_cast(d_indexArray.data())
-//        );
-//   }
-//   cudaDeviceSynchronize();
-//   std::cout << "#counted unique vertices, took " << time.elapsed() << "s" << std::endl;
-
-//   int numVertices = d_atomicCounter[0];
-//   std::cout << "expecting num vertices " << numVertices << std::endl;
-
-//   // ------------------------------------------------------------------
-//   // step 3c: writing vertices
-//   // ------------------------------------------------------------------
-//   d_vertexArray.resize(numVertices);
-//   {
-//     d_atomicCounter[0] = 0;
-//     int numJobs   = 3*numTriangles;
-//     int blockSize = 512;
-//     int numBlocks = (numJobs+blockSize-1)/blockSize;
-//     createVertexArray<<<numBlocks,blockSize>>>
-//       (thrust::raw_pointer_cast(d_atomicCounter.data()),
-//        thrust::raw_pointer_cast(d_triangleVertices.data()),
-//        d_triangleVertices.size(),
-//        thrust::raw_pointer_cast(d_vertexArray.data()),
-//        d_vertexArray.size(),
-//        thrust::raw_pointer_cast(d_indexArray.data())
-//        );
-//   }
-//   cudaDeviceSynchronize();
-//   std::cout << "#generated vertex and index array, took " << time.elapsed() << "s" << std::endl;
-
-//   std::cout << "total runtime from upload to download : " << totalRuntime.elapsed()
-//             << "s" << std::endl;
-
-//   // ------------------------------------------------------------------
-//   // step 4: download and write out
-//   // ------------------------------------------------------------------
-//   std::ofstream out(outFileName,std::ios::binary);
-// out.precision(10);
-//   thrust::host_vector<float3> h_vertexArray = d_vertexArray;
-//   thrust::host_vector<int3>   h_indexArray = d_indexArray;
-//   out << "# iso-surface generated by cudaAmrIso tool:" << std::endl;
-//   out << "# num vertices " << h_vertexArray.size() << std::endl;
-//   out << "# num triangles " << h_indexArray.size() << std::endl;
-//   for (int i=0;i<h_vertexArray.size();i++)
-//     out << "v "
-//         << h_vertexArray[i].x << " "
-//         << h_vertexArray[i].y << " "
-//         << h_vertexArray[i].z << std::endl;
-//   for (int i=0;i<h_indexArray.size();i++)
-//     out << "f "
-//         << (h_indexArray[i].x+1) << " "
-//         << (h_indexArray[i].y+1) << " "
-//         << (h_indexArray[i].z+1) << std::endl;
-//   return 0;
-// }
-
 }
 

@@ -30,7 +30,6 @@ __global__ void estimateTotalInfluenceParticlesKernel(uint64_t* d_iso_tree, int 
 	Vec3f box2 = center + Vec3f(d_iso_sizes[tid].x, d_iso_sizes[tid].y, d_iso_sizes[tid].z);
 	for(int i = 0; i < d_searchers_size; i++){
 		HashGridGPU* cur_searcher = d_searchers[i];
-		// printf("cur_searcher's d_IndexList[0]: %d\n", cur_searcher->d_IndexList[0]);
 		cur_searcher->GetInBoxEstimateGPU(box1, box2, d_estimateNeighborsNums[tid]);
 	}
 	
@@ -49,8 +48,6 @@ __global__ void calculateSplitsKernel(uint64_t* d_iso_tree, int d_iso_tree_size,
 	Vec3f center = d_iso_centers[tid];
 	Vec3f box1 = center - Vec3f(d_iso_sizes[tid].x, d_iso_sizes[tid].y, d_iso_sizes[tid].z);
 	Vec3f box2 = center + Vec3f(d_iso_sizes[tid].x, d_iso_sizes[tid].y, d_iso_sizes[tid].z);
-	// int curr_d_estimateNeighborsNumsBeginIdx = tid * d_searchers_size;
-	// int curr_d_estimateNeighborsNumsEndIdx = tid * d_searchers_size + d_searchers_size;
 	int d_particlesBeginIdx = d_estimateNeighborsNumsLayout[tid];
 	
 	int tmp_numNeighbors = 0;
@@ -60,9 +57,7 @@ __global__ void calculateSplitsKernel(uint64_t* d_iso_tree, int d_iso_tree_size,
 	}
 	float minRadius = FLT_MAX;
 	bool empty = true;
-	// printf("iso_value = %f\n", d_evaluator->d_ISO_VALUE);
 	float curv = d_evaluator->EvalInNodeCurv(box1, box2, tmp_numNeighbors, d_totalInsideParticlesIdx + d_particlesBeginIdx, minRadius, empty);
-	// printf("curv = %f\n", curv);
 	if (empty) {
 		d_iso_scalars[tid] = d_evaluator->d_ISO_VALUE;
 		d_iso_nodeOps[tid] = 1;
@@ -96,19 +91,13 @@ __global__ void calculateSplitsKernel(uint64_t* d_iso_tree, int d_iso_tree_size,
 
 void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 	timer t;
-
+	useCPU = false;
 	printf("-= Box =-\n");
 	loadRootBox(*std::max_element(_GlobalRadiuses.begin(), _GlobalRadiuses.end()));
 
 	int particles_size = _GlobalParticles.size();
 	printf("-= Build Neighbor Searcher =-\n");
-	// if (IS_CONST_RADIUS)
-	// {
-    	// _hashgrid = std::make_shared<HashGrid>(&_GlobalParticles, _BoundingBox, _RADIUS, 4.0f);
-	// } else {
-	useCPU = false;
     _searcherGPU = std::make_shared<MultiLevelSearcherGPU>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
-	// }
 	printf("   Build Neighbor Searcher Time = %f \n", t.elapsed());
 	t.reset();
 
@@ -120,11 +109,6 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 	printf("   Initialize Evaluator Time = %f \n", t.elapsed());
 	t.reset();
 	printf("-= Resize Box =-\n");
-	// if (IS_CONST_RADIUS)
-	// {
-	// 	resizeRootBoxConstR();
-	// } else {
-	// }
 	resizeRootBoxVarR();
 	printf("   MAX_DEPTH = %d, MIN_DEPTH = %d\n", _DEPTH_MAX, _DEPTH_MIN);
 
@@ -162,7 +146,6 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 	
 	cstoneOctree::Box box(_BoundingBox[0], _BoundingBox[1], _BoundingBox[2], 
 						  _BoundingBox[3], _BoundingBox[4], _BoundingBox[5]);
-	// std::cout << "box: " << box.xmin() << ", " << box.xmax() << ", " << box.ymin() << ", " << box.ymax() << ", " << box.zmin() << ", " << box.zmax() << std::endl;
 	cstoneOctree::Box* d_box;
 	cudaMalloc(&d_box, sizeof(cstoneOctree::Box));
 	cudaMemcpy(d_box, &box, sizeof(cstoneOctree::Box), cudaMemcpyHostToDevice);
@@ -209,64 +192,51 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
         // ----------------------- begin split calculation ---------------------------
 		int newInternalNodes = 0;
 		uint64_t iso_allOpsSum = 0;
-		// if (iso_count < _DEPTH_MIN)
-		// {
-		// 	for(int i = 0; i < iso_nodeOps.size() - 1; i++){
-		// 		iso_nodeOps[i] = 8;
-		// 		newInternalNodes += 8;
-		// 	}
-		// 	iso_allOpsSum = std::accumulate(iso_nodeOps.begin(), iso_nodeOps.end(), 0);
-		// } else {
-			// estimate total number of searched particles through each octree node
-			thrust::host_vector<int> estimateNeighborsNums(d_iso_tree_size, 0);
-			thrust::device_vector<int> d_estimateNeighborsNums(estimateNeighborsNums);
-			int* d_estimateNeighborsNumPtr = thrust::raw_pointer_cast(d_estimateNeighborsNums.data());
-			// calculate the estimate neighbors number for each octree node
-			estimateTotalInfluenceParticlesKernel<<<isoTreeConfig.blocks, isoTreeConfig.threads>>>(d_iso_treePtr, d_iso_tree_size,
-																									d_iso_centersPtr, d_iso_sizesPtr,
-																									d_searcher, HashGridGPUs_size,
-																									d_estimateNeighborsNumPtr);
-			cudaError_t err = cudaGetLastError();
-			if (err != cudaSuccess) {
-				std::cerr << "Kernel error: " << cudaGetErrorString(err) << std::endl;
+		// estimate total number of searched particles through each octree node
+		thrust::host_vector<int> estimateNeighborsNums(d_iso_tree_size, 0);
+		thrust::device_vector<int> d_estimateNeighborsNums(estimateNeighborsNums);
+		int* d_estimateNeighborsNumPtr = thrust::raw_pointer_cast(d_estimateNeighborsNums.data());
+		// calculate the estimate neighbors number for each octree node
+		estimateTotalInfluenceParticlesKernel<<<isoTreeConfig.blocks, isoTreeConfig.threads>>>(d_iso_treePtr, d_iso_tree_size,
+																								d_iso_centersPtr, d_iso_sizesPtr,
+																								d_searcher, HashGridGPUs_size,
+																								d_estimateNeighborsNumPtr);
+		cudaError_t err = cudaGetLastError();
+		if (err != cudaSuccess) {
+			std::cerr << "Kernel error: " << cudaGetErrorString(err) << std::endl;
+		}
+		cudaDeviceSynchronize();
+		std::cout << "estimate neighbors number calculation done" << std::endl;
+		estimateNeighborsNums = d_estimateNeighborsNums;
+		int total_estimateNeighborsNum = std::accumulate(estimateNeighborsNums.begin(), estimateNeighborsNums.end(), 0);
+		thrust::device_vector<int> d_totalInsideParticlesIdx(total_estimateNeighborsNum, -1);
+		thrust::host_vector<int> estimateNeighborsNumsLayout(estimateNeighborsNums.size(), 0);
+		thrust::exclusive_scan(estimateNeighborsNums.begin(), estimateNeighborsNums.end(), estimateNeighborsNumsLayout.begin(), 0);
+		thrust::device_vector<int> d_estimateNeighborsNumsLayout(estimateNeighborsNumsLayout);
+		int* d_estimateNeighborsNumsLayoutPtr = thrust::raw_pointer_cast(d_estimateNeighborsNumsLayout.data());
+		calculateSplitsKernel<<<isoTreeConfig.blocks, isoTreeConfig.threads>>>(d_iso_treePtr, d_iso_tree_size, d_iso_depthsPtr, 
+																				   thrust::raw_pointer_cast(d_scalars.data()), 
+																				d_iso_centersPtr, d_iso_sizesPtr,
+																				d_searcher, HashGridGPUs_size, _DEPTH_MIN, _DEPTH_MAX,
+																				d_evaluator,
+																				d_estimateNeighborsNumPtr, d_estimateNeighborsNumsLayoutPtr,
+																				thrust::raw_pointer_cast(d_totalInsideParticlesIdx.data()),
+																				thrust::raw_pointer_cast(d_iso_nodeOps.data()));
+		cudaDeviceSynchronize();
+		thrust::host_vector<int> totalInsidesParticlesIdx = d_totalInsideParticlesIdx;
+		iso_scalars = d_scalars;
+		iso_nodeOps = d_iso_nodeOps;
+		iso_allOpsSum = std::accumulate(iso_nodeOps.begin(), iso_nodeOps.end(), 0);
+		for(int i = 0; i < iso_nodeOps.size() - 1; i++){
+			int val = iso_nodeOps[i] - 1;
+			if(val != 0 && val != 7){
+				std::cout << "error in iso_nodeOps, " << i << "th value is " << val << std::endl;
 			}
-			cudaDeviceSynchronize();
-			std::cout << "estimate neighbors number calculation done" << std::endl;
-			estimateNeighborsNums = d_estimateNeighborsNums;
-			// for(int i = 0; i < estimateNeighborsNums.size(); i++){
-			// 	int val = estimateNeighborsNums[i];
-			// 	std::cout << "estimateNeighborsNums[" << i << "] = " << val << std::endl;
-			// }
-			int total_estimateNeighborsNum = std::accumulate(estimateNeighborsNums.begin(), estimateNeighborsNums.end(), 0);
-			thrust::device_vector<int> d_totalInsideParticlesIdx(total_estimateNeighborsNum, -1);
-			thrust::host_vector<int> estimateNeighborsNumsLayout(estimateNeighborsNums.size(), 0);
-			thrust::exclusive_scan(estimateNeighborsNums.begin(), estimateNeighborsNums.end(), estimateNeighborsNumsLayout.begin(), 0);
-			thrust::device_vector<int> d_estimateNeighborsNumsLayout(estimateNeighborsNumsLayout);
-			int* d_estimateNeighborsNumsLayoutPtr = thrust::raw_pointer_cast(d_estimateNeighborsNumsLayout.data());
-			calculateSplitsKernel<<<isoTreeConfig.blocks, isoTreeConfig.threads>>>(d_iso_treePtr, d_iso_tree_size, d_iso_depthsPtr, 
-																					   thrust::raw_pointer_cast(d_scalars.data()), 
-																					d_iso_centersPtr, d_iso_sizesPtr,
-																					d_searcher, HashGridGPUs_size, _DEPTH_MIN, _DEPTH_MAX,
-																					d_evaluator,
-																					d_estimateNeighborsNumPtr, d_estimateNeighborsNumsLayoutPtr,
-																					thrust::raw_pointer_cast(d_totalInsideParticlesIdx.data()),
-																					thrust::raw_pointer_cast(d_iso_nodeOps.data()));
-			cudaDeviceSynchronize();
-			thrust::host_vector<int> totalInsidesParticlesIdx = d_totalInsideParticlesIdx;
-			iso_scalars = d_scalars;
-			iso_nodeOps = d_iso_nodeOps;
-			iso_allOpsSum = std::accumulate(iso_nodeOps.begin(), iso_nodeOps.end(), 0);
-			for(int i = 0; i < iso_nodeOps.size() - 1; i++){
-				int val = iso_nodeOps[i] - 1;
-				if(val != 0 && val != 7){
-					std::cout << "error in iso_nodeOps, " << i << "th value is " << val << std::endl;
-				}
-				if (iso_nodeOps[i] == 8)
-				{
-					newInternalNodes += 8;
-				}
+			if (iso_nodeOps[i] == 8)
+			{
+				newInternalNodes += 8;
 			}
-		// }
+		}
 		std::cout << "iso_allOpsSum = " << iso_allOpsSum << std::endl;
 		std::cout << "newInternalNodes = " << newInternalNodes << std::endl;
 		std::exclusive_scan(iso_nodeOps.begin(), iso_nodeOps.end(), iso_nodeOpsLayout.begin(), 0);
@@ -282,28 +252,21 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 		iso_count++;
 		if(iso_allOpsSum == iso_nodeOps.size() - 1) break;
     }
-	// std::vector<Vec3i> iso_lowers(iso_tree.size() - 1);
-	// std::vector<unsigned> iso_levels(iso_tree.size() - 1);
 	thrust::device_vector<uint64_t> d_iso_tree(iso_tree);
 	int d_iso_tree_size = d_iso_tree.size() - 1;
 	DeviceConfig isoTreeConfig(d_iso_tree_size);
-	// thrust::device_vector<Vec3f> d_iso_centers(d_iso_tree_size);
 	thrust::device_vector<Vec3i> d_iso_lowers(d_iso_tree_size);
 	thrust::device_vector<unsigned> d_iso_levels(d_iso_tree_size);
-	// calculateLeavesLowersAndLevelsCPU(iso_tree, iso_lowers, iso_levels);
 	calculateLeavesLowersAndLevelsKernel<<<isoTreeConfig.blocks, isoTreeConfig.threads>>>(thrust::raw_pointer_cast(d_iso_tree.data()), d_iso_tree_size,
-																						//   thrust::raw_pointer_cast(d_iso_centers.data()),
 																						  thrust::raw_pointer_cast(d_iso_lowers.data()),
 																						  thrust::raw_pointer_cast(d_iso_levels.data())
-																						//   , d_box
 																						);
 	thrust::device_vector<float> d_scalars(iso_scalars);
 	iso::generateIsoDirectGPU(d_iso_tree
-		// , d_iso_centers
 		, d_iso_lowers, d_iso_levels, d_scalars, d_iso_tree_size, 
 		d_searcher, HashGridGPUs_size, d_evaluator, 
 		0.0, _searcherGPU->minRadius,
-		d_box, 
+		d_box, &box,
 		_OurMesh
 	);
 	if (GEN_SPLASH)
@@ -329,6 +292,5 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 			_OurMesh->AppendSplash_VarR(splash_pos, splash_radiuses);
 		}
 	}
-	// printf("Time generating polygons = %f\n", t_gen_mesh.elapsed());
 	std::cout << "Time generating polygons;" << std::endl;
 }
