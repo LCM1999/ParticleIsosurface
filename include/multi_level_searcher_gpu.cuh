@@ -89,7 +89,7 @@ struct MultiLevelSearcherGPU
         // assign data to h_searchers
         for(int i = 0; i < searchers.size(); i++){
             HashGridGPU* d_searcher_ptr;
-            cudaMalloc(&d_searcher_ptr, sizeof(HashGridGPU));
+            cudaMalloc(reinterpret_cast<void**>(&d_searcher_ptr), sizeof(HashGridGPU));
             cudaMemcpy(&(d_searcher_ptr->CellSize), &(searchers[i]->CellSize), sizeof(float), cudaMemcpyHostToDevice);
             cudaMemcpy(&(d_searcher_ptr->Bounding), &(searchers[i]->Bounding), sizeof(float) * 6, cudaMemcpyHostToDevice);
             cudaMemcpy(&(d_searcher_ptr->XYZCellNum), &(searchers[i]->XYZCellNum), sizeof(uint64_t) * 3, cudaMemcpyHostToDevice);

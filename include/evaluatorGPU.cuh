@@ -38,6 +38,7 @@ struct EvaluatorGPU
 
     EvaluatorGPU(const Evaluator& evaluartor)
     {
+
         d_NEIGHBOR_FACTOR = evaluartor._NEIGHBOR_FACTOR;
         d_SMOOTH_FACTOR = evaluartor._SMOOTH_FACTOR;
         d_ISO_FACTOR = evaluartor._ISO_FACTOR;
