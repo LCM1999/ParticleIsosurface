@@ -19,6 +19,56 @@
 using namespace cal;
 using namespace cstoneOctree;
 
+
+__global__ void calculateParticlesNormalsKernel(HashGridGPU** d_searchers
+												, int d_searchers_size
+												, EvaluatorGPU* d_evaluator)
+{
+	int tid = blockIdx.x * blockDim.x + threadIdx.x;
+	if (tid >= d_evaluator->d_GlobalParticlesNum) return;
+	cstoneOctree::Vec3f pos = d_evaluator->d_GlobalxMeans[tid];
+	cstoneOctree::Vec3f normal = cstoneOctree::Vec3f(0.0f);
+	for (int hgi = 0; hgi < d_searchers_size; hgi++)
+	{
+		HashGridGPU* cur_searcher = d_searchers[hgi];
+        cstoneOctree::Vec3i xyzIdx;
+        int64_t neighbor_hash = -1;
+        cur_searcher->CalcXYZIdx(pos, xyzIdx);
+        for (int z = -1; z <= 1; z++)
+        {
+            for (int y = -1; y <= 1; y++)
+            {
+                for (int x = -1; x <= 1; x++)
+                {
+                    neighbor_hash = cur_searcher->CalcCellHash((xyzIdx + cstoneOctree::Vec3i(x, y, z)));
+                    if (neighbor_hash < 0) {continue;}
+                    int countIndex, startIndex, endIndex;
+                    if ((cur_searcher->d_StartList[neighbor_hash] >= 0) && (cur_searcher->d_EndList[neighbor_hash] >= 0))
+                    {
+                        startIndex = cur_searcher->d_StartList[neighbor_hash];
+                        endIndex = cur_searcher->d_EndList[neighbor_hash];
+                    }
+                    else
+                    {
+                        continue;
+                    }
+                    for (int countIndex = startIndex; countIndex < endIndex; countIndex++)
+                    {
+                        int pId = cur_searcher->d_PIndexes[cur_searcher->d_IndexList[countIndex]];
+                        if (d_evaluator->CheckSplash(pId))
+                        {
+                            continue;
+                        }
+                        cstoneOctree::Vec3f diff = pos - d_evaluator->d_GlobalxMeans[pId];
+                        normal += d_evaluator->AnisotropicInterpolateGrad(pId, diff);
+                    }
+                }
+            }
+        }
+	}
+	d_evaluator->d_PariclesNormals[tid] = normal;
+}
+
 __global__ void estimateTotalInfluenceParticlesKernel(uint64_t* d_iso_tree, int d_iso_tree_size,
 		                                              Vec3f* d_iso_centers, Vec3f* d_iso_sizes,
 													  HashGridGPU** d_searchers, int d_searchers_size,
@@ -117,12 +167,12 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 	
 	_evaluator->RecommendIsoValueVarR();
     printf("   Recommend Iso Value = %f\n", _evaluator->getIsoValue());
-	if (CALC_P_NORMAL)
-	{
-		_evaluator->CalcParticlesNormal();
-		printf("   Calculate Particals Normal Time = %f\n", t.elapsed());
-		t.reset();
-	}
+	// if (CALC_P_NORMAL)
+	// {
+	// 	_evaluator->CalcParticlesNormal();
+	// 	printf("   Calculate Particals Normal Time = %f\n", t.elapsed());
+	// 	t.reset();
+	// }
 
 	// for each resolution particles level, calculate each estimate neighbors number for each octree node
 	int HashGridGPUs_size = _searcherGPU->h_searchers.size();
@@ -166,6 +216,13 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 	uint64_t* d_mortonCodesPtr = thrust::raw_pointer_cast(d_mortonCodes.data());
 	cstoneOctree::Vec3f* d_GlobalParticlesPtr = thrust::raw_pointer_cast(d_GlobalParticles.data());
 	DeviceConfig cudaConfig(particles_size);
+	{
+		t.reset();
+		calculateParticlesNormalsKernel<<<cudaConfig.blocks, cudaConfig.threads>>>(d_searcher, HashGridGPUs_size, d_evaluator);
+		cudaDeviceSynchronize();
+		printf("   Calculate Particals Normal Time = %f\n", t.elapsed());
+		t.reset();
+	}
 	calMortonCodeGPUKenrel<<<cudaConfig.blocks, cudaConfig.threads>>>(d_GlobalParticlesPtr, d_mortonCodesPtr, d_box, particles_size);
 	cudaDeviceSynchronize();
 

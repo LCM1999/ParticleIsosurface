@@ -38,7 +38,6 @@ struct EvaluatorGPU
 
     EvaluatorGPU(const Evaluator& evaluartor)
     {
-
         d_NEIGHBOR_FACTOR = evaluartor._NEIGHBOR_FACTOR;
         d_SMOOTH_FACTOR = evaluartor._SMOOTH_FACTOR;
         d_ISO_FACTOR = evaluartor._ISO_FACTOR;
@@ -58,7 +57,10 @@ struct EvaluatorGPU
         cudaMemcpy(d_GlobalInflunce2, evaluartor.GlobalInflunce2.data(), sizeof(float) * d_GlobalParticlesNum, cudaMemcpyHostToDevice);
         cudaMemcpy(d_GlobalSigma, evaluartor.GlobalSigma.data(), sizeof(float) * d_GlobalParticlesNum, cudaMemcpyHostToDevice);
         cudaMemcpy(d_GlobalSplash, evaluartor.GlobalSplash.data(), sizeof(char) * d_GlobalParticlesNum, cudaMemcpyHostToDevice);
-        cudaMemcpy(d_PariclesNormals, evaluartor.PariclesNormals.data(), sizeof(cstoneOctree::Vec3f) * d_GlobalParticlesNum, cudaMemcpyHostToDevice);
+        if (!evaluartor.PariclesNormals.empty())
+        {
+            cudaMemcpy(d_PariclesNormals, evaluartor.PariclesNormals.data(), sizeof(cstoneOctree::Vec3f) * d_GlobalParticlesNum, cudaMemcpyHostToDevice);
+        }
         cudaMemcpy(d_GlobalxMeans, evaluartor.GlobalxMeans.data(), sizeof(cstoneOctree::Vec3f) * d_GlobalParticlesNum, cudaMemcpyHostToDevice);
         cudaMemcpy(d_GlobalGs, evaluartor.GlobalGs.data(), sizeof(cstoneOctree::Mat3f) * d_GlobalParticlesNum, cudaMemcpyHostToDevice);
         cudaMemcpy(d_GlobalDeterminant, evaluartor.GlobalDeterminant.data(), sizeof(float) * d_GlobalParticlesNum, cudaMemcpyHostToDevice);
@@ -81,6 +83,14 @@ struct EvaluatorGPU
         return p_dist * sigma;
     };
 
+    DEVICE cstoneOctree::Vec3f poly6_gradient_kernel(float d2, float h2, float sigma, const Vec3f diff) {
+        Vec3f grad;
+        grad[0] = sigma * (-6 * diff[0]) * (d2 > h2 ? 0.0f : ((h2 - d2) * (h2 - d2)));
+        grad[1] = sigma * (-6 * diff[1]) * (d2 > h2 ? 0.0f : ((h2 - d2) * (h2 - d2)));
+        grad[2] = sigma * (-6 * diff[2]) * (d2 > h2 ? 0.0f : ((h2 - d2) * (h2 - d2)));
+        return grad;
+    }
+
     DEVICE float AnisotropicInterpolate(const int pIdx, const cstoneOctree::Vec3f diff) {
         float k_value;
         k_value = poly6_kernel(
@@ -89,6 +99,15 @@ struct EvaluatorGPU
             (d_GlobalSigma[pIdx]));
         return (d_GlobalDeterminant[pIdx] * k_value);
     };
+
+    DEVICE cstoneOctree::Vec3f AnisotropicInterpolateGrad(const int pIdx, const Vec3f diff) {
+        Vec3f grad = poly6_gradient_kernel(
+            (d_GlobalGs[pIdx] * diff).squaredNorm(), 
+            (d_GlobalInflunce2[pIdx]), 
+            (d_GlobalSigma[pIdx]), 
+            (d_GlobalGs[pIdx] * diff));
+        return (grad * d_GlobalDeterminant[pIdx]); 
+    }
 
     DEVICE bool CheckSplash(const int& pIdx) {
         if (d_GlobalSplash[pIdx])
