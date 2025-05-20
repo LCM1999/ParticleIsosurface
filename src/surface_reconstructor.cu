@@ -139,9 +139,18 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
     // -------- assign data and sort the coordinate with morton code-------
 	thrust::host_vector<float> iso_scalars;
 	std::vector<uint64_t> iso_tree;
-	iso_tree.resize(1 + 1);
-	cal::fill_data_cpu(iso_tree.data(), 1, 0);
-	cal::fill_data_cpu(iso_tree.data() + 1, 1, uint64_t(1) << 63);
+	// iso_tree.resize(1 + 1);
+	// cal::fill_data_cpu(iso_tree.data(), 1, 0);
+	// cal::fill_data_cpu(iso_tree.data() + 1, 1, uint64_t(1) << 63);
+	int initial_iso_tree_size = std::pow(8, _DEPTH_MIN) + 1;
+	iso_tree.resize(initial_iso_tree_size);
+	uint64_t max_value = uint64_t(1) << 63;
+	uint64_t step = max_value / (initial_iso_tree_size - 1);
+	for (size_t i = 0; i < initial_iso_tree_size; ++i) {
+        iso_tree[i] = static_cast<uint64_t>(i * step);
+    }
+	iso_tree[initial_iso_tree_size - 1] = max_value;
+	
 	int iso_count = 0;
 	
 	cstoneOctree::Box box(_BoundingBox[0], _BoundingBox[1], _BoundingBox[2], 
@@ -159,13 +168,14 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 	DeviceConfig cudaConfig(particles_size);
 	calMortonCodeGPUKenrel<<<cudaConfig.blocks, cudaConfig.threads>>>(d_GlobalParticlesPtr, d_mortonCodesPtr, d_box, particles_size);
 	cudaDeviceSynchronize();
-    std::cout << "works" << std::endl;
+
+	thrust::device_vector<float> d_scalars(iso_tree.size(), 0.0f);
     while(1){
         // --- iso octree's info calculation ---
 		thrust::device_vector<uint64_t> d_iso_tree(iso_tree);
 		uint64_t* d_iso_treePtr = thrust::raw_pointer_cast(d_iso_tree.data());
         int d_iso_tree_size = d_iso_tree.size() - 1;
-		std::cout << "d_iso_tree_size = " << d_iso_tree_size << std::endl;
+		// std::cout << "d_iso_tree_size = " << d_iso_tree_size << std::endl;
         thrust::device_vector<uint64_t> d_prefixes(d_iso_tree_size);
         uint64_t* d_prefixesPtr = thrust::raw_pointer_cast(d_prefixes.data());
 
@@ -174,7 +184,7 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
         cstoneOctree::calculatePrefixesKernel<<<isoTreeConfig.blocks, isoTreeConfig.threads>>>(d_iso_treePtr, d_prefixesPtr, d_iso_tree_size);
         cudaDeviceSynchronize();
         // std::cout << "prefixes calculation done" << std::endl;
-		thrust::device_vector<float> d_scalars(d_iso_tree_size, 0.0f);
+		d_scalars = thrust::device_vector<float> (d_iso_tree_size, 0.0f);
         thrust::device_vector<Vec3f> d_iso_centers(d_iso_tree_size);
         thrust::device_vector<Vec3f> d_iso_sizes(d_iso_tree_size);
 		
@@ -206,7 +216,7 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 			std::cerr << "Kernel error: " << cudaGetErrorString(err) << std::endl;
 		}
 		cudaDeviceSynchronize();
-		std::cout << "estimate neighbors number calculation done" << std::endl;
+		// std::cout << "estimate neighbors number calculation done" << std::endl;
 		estimateNeighborsNums = d_estimateNeighborsNums;
 		int total_estimateNeighborsNum = std::accumulate(estimateNeighborsNums.begin(), estimateNeighborsNums.end(), 0);
 		thrust::device_vector<int> d_totalInsideParticlesIdx(total_estimateNeighborsNum, -1);
@@ -223,35 +233,39 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 																				thrust::raw_pointer_cast(d_totalInsideParticlesIdx.data()),
 																				thrust::raw_pointer_cast(d_iso_nodeOps.data()));
 		cudaDeviceSynchronize();
-		thrust::host_vector<int> totalInsidesParticlesIdx = d_totalInsideParticlesIdx;
-		iso_scalars = d_scalars;
+
 		iso_nodeOps = d_iso_nodeOps;
-		iso_allOpsSum = std::accumulate(iso_nodeOps.begin(), iso_nodeOps.end(), 0);
-		for(int i = 0; i < iso_nodeOps.size() - 1; i++){
-			int val = iso_nodeOps[i] - 1;
-			if(val != 0 && val != 7){
-				std::cout << "error in iso_nodeOps, " << i << "th value is " << val << std::endl;
-			}
-			if (iso_nodeOps[i] == 8)
-			{
-				newInternalNodes += 8;
-			}
-		}
-		std::cout << "iso_allOpsSum = " << iso_allOpsSum << std::endl;
-		std::cout << "newInternalNodes = " << newInternalNodes << std::endl;
+		iso_allOpsSum = thrust::reduce(d_iso_nodeOps.begin(), d_iso_nodeOps.end(), 0);
+		// printf("loop %d tree updated time %f\n: ", iso_count, t.elapsed());
+		// t.reset();
+		// for(int i = 0; i < iso_nodeOps.size() - 1; i++){
+		// 	int val = iso_nodeOps[i] - 1;
+		// 	if(val != 0 && val != 7){
+		// 		std::cout << "error in iso_nodeOps, " << i << "th value is " << val << std::endl;
+		// 	}
+		// 	if (iso_nodeOps[i] == 8)
+		// 	{
+		// 		newInternalNodes += 8;
+		// 	}
+		// }
+		// std::cout << "iso_allOpsSum = " << iso_allOpsSum << std::endl;
+		// std::cout << "newInternalNodes = " << newInternalNodes << std::endl;
 		std::exclusive_scan(iso_nodeOps.begin(), iso_nodeOps.end(), iso_nodeOpsLayout.begin(), 0);
 		uint64_t newTreeNodesNum;	
 		newTreeNodesNum = iso_nodeOpsLayout[iso_tree.size() - 1];
 		std::vector<uint64_t> new_iso_tree(newTreeNodesNum + 1);  // updated tree array
 
 		updateTreeArrayCPU(iso_nodeOpsLayout, iso_tree, new_iso_tree);
-
+		
 		std::copy_n(iso_tree.data() + iso_tree.size() - 1, 1, new_iso_tree.data() + new_iso_tree.size() - 1);
 		std::swap(new_iso_tree, iso_tree);
-
 		iso_count++;
+
 		if(iso_allOpsSum == iso_nodeOps.size() - 1) break;
     }
+
+	printf("Octree generation time = %f\n", t.elapsed());
+
 	thrust::device_vector<uint64_t> d_iso_tree(iso_tree);
 	int d_iso_tree_size = d_iso_tree.size() - 1;
 	DeviceConfig isoTreeConfig(d_iso_tree_size);
@@ -261,7 +275,7 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 																						  thrust::raw_pointer_cast(d_iso_lowers.data()),
 																						  thrust::raw_pointer_cast(d_iso_levels.data())
 																						);
-	thrust::device_vector<float> d_scalars(iso_scalars);
+	// d_scalars = iso_scalars;
 	iso::generateIsoDirectGPU(d_iso_tree
 		, d_iso_lowers, d_iso_levels, d_scalars, d_iso_tree_size, 
 		d_searcher, HashGridGPUs_size, d_evaluator, 
@@ -292,5 +306,6 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 			_OurMesh->AppendSplash_VarR(splash_pos, splash_radiuses);
 		}
 	}
-	std::cout << "Time generating polygons;" << std::endl;
+	// std::cout << "Time generating polygons;" << std::endl;
+	printf("-=  generate time = %f  =-\n", t.elapsed());
 }

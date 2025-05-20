@@ -83,7 +83,7 @@ void VisitorExtract::calc_vertices()
 					}
 					d /= 2;
 				}
-				std::cout << "count = " << count << std::endl;
+				// std::cout << "count = " << count << std::endl;
 				ratio = invlerp(v1s, v2s, 0.0f);
 				if (ratio < 0.1)
 					tmpv = tmpv1;
