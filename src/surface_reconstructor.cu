@@ -184,7 +184,7 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 	EvaluatorGPU* d_evaluator;
 	cudaMalloc(&d_evaluator, sizeof(EvaluatorGPU));
 	cudaMemcpy(d_evaluator, &evaluatorGPU, sizeof(EvaluatorGPU), cudaMemcpyHostToDevice);
-
+	std::cout << "hash searchers and evaluator upload device done" << std::endl;
 	// ----------- generating iso surface octree ---------
     // -------- assign data and sort the coordinate with morton code-------
 	thrust::host_vector<float> iso_scalars;
@@ -192,7 +192,7 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 	// iso_tree.resize(1 + 1);
 	// cal::fill_data_cpu(iso_tree.data(), 1, 0);
 	// cal::fill_data_cpu(iso_tree.data() + 1, 1, uint64_t(1) << 63);
-	int initial_iso_tree_size = std::pow(8, _DEPTH_MIN) + 1;
+	int initial_iso_tree_size = std::pow(8, std::min(_DEPTH_MIN, 6)) + 1;
 	iso_tree.resize(initial_iso_tree_size);
 	uint64_t max_value = uint64_t(1) << 63;
 	uint64_t step = max_value / (initial_iso_tree_size - 1);
@@ -200,6 +200,8 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
         iso_tree[i] = static_cast<uint64_t>(i * step);
     }
 	iso_tree[initial_iso_tree_size - 1] = max_value;
+
+	std::cout << "iso tree initialization done" << std::endl;
 	
 	int iso_count = 0;
 	
@@ -208,6 +210,8 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 	cstoneOctree::Box* d_box;
 	cudaMalloc(&d_box, sizeof(cstoneOctree::Box));
 	cudaMemcpy(d_box, &box, sizeof(cstoneOctree::Box), cudaMemcpyHostToDevice);
+
+	std::cout << "box upload device done" << std::endl;
 
 	thrust::host_vector<uint64_t> mortonCodes(particles_size, 0);
 	thrust::device_vector<cstoneOctree::Vec3f> d_GlobalParticles = _GlobalParticles;
