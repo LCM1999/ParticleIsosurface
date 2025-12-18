@@ -122,7 +122,7 @@ __global__ void calculateSplitsKernel(uint64_t* d_iso_tree, int d_iso_tree_size,
 	float nodeSamplePoints[27 * 3];
 	float nodeSampleScalars[27] = {0};
 	bool signchange = false;
-	d_evaluator->EvalInNode(box1, box2, nodeSamplePoints, nodeSampleScalars, tmp_numNeighbors, d_totalInsideParticlesIdx + d_particlesBeginIdx, signchange);
+	d_evaluator->EvalInNode(box1, box2, nodeSamplePoints, nodeSampleScalars, tmp_numNeighbors, d_totalInsideParticlesIdx + d_particlesBeginIdx, signchange, curv);
 	if (d_iso_sizes[tid].x * 2 - minRadius < 1e-8) {
 		d_iso_nodeOps[tid] = 1;
 		d_iso_scalars[tid] = nodeSampleScalars[13];
@@ -189,9 +189,6 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
     // -------- assign data and sort the coordinate with morton code-------
 	thrust::host_vector<float> iso_scalars;
 	std::vector<uint64_t> iso_tree;
-	// iso_tree.resize(1 + 1);
-	// cal::fill_data_cpu(iso_tree.data(), 1, 0);
-	// cal::fill_data_cpu(iso_tree.data() + 1, 1, uint64_t(1) << 63);
 	int initial_iso_tree_size = std::pow(8, std::min(_DEPTH_MIN, 6)) + 1;
 	iso_tree.resize(initial_iso_tree_size);
 	uint64_t max_value = uint64_t(1) << 63;
@@ -212,13 +209,6 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 	cudaMemcpy(d_box, &box, sizeof(cstoneOctree::Box), cudaMemcpyHostToDevice);
 
 	std::cout << "box upload device done" << std::endl;
-
-	thrust::host_vector<uint64_t> mortonCodes(particles_size, 0);
-	thrust::device_vector<cstoneOctree::Vec3f> d_GlobalParticles = _GlobalParticles;
-	thrust::device_vector<uint64_t> d_mortonCodes = mortonCodes;
-
-	uint64_t* d_mortonCodesPtr = thrust::raw_pointer_cast(d_mortonCodes.data());
-	cstoneOctree::Vec3f* d_GlobalParticlesPtr = thrust::raw_pointer_cast(d_GlobalParticles.data());
 	DeviceConfig cudaConfig(particles_size);
 	{
 		t.reset();
@@ -227,15 +217,16 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 		printf("   Calculate Particals Normal Time = %f\n", t.elapsed());
 		t.reset();
 	}
-	calMortonCodeGPUKenrel<<<cudaConfig.blocks, cudaConfig.threads>>>(d_GlobalParticlesPtr, d_mortonCodesPtr, d_box, particles_size);
 	cudaDeviceSynchronize();
 
 	thrust::device_vector<float> d_scalars(iso_tree.size(), 0.0f);
+	thrust::device_vector<uint64_t> d_iso_tree(iso_tree);
+	int d_iso_tree_size = d_iso_tree.size() - 1;
     while(1){
+		d_iso_tree_size = d_iso_tree.size() - 1;
+		d_scalars.resize(d_iso_tree_size);
         // --- iso octree's info calculation ---
-		thrust::device_vector<uint64_t> d_iso_tree(iso_tree);
 		uint64_t* d_iso_treePtr = thrust::raw_pointer_cast(d_iso_tree.data());
-        int d_iso_tree_size = d_iso_tree.size() - 1;
 		// std::cout << "d_iso_tree_size = " << d_iso_tree_size << std::endl;
         thrust::device_vector<uint64_t> d_prefixes(d_iso_tree_size);
         uint64_t* d_prefixesPtr = thrust::raw_pointer_cast(d_prefixes.data());
@@ -245,7 +236,7 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
         cstoneOctree::calculatePrefixesKernel<<<isoTreeConfig.blocks, isoTreeConfig.threads>>>(d_iso_treePtr, d_prefixesPtr, d_iso_tree_size);
         cudaDeviceSynchronize();
         // std::cout << "prefixes calculation done" << std::endl;
-		d_scalars = thrust::device_vector<float> (d_iso_tree_size, 0.0f);
+		// d_scalars = thrust::device_vector<float> (d_iso_tree_size, 0.0f);
         thrust::device_vector<Vec3f> d_iso_centers(d_iso_tree_size);
         thrust::device_vector<Vec3f> d_iso_sizes(d_iso_tree_size);
 		
@@ -257,15 +248,16 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
         cudaDeviceSynchronize();
         // std::cout << "leaves centers and sizes calculation done" << std::endl;
 
-        thrust::host_vector<int> iso_nodeOps(d_iso_tree.size(), 0); // Store the split decision for each node (the split decision is based on whether the node has isosurface)
-        thrust::device_vector<int> d_iso_nodeOps(iso_nodeOps);
-		std::vector<uint64_t> iso_nodeOpsLayout(iso_nodeOps.size());
+        // thrust::host_vector<int> iso_nodeOps(d_iso_tree.size(), 0); // Store the split decision for each node (the split decision is based on whether the node has isosurface)
+        thrust::device_vector<int> d_iso_nodeOps(d_iso_tree.size(), 0);
+		thrust::device_vector<uint64_t> d_iso_nodeOpsLayout(d_iso_tree.size());
+		// std::vector<uint64_t> iso_nodeOpsLayout(iso_nodeOps.size());
         // ----------------------- begin split calculation ---------------------------
 		int newInternalNodes = 0;
 		uint64_t iso_allOpsSum = 0;
 		// estimate total number of searched particles through each octree node
-		thrust::host_vector<int> estimateNeighborsNums(d_iso_tree_size, 0);
-		thrust::device_vector<int> d_estimateNeighborsNums(estimateNeighborsNums);
+		// thrust::host_vector<int> estimateNeighborsNums(d_iso_tree_size, 0);
+		thrust::device_vector<int> d_estimateNeighborsNums(d_iso_tree_size, 0);
 		int* d_estimateNeighborsNumPtr = thrust::raw_pointer_cast(d_estimateNeighborsNums.data());
 		// calculate the estimate neighbors number for each octree node
 		estimateTotalInfluenceParticlesKernel<<<isoTreeConfig.blocks, isoTreeConfig.threads>>>(d_iso_treePtr, d_iso_tree_size,
@@ -278,13 +270,13 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 		}
 		cudaDeviceSynchronize();
 		// std::cout << "estimate neighbors number calculation done" << std::endl;
-		estimateNeighborsNums = d_estimateNeighborsNums;
-		int total_estimateNeighborsNum = std::accumulate(estimateNeighborsNums.begin(), estimateNeighborsNums.end(), 0);
-		thrust::device_vector<int> d_totalInsideParticlesIdx(total_estimateNeighborsNum, -1);
-		thrust::host_vector<int> estimateNeighborsNumsLayout(estimateNeighborsNums.size(), 0);
-		thrust::exclusive_scan(estimateNeighborsNums.begin(), estimateNeighborsNums.end(), estimateNeighborsNumsLayout.begin(), 0);
-		thrust::device_vector<int> d_estimateNeighborsNumsLayout(estimateNeighborsNumsLayout);
+		// estimateNeighborsNums = d_estimateNeighborsNums;
+		// int total_estimateNeighborsNum = std::accumulate(estimateNeighborsNums.begin(), estimateNeighborsNums.end(), 0);
+		thrust::device_vector<int> d_estimateNeighborsNumsLayout(d_iso_tree_size);
+		thrust::exclusive_scan(d_estimateNeighborsNums.begin(), d_estimateNeighborsNums.end(), d_estimateNeighborsNumsLayout.begin(), 0);
 		int* d_estimateNeighborsNumsLayoutPtr = thrust::raw_pointer_cast(d_estimateNeighborsNumsLayout.data());
+		int total_estimateNeighborsNum = thrust::reduce(d_estimateNeighborsNums.begin(), d_estimateNeighborsNums.end(), 0, thrust::plus<int>());
+		thrust::device_vector<int> d_totalInsideParticlesIdx(total_estimateNeighborsNum, -1);
 		calculateSplitsKernel<<<isoTreeConfig.blocks, isoTreeConfig.threads>>>(d_iso_treePtr, d_iso_tree_size, d_iso_depthsPtr, 
 																				   thrust::raw_pointer_cast(d_scalars.data()), 
 																				d_iso_centersPtr, d_iso_sizesPtr,
@@ -295,40 +287,38 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 																				thrust::raw_pointer_cast(d_iso_nodeOps.data()));
 		cudaDeviceSynchronize();
 
-		iso_nodeOps = d_iso_nodeOps;
+		// iso_nodeOps = d_iso_nodeOps;
+		thrust::exclusive_scan(d_iso_nodeOps.begin(), d_iso_nodeOps.end(), d_iso_nodeOpsLayout.begin(), 0);
 		iso_allOpsSum = thrust::reduce(d_iso_nodeOps.begin(), d_iso_nodeOps.end(), 0);
-		// printf("loop %d tree updated time %f\n: ", iso_count, t.elapsed());
-		// t.reset();
-		// for(int i = 0; i < iso_nodeOps.size() - 1; i++){
-		// 	int val = iso_nodeOps[i] - 1;
-		// 	if(val != 0 && val != 7){
-		// 		std::cout << "error in iso_nodeOps, " << i << "th value is " << val << std::endl;
-		// 	}
-		// 	if (iso_nodeOps[i] == 8)
-		// 	{
-		// 		newInternalNodes += 8;
-		// 	}
-		// }
-		// std::cout << "iso_allOpsSum = " << iso_allOpsSum << std::endl;
-		// std::cout << "newInternalNodes = " << newInternalNodes << std::endl;
-		std::exclusive_scan(iso_nodeOps.begin(), iso_nodeOps.end(), iso_nodeOpsLayout.begin(), 0);
-		uint64_t newTreeNodesNum;	
-		newTreeNodesNum = iso_nodeOpsLayout[iso_tree.size() - 1];
-		std::vector<uint64_t> new_iso_tree(newTreeNodesNum + 1);  // updated tree array
+		if(iso_allOpsSum == d_iso_tree_size) break;
+		// std::exclusive_scan(iso_nodeOps.begin(), iso_nodeOps.end(), iso_nodeOpsLayout.begin(), 0);
+		uint64_t lastNodeOffset = d_iso_nodeOpsLayout.back();
+		// 获取最后一个元素的 op 值 (count)
+		int lastNodeOp = d_iso_nodeOps.back();
+		uint64_t newTreeNodesNum = lastNodeOffset + lastNodeOp;
+		// std::vector<uint64_t> new_iso_tree(newTreeNodesNum + 1);  // updated tree array
+		thrust::device_vector<uint64_t> d_new_iso_tree(newTreeNodesNum + 1);
 
-		updateTreeArrayCPU(iso_nodeOpsLayout, iso_tree, new_iso_tree);
-		
-		std::copy_n(iso_tree.data() + iso_tree.size() - 1, 1, new_iso_tree.data() + new_iso_tree.size() - 1);
-		std::swap(new_iso_tree, iso_tree);
+		// updateTreeArrayCPU(iso_nodeOpsLayout, iso_tree, new_iso_tree);
+		updateTreeArrayGPUKernel<<<isoTreeConfig.blocks, isoTreeConfig.threads>>>(thrust::raw_pointer_cast(d_iso_nodeOpsLayout.data()),
+																						 d_iso_treePtr,
+																						 thrust::raw_pointer_cast(d_new_iso_tree.data()),
+																						 d_iso_tree_size);
+		cudaDeviceSynchronize();
+		// std::cout << "tree update done" << std::endl;
+		thrust::copy(d_iso_tree.end() - 1, d_iso_tree.end(), d_new_iso_tree.end() - 1);
+		d_iso_tree.swap(d_new_iso_tree);
+		// std::copy_n(iso_tree.data() + iso_tree.size() - 1, 1, new_iso_tree.data() + new_iso_tree.size() - 1);
+		// std::swap(new_iso_tree, iso_tree);
 		iso_count++;
 
-		if(iso_allOpsSum == iso_nodeOps.size() - 1) break;
     }
 
 	printf("Octree generation time = %f\n", t.elapsed());
 
-	thrust::device_vector<uint64_t> d_iso_tree(iso_tree);
-	int d_iso_tree_size = d_iso_tree.size() - 1;
+	// thrust::device_vector<uint64_t> d_iso_tree(iso_tree);
+	// d_iso_tree_size = d_iso_tree.size() - 1;
+	// d_scalars.resize(d_iso_tree_size);
 	DeviceConfig isoTreeConfig(d_iso_tree_size);
 	thrust::device_vector<Vec3i> d_iso_lowers(d_iso_tree_size);
 	thrust::device_vector<unsigned> d_iso_levels(d_iso_tree_size);
@@ -340,7 +330,7 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 	iso::generateIsoDirectGPU(d_iso_tree
 		, d_iso_lowers, d_iso_levels, d_scalars, d_iso_tree_size, 
 		d_searcher, HashGridGPUs_size, d_evaluator, 
-		0.0, _searcherGPU->minRadius,
+		0.0, (_searcherGPU->minRadius / 2),
 		d_box, &box,
 		_OurMesh
 	);

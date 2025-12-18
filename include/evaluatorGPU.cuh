@@ -151,20 +151,23 @@ struct EvaluatorGPU
 
     DEVICE void EvalInNode(const cstoneOctree::Vec3f box1, const cstoneOctree::Vec3f box2, 
         float* nodeSamplePoints, float* nodeSampleScalars, // node samples size is 3 * 3 * 3
-        const int numNeighbors, const int* neighbors, bool& signChange) {
+        const int numNeighbors, const int* neighbors, bool& signChange, float& curv) {
         bool originSign = true;
+        int sampleIndices[27][3];
         for (int z = 0; z <= 2; z++)
         {
             for (int y = 0; y <= 2; y++)
             {
                 for (int x = 0; x <= 2; x++)
                 {
-                    nodeSamplePoints[(z * (2+1) * (2+1) + y * (2+1) + x) * 3 + 0] = 
-                    box1[0] * (1 - float(x) / 2) + box2[0] * (float(x) / 2);
-                    nodeSamplePoints[(z * (2+1) * (2+1) + y * (2+1) + x) * 3 + 1] = 
-                    box1[1] * (1 - float(y) / 2) + box2[1] * (float(y) / 2);
-                    nodeSamplePoints[(z * (2+1) * (2+1) + y * (2+1) + x) * 3 + 2] = 
-                    box1[2] * (1 - float(z) / 2) + box2[2] * (float(z) / 2);
+                    int j = z * 9 + y * 3 + x;
+                    // 保存x/y/z索引
+                    sampleIndices[j][0] = x;
+                    sampleIndices[j][1] = y;
+                    sampleIndices[j][2] = z;
+                    nodeSamplePoints[j * 3 + 0] = box1[0] * (1 - float(x) / 2) + box2[0] * (float(x) / 2);
+                    nodeSamplePoints[j * 3 + 1] = box1[1] * (1 - float(y) / 2) + box2[1] * (float(y) / 2);
+                    nodeSamplePoints[j * 3 + 2] = box1[2] * (1 - float(z) / 2) + box2[2] * (float(z) / 2);
                 }
             }
         }
@@ -186,12 +189,74 @@ struct EvaluatorGPU
             }
 
             nodeSampleScalars[j] = d_ISO_VALUE - nodeSampleScalars[j];
-            originSign = (nodeSampleScalars[0] >= 0);
+            if (j == 0) {
+                originSign = (nodeSampleScalars[0] >= 0);
+            }   
             if (!signChange)
             {
                 signChange = originSign ^ (nodeSampleScalars[j] >= 0);
             }
         }
+
+        float hx = (box2[0] - box1[0]) / 2.0f; // x方向步长：(max - min)/2（因为x取0,1,2，共2个间隔）
+        float hy = (box2[1] - box1[1]) / 2.0f;
+        float hz = (box2[2] - box1[2]) / 2.0f;
+
+        cstoneOctree::Vec3f gradSum(0.0f, 0.0f, 0.0f); 
+        float area = 0.0f;
+        for (int j = 0; j < 27; j++)
+        {
+            int x = sampleIndices[j][0];
+            int y = sampleIndices[j][1];
+            int z = sampleIndices[j][2];
+            float dx = 0.0f, dy = 0.0f, dz = 0.0f;
+
+            // ---------------------- 计算x方向的偏导数 ----------------------
+            if (x == 0) {
+                // 前向差分：(φ(x+1,y,z) - φ(x,y,z))/hx
+                int j_next = z * 9 + y * 3 + (x + 1);
+                dx = (nodeSampleScalars[j_next] - nodeSampleScalars[j]) / hx;
+            } else if (x == 2) {
+                // 后向差分：(φ(x,y,z) - φ(x-1,y,z))/hx
+                int j_prev = z * 9 + y * 3 + (x - 1);
+                dx = (nodeSampleScalars[j] - nodeSampleScalars[j_prev]) / hx;
+            } else {
+                // 中心差分：(φ(x+1,y,z) - φ(x-1,y,z))/(2*hx)（精度更高）
+                int j_next = z * 9 + y * 3 + (x + 1);
+                int j_prev = z * 9 + y * 3 + (x - 1);
+                dx = (nodeSampleScalars[j_next] - nodeSampleScalars[j_prev]) / (2.0f * hx);
+            }
+
+            // ---------------------- 计算y方向的偏导数 ----------------------
+            if (y == 0) {
+                int j_next = z * 9 + (y + 1) * 3 + x;
+                dy = (nodeSampleScalars[j_next] - nodeSampleScalars[j]) / hy;
+            } else if (y == 2) {
+                int j_prev = z * 9 + (y - 1) * 3 + x;
+                dy = (nodeSampleScalars[j] - nodeSampleScalars[j_prev]) / hy;
+            } else {
+                int j_next = z * 9 + (y + 1) * 3 + x;
+                int j_prev = z * 9 + (y - 1) * 3 + x;
+                dy = (nodeSampleScalars[j_next] - nodeSampleScalars[j_prev]) / (2.0f * hy);
+            }
+
+            // ---------------------- 计算z方向的偏导数 ----------------------
+            if (z == 0) {
+                int j_next = (z + 1) * 9 + y * 3 + x;
+                dz = (nodeSampleScalars[j_next] - nodeSampleScalars[j]) / hz;
+            } else if (z == 2) {
+                int j_prev = (z - 1) * 9 + y * 3 + x;
+                dz = (nodeSampleScalars[j] - nodeSampleScalars[j_prev]) / hz;
+            } else {
+                int j_next = (z + 1) * 9 + y * 3 + x;
+                int j_prev = (z - 1) * 9 + y * 3 + x;
+                dz = (nodeSampleScalars[j_next] - nodeSampleScalars[j_prev]) / (2.0f * hz);
+            }
+            cstoneOctree::Vec3f grad(dx, dy, dz);
+            gradSum += grad;
+            area += grad.norm();
+        }
+        curv = fminf(curv, ((area == 0) ? 1.0 : (gradSum.norm() / area)));
     }
 };
 

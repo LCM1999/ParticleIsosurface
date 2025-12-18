@@ -27,6 +27,8 @@ if(CMAKE_CUDA_COMPILER)
     # include_directories(${CUDA_TOOLKIT_ROOT_DIR}/include)
 endif()
 
+set(HDF5_DIR "D:/HDF/HDF5-1.14.4-win64/cmake")
+
 ################################################################################
 # Find packages
 ################################################################################
@@ -57,6 +59,7 @@ find_package(VTK REQUIRED)
 if(NOT VTK_FOUND)
     message(FATAL_ERROR "VTK not found!")
 endif()
+message(STATUS "找到 VTK 版本: ${VTK_VERSION}")
 
 ################################################################################
 # Target

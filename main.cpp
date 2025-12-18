@@ -425,6 +425,7 @@ int main(int argc, char **argv)
     case 1:
     default:
         dataDirPath =
+        // "D:/data/10000";
         // "/home/letian/Letian_Xie/work/ParticleIsosurface/test_cases/multiR/mr_csv";
         // "D:/data/multiR/mr_csv";
         // "D:/data/oil_csv";
@@ -434,6 +435,7 @@ int main(int argc, char **argv)
         // "D:/data/damBreak3D-27steps";
         // "D:/data/test";
         outPath = 
+        // "D:/data/10000/out";
         // "D:/data/multiR/mr_csv/out";
         // "D:/data/oil_csv/out";
         // "D:/data/inWater/particles/out";
