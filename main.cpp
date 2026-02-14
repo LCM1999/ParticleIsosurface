@@ -5,6 +5,8 @@
 #include <regex>
 #include <random>
 #include <vector>
+#include <cmath>
+#include <vector>
 
 #include "global.h"
 #include "hdf5Utils.hpp"
@@ -13,6 +15,7 @@
 #include "json.hpp"
 #include "surface_reconstructor.h"
 #include "rply.h"
+#include "marching.h"
 
 #include "hash_grid.h"
 #include "multi_level_searcher.h"
@@ -27,27 +30,6 @@
 #endif
 
 #include <var.h>
-//  int OMP_USE_DYNAMIC_THREADS = 0;
-//  int OMP_THREADS_NUM = 16;
-//  bool IS_CONST_RADIUS = false;
-//  bool USE_ANI = true;
-//  // variants for test
-//  bool NEED_RECORD = false;
-//  int TARGET_FRAME = 0;
-//  // std::string PREFIX = "";
-//  std::string SUFFIX = "";    // CSV, H5
-//  std::vector<std::string> DATA_PATHES;
-//  std::string OUTPUT_TYPE = "ply";
-//  float RADIUS = 0;
-//  float MAX_RADIUS = 0;
-//  float MIN_RADIUS = 0;
-//  float SMOOTH_FACTOR = 2.0;
-//  float ISO_FACTOR = 1.9;
-//  float ISO_VALUE = 0.0f;
-//  // bool USE_CUDA = false;
-//  bool CALC_P_NORMAL = true;
-//  bool GEN_SPLASH = true;
-//  bool SINGLE_LAYER = false;
 
 void writeObjFile(Mesh &m, std::string fn)
 {
@@ -314,6 +296,18 @@ bool readShonDyParticleData(const std::string &fileName,
     return true;
 }
 
+static double particleVolumeSumSpheres(const std::vector<Vec3f>& /*particles*/,
+                                      const std::vector<float>& radiuses)
+{
+    const double PI = 3.14159265358979323846;
+    double V = 0.0;
+    for (float r : radiuses) {
+        const double rd = (double)r;
+        V += 8 * rd * rd * rd;       //(4.0 / 3.0) * PI
+    }
+    return V;
+}
+
 void runOurs(std::string dataDirPath, std::string outPath)
 {
     timer t;
@@ -338,19 +332,15 @@ void runOurs(std::string dataDirPath, std::string outPath)
             readShonDyParticleData(dataPath, particles, radiuses);
         }
         IS_CONST_RADIUS = false;
-        // if (!IS_CONST_RADIUS)
-        // {
-        //     if (abs(*std::max_element(radiuses.begin(), radiuses.end()) - *std::min_element(radiuses.begin(), radiuses.end())) < 1e-7)
-        //     {
-        //             IS_CONST_RADIUS = true;
-        //             RADIUS = radiuses[0];
-        //     }
-        // }
         printf("Particles Number = %zd\n", particles.size());
+
+        const double Vin_particles = particleVolumeSumSpheres(particles, radiuses);
+        std::cout << "[Volume] Particles (sum of spheres) = " << Vin_particles << std::endl;
+        
         SurfReconstructor* constructor = new SurfReconstructor(particles, radiuses, &mesh, RADIUS);
-        // constructor->Run(ISO_FACTOR, SMOOTH_FACTOR);
+        constructor->Run(ISO_FACTOR, SMOOTH_FACTOR);
         // constructor->RunCPU2(ISO_FACTOR, SMOOTH_FACTOR);
-        constructor->RunGPU(ISO_FACTOR, SMOOTH_FACTOR);
+        // constructor->RunGPU(ISO_FACTOR, SMOOTH_FACTOR);
         std::string output_name = frame.substr(0, frame.find_last_of('.'));
         std::cout << "Output path: " << outPath + "/" + output_name + "." + OUTPUT_TYPE<< std::endl; 
         
@@ -385,6 +375,45 @@ void runOurs(std::string dataDirPath, std::string outPath)
         }
         index++;
         delete constructor;
+    }
+}
+
+void runUniform(std::string dataDirPath, std::string outPath)
+{
+    int index = 1;
+    std::vector<Vec3f> particles;
+    std::vector<float> radiuses;
+    for (const std::string frame : DATA_PATHES)
+    {
+        Mesh mesh(int(pow(10, 4)));
+        std::cout << "-=   Frame " << (TARGET_FRAME == 0 ? index : TARGET_FRAME) << " " << frame << "   =-"
+                  << std::endl;
+        std::string dataPath = dataDirPath + "/" + frame;
+
+        if (SUFFIX == "")
+        {
+            SUFFIX = std::filesystem::path(dataPath).filename().extension().string();
+        }
+        if (".csv" == SUFFIX) {
+            loadParticlesFromCSV(dataPath, particles, radiuses);
+        } else if (".h5" == SUFFIX) {
+            readShonDyParticleData(dataPath, particles, radiuses);
+        }
+
+        if (!IS_CONST_RADIUS)
+        {
+            if (abs(*std::max_element(radiuses.begin(), radiuses.end()) - *std::min_element(radiuses.begin(), radiuses.end())) < 1e-7)
+            {
+                    IS_CONST_RADIUS = true;
+                    RADIUS = radiuses[0];
+            }
+        }
+        printf("Particles Number = %zd\n", particles.size());
+        std::string output_name = frame.substr(0, frame.find_last_of('.'));
+        UniformGrid* uniformGrid = IS_CONST_RADIUS ? new UniformGrid(particles, RADIUS) : new UniformGrid(particles, radiuses);
+        uniformGrid->Run(ISO_VALUE, output_name, outPath);
+        std::cout << "Output path: " << outPath + "/" + output_name + ".vti"<< std::endl;
+        std::cout << "Output Done" << std::endl;
     }
 }
 
@@ -428,24 +457,25 @@ int main(int argc, char **argv)
         // "D:/data/10000";
         // "/home/letian/Letian_Xie/work/ParticleIsosurface/test_cases/multiR/mr_csv";
         // "D:/data/multiR/mr_csv";
-        // "D:/data/oil_csv";
+        "D:/data/oil_csv";
         // "D:/data/inWater/particles";
         // "D:/data/3s/20231222-water";
-        "D:/data/car_render_test_data_2/Fluid";
+        // "D:/data/car_render_test_data_2/Fluid";
         // "D:/data/damBreak3D-27steps";
         // "D:/data/test";
         outPath = 
         // "D:/data/10000/out";
         // "D:/data/multiR/mr_csv/out";
-        // "D:/data/oil_csv/out";
+        "D:/data/oil_csv/out";
         // "D:/data/inWater/particles/out";
         // "D:/data/3s/20231222-water/out";
-        "D:/data/car_render_test_data_2/Fluid/out";
+        // "D:/data/car_render_test_data_2/Fluid/out";
         // "D:/data/damBreak3D-27steps/out";
         // "D:/data/test/out";
         // "/home/letian/Letian_Xie/work/ParticleIsosurface/test_cases/multiR/mr_csv/out";
         loadConfigJson(dataDirPath);
         runOurs(dataDirPath, outPath);
+        // runUniform(dataDirPath, outPath);
         
         break;
     }

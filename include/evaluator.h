@@ -29,7 +29,7 @@ public:
     float _MIN_SCALAR = 0.0;
 
     bool _USE_XMEAN = true;
-    float _XMEAN_DELTA = 0.0;
+    float _XMEAN_DELTA = 1.0;
 
     float poly6_kernel(float d2, float h2, float sigma);
     float Bspline_kernel(float ratio, float sigma);
@@ -38,8 +38,8 @@ public:
     Vec3f Bspline_gradient_kernel(float ratio, float sigma, Vec3f diff);
 	float AnisotropicInterpolate(const int pIdx, const Vec3f diff);
     Vec3f AnisotropicInterpolateGrad(const int pIdx, const Vec3f diff);
-    void compute_xMeans(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Vec3f &xMean);
-    void compute_G_ours(int pIdx, Vec3f xMean, std::vector<int> neighbors, Mat3f &G);
+    void compute_xMeans(int pIdx, const std::vector<int>& temp_neighbors, std::vector<int>& neighbors, int &closer_neighbor, Vec3f &xMean);
+    void compute_G_ours(int pIdx, Vec3f xMean, const std::vector<int>& neighbors, Mat3f &G);
     void compute_G_Yus(int pIdx, Vec3f xMean, std::vector<int> neighbors, Mat3f &G);
     Vec3f IsotropicInterpolateGrad(const int pIdx, const float d2, const Vec3f diff);
 	float IsotropicInterpolate(const int pIdx, const float d);

@@ -140,6 +140,7 @@ __global__ void calculateSplitsKernel(uint64_t* d_iso_tree, int d_iso_tree_size,
 }
 
 void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
+	printCudaMemUsage();
 	timer t;
 	useCPU = false;
 	printf("-= Box =-\n");
@@ -147,8 +148,10 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 
 	int particles_size = _GlobalParticles.size();
 	printf("-= Build Neighbor Searcher =-\n");
-    _searcherGPU = std::make_shared<MultiLevelSearcherGPU>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
+	printMem();
+    _searcherGPU = std::make_shared<MultiLevelSearcherGPU>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f, 1.5f);
 	printf("   Build Neighbor Searcher Time = %f \n", t.elapsed());
+	printMem();
 	t.reset();
 
     printf("-= Initialize Evaluator =-\n");
@@ -173,7 +176,7 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 	// 	printf("   Calculate Particals Normal Time = %f\n", t.elapsed());
 	// 	t.reset();
 	// }
-
+	printMem();
 	// for each resolution particles level, calculate each estimate neighbors number for each octree node
 	int HashGridGPUs_size = _searcherGPU->h_searchers.size();
 	HashGridGPU** d_searcher;	
@@ -185,6 +188,9 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 	cudaMalloc(&d_evaluator, sizeof(EvaluatorGPU));
 	cudaMemcpy(d_evaluator, &evaluatorGPU, sizeof(EvaluatorGPU), cudaMemcpyHostToDevice);
 	std::cout << "hash searchers and evaluator upload device done" << std::endl;
+	printCudaMemUsage();
+	timer t2;
+	t2.reset();
 	// ----------- generating iso surface octree ---------
     // -------- assign data and sort the coordinate with morton code-------
 	thrust::host_vector<float> iso_scalars;
@@ -313,9 +319,11 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 		iso_count++;
 
     }
+	printf("Octree generation time = %f\n", t2.elapsed());
+	t2.reset();
+	printCudaMemUsage();
 
-	printf("Octree generation time = %f\n", t.elapsed());
-
+	printMem();
 	// thrust::device_vector<uint64_t> d_iso_tree(iso_tree);
 	// d_iso_tree_size = d_iso_tree.size() - 1;
 	// d_scalars.resize(d_iso_tree_size);
@@ -334,6 +342,11 @@ void SurfReconstructor::RunGPU(float iso_factor, float smooth_factor){
 		d_box, &box,
 		_OurMesh
 	);
+	printf("Surface generation time = %f\n", t2.elapsed());
+
+	printMem();
+	printCudaMemUsage();
+
 	if (GEN_SPLASH)
 	{
 		printf("-= Generate Splash =-\n");

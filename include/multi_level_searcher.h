@@ -17,7 +17,9 @@ private:
     float infFactor;
 
 public:
-    MultiLevelSearcher(std::vector<cstoneOctree::Vec3f>* particles, float* bounding, std::vector<float>* radiuses, float inf_factor);
+    MultiLevelSearcher(std::vector<cstoneOctree::Vec3f>* particles, 
+                       float* bounding, std::vector<float>* radiuses, 
+                       float inf_factor, float scale);
     MultiLevelSearcher() {};
     ~MultiLevelSearcher() {
         for (size_t i = 0; i < searchers.size(); i++)

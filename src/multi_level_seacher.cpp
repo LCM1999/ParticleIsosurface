@@ -3,57 +3,78 @@
 #include <cfloat>
 #include "hash_grid.h"
 
-MultiLevelSearcher::MultiLevelSearcher(std::vector<cstoneOctree::Vec3f>* particles, float* bounding, std::vector<float>* radiuses, float inf_factor)
+MultiLevelSearcher::MultiLevelSearcher(
+    std::vector<cstoneOctree::Vec3f>* particles, 
+    float* bounding, std::vector<float>* radiuses, 
+    float inf_factor, float scale)
 {
     maxRadius = *std::max_element(radiuses->begin(), radiuses->end());   // * 1.01
     minRadius = *std::min_element(radiuses->begin(), radiuses->end());   // * 0.99
     infFactor = inf_factor;
-    int particlesNum = particles->size();
+
+    if (!(scale > 1.0f)) {
+        scale = 1.0f;
+    }
     std::vector<std::pair<float, float>> bin_bounds;
-    float bin_extent = minRadius * 0.5;
-    int bins = std::max(int(ceil((maxRadius - minRadius) / bin_extent)), 1);
-    bin_extent = (maxRadius - minRadius) / bins;
-    std::vector<std::vector<unsigned>>sortedIndex(bins);
-    if (bins == 1 || bin_extent == 0.0f)
-    {
-        for (int i = 0; i < radiuses->size(); i++)
-        {
-            sortedIndex[0].push_back(i);
-        }
-    } else {
-        for (size_t i = 0; i < bins; i++)
-        {
-            bin_bounds.push_back(
-                std::pair<float, float>(
-                    minRadius+(i*bin_extent), 
-                    std::min(minRadius+((i+1)*bin_extent), maxRadius)));
-        }
-        auto whichBin = [&](const float r)
-        {
-            for (auto tit = bin_bounds.begin(); tit < bin_bounds.end(); tit++)
-            {
-                if (r >= tit->first && r <= tit->second)
-                    return static_cast<int>(std::distance(bin_bounds.begin(), tit));
-            }
-            return -1;
-        };
     
-        for (int i = 0; i < radiuses->size(); i++)
-        {
-            sortedIndex[whichBin(radiuses->at(i))].push_back(i);
+    if (maxRadius <= minRadius || scale == 1.0f) {
+        bin_bounds.emplace_back(minRadius, maxRadius);
+    } else {
+        float bmin = minRadius;
+
+        const float eps = 1e-20f;
+        if (bmin < eps) bmin = eps;
+
+        while (true) {
+            float bmax = bmin * scale;
+
+            if (bmax >= maxRadius) {
+                bin_bounds.emplace_back(bmin, maxRadius);
+                break;
+            }
+
+            bin_bounds.emplace_back(bmin, bmax);
+            bmin = bmax;
+
+            if (bin_bounds.size() > 4096) {
+                bin_bounds.back().second = maxRadius;
+                break;
+            }
         }
     }
+
+    const int bins = static_cast<int>(bin_bounds.size());
+    std::vector<std::vector<unsigned>> sortedIndex(bins);
+
+    auto whichBin = [&](float r) -> int
+    {
+        if (r <= bin_bounds.front().first) return 0;
+        if (r >= bin_bounds.back().second) return bins - 1;
+
+        for (int i = 0; i < bins; ++i) {
+            const float lo = bin_bounds[i].first;
+            const float hi = bin_bounds[i].second;
+            const bool last = (i == bins - 1);
+
+            if (r >= lo && (r < hi || (last && r <= hi)))
+                return i;
+        }
+        return bins - 1; // 理论上不会到这，兜底
+    };
+
+    for (int i = 0; i < (int)radiuses->size(); i++) {
+        const int b = whichBin(radiuses->at(i));
+        sortedIndex[b].push_back(i);
+    }
+
     for (int i = 0; i < bins; i++)
     {
-        if (sortedIndex[i].size() == 0) continue;
-        float temp_bounding [6] = {0.0f};
-        for (size_t j = 0; j < 6; j++)
-        {
-            temp_bounding[j] = bounding[j];
-        }
-        // temp_bounding[0] = temp_bounding[2] = temp_bounding[4] = FLT_MAX;
-        // temp_bounding[1] = temp_bounding[3] = temp_bounding[5] = -FLT_MAX;
-        for (auto pI: sortedIndex[i])
+        if (sortedIndex[i].empty()) continue;
+
+        float temp_bounding[6] = {0.0f};
+        for (size_t j = 0; j < 6; j++) temp_bounding[j] = bounding[j];
+
+        for (auto pI : sortedIndex[i])
         {
             temp_bounding[0] = std::min(temp_bounding[0], particles->at(pI).x);
             temp_bounding[1] = std::max(temp_bounding[1], particles->at(pI).x);
@@ -62,13 +83,18 @@ MultiLevelSearcher::MultiLevelSearcher(std::vector<cstoneOctree::Vec3f>* particl
             temp_bounding[4] = std::min(temp_bounding[4], particles->at(pI).z);
             temp_bounding[5] = std::max(temp_bounding[5], particles->at(pI).z);
         }
-        unsigned int binRadiusId = *std::max_element(sortedIndex[i].begin(), sortedIndex[i].end(), 
+
+        unsigned int binRadiusId = *std::max_element(
+            sortedIndex[i].begin(), sortedIndex[i].end(),
             [&](unsigned int& a, unsigned int& b) {
                 return radiuses->at(a) < radiuses->at(b);
             });
+
         maxRadiusParticleIds.push_back(binRadiusId);
-        searchers.push_back(new HashGrid(particles, radiuses, sortedIndex[i], temp_bounding, binRadiusId, inf_factor));
+        searchers.push_back(new HashGrid(particles, radiuses, sortedIndex[i],
+                                         temp_bounding, binRadiusId, inf_factor));
     }
+
     printf("   Seachers level: %d.\n", searchers.size());
 }
 

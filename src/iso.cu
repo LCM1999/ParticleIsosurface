@@ -1436,9 +1436,11 @@ void generateIsoDirectGPU(
   for (int i=0;i<h_indexArray.size();i++)
   {
       mesh->tris.push_back(
-          Triangle(h_indexArray[i].x + 1, 
-                   h_indexArray[i].y + 1,
-                   h_indexArray[i].z + 1));
+          Triangle(
+            h_indexArray[i].z + 1,
+            h_indexArray[i].y + 1,
+            h_indexArray[i].x + 1 
+          ));
   }
   mesh->trianglesNum = mesh->tris.size();
 }

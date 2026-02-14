@@ -18,57 +18,80 @@ struct MultiLevelSearcherGPU
     float infFactor;
 
     HOST MultiLevelSearcherGPU() {};
-    HOST MultiLevelSearcherGPU(std::vector<cstoneOctree::Vec3f>* particles, float* bounding, std::vector<float>* radiuses, float inf_factor)
+    HOST MultiLevelSearcherGPU(std::vector<cstoneOctree::Vec3f>* particles,
+                            float* bounding,
+                            std::vector<float>* radiuses,
+                            float inf_factor,
+                            float scale)   // 新增：分组大小系数
     {
-        maxRadius = *std::max_element(radiuses->begin(), radiuses->end());   // * 1.01
-        minRadius = *std::min_element(radiuses->begin(), radiuses->end());   // * 0.99
+        maxRadius = *std::max_element(radiuses->begin(), radiuses->end());
+        minRadius = *std::min_element(radiuses->begin(), radiuses->end());
         infFactor = inf_factor;
-        int particlesNum = particles->size();
-        float bin_extent = minRadius * 0.5;
-        int bins = std::max(int(ceil((maxRadius - minRadius) / bin_extent)), 1);
-        bin_extent = (maxRadius - minRadius) / bins;
-        std::vector<std::vector<unsigned>>sortedIndex(bins);
-        if (bins == 1 || bin_extent == 0.0f)
-        {
-            for (int i = 0; i < radiuses->size(); i++)
-            {
-                sortedIndex[0].push_back(i);
-            }
+
+        if (!(scale > 1.0f)) {
+            scale = 1.0f;
+        }
+
+        std::vector<std::pair<float, float>> bin_bounds;
+
+        if (maxRadius <= minRadius || scale == 1.0f) {
+            bin_bounds.emplace_back(minRadius, maxRadius);
         } else {
-            std::vector<std::pair<float, float>> bin_bounds;
-            for (size_t i = 0; i < bins; i++)
-            {
-                bin_bounds.push_back(
-                    std::pair<float, float>(
-                        minRadius+(i*bin_extent), 
-                        std::min(minRadius+((i+1)*bin_extent), maxRadius)));
-            }
-            auto whichBin = [&](const float r)
-            {
-                for (auto tit = bin_bounds.begin(); tit < bin_bounds.end(); tit++)
-                {
-                    if (r >= tit->first && r <= tit->second)
-                        return static_cast<int>(std::distance(bin_bounds.begin(), tit));
+            float bmin = minRadius;
+
+            const float eps = 1e-20f;
+            if (bmin < eps) bmin = eps;
+
+            while (true) {
+                float bmax = bmin * scale;
+
+                if (bmax >= maxRadius) {
+                    bin_bounds.emplace_back(bmin, maxRadius);
+                    break;
                 }
-                return -1;
-            };
-        
-            for (int i = 0; i < radiuses->size(); i++)
-            {
-                sortedIndex[whichBin(radiuses->at(i))].push_back(i);
+
+                bin_bounds.emplace_back(bmin, bmax);
+                bmin = bmax;
+
+                if (bin_bounds.size() > 4096) {
+                    bin_bounds.back().second = maxRadius;
+                    break;
+                }
             }
         }
+
+        const int bins = static_cast<int>(bin_bounds.size());
+        std::vector<std::vector<unsigned>> sortedIndex(bins);
+
+        auto whichBin = [&](float r) -> int
+        {
+            if (r <= bin_bounds.front().first) return 0;
+            if (r >= bin_bounds.back().second) return bins - 1;
+
+            for (int i = 0; i < bins; ++i) {
+                const float lo = bin_bounds[i].first;
+                const float hi = bin_bounds[i].second;
+                const bool last = (i == bins - 1);
+
+                if (r >= lo && (r < hi || (last && r <= hi)))
+                    return i;
+            }
+            return bins - 1; // 理论上不会到这，兜底
+        };
+
+        for (int i = 0; i < (int)radiuses->size(); i++) {
+            const int b = whichBin(radiuses->at(i));
+            sortedIndex[b].push_back(i);
+        }
+
         for (int i = 0; i < bins; i++)
         {
-            if (sortedIndex[i].size() == 0) continue;
+            if (sortedIndex[i].empty()) continue;
+
             float temp_bounding[6] = {0.0f};
-            for (size_t j = 0; j < 6; j++)
-            {
-                temp_bounding[j] = bounding[j];
-            }
-            // temp_bounding[0] = temp_bounding[2] = temp_bounding[4] = FLT_MAX;
-            // temp_bounding[1] = temp_bounding[3] = temp_bounding[5] = -FLT_MAX;
-            for (auto pI: sortedIndex[i])
+            for (size_t j = 0; j < 6; j++) temp_bounding[j] = bounding[j];
+
+            for (auto pI : sortedIndex[i])
             {
                 temp_bounding[0] = std::min(temp_bounding[0], particles->at(pI).x);
                 temp_bounding[1] = std::max(temp_bounding[1], particles->at(pI).x);
@@ -77,17 +100,21 @@ struct MultiLevelSearcherGPU
                 temp_bounding[4] = std::min(temp_bounding[4], particles->at(pI).z);
                 temp_bounding[5] = std::max(temp_bounding[5], particles->at(pI).z);
             }
-            unsigned int binRadiusId = *std::max_element(sortedIndex[i].begin(), sortedIndex[i].end(), 
+
+            unsigned int binRadiusId = *std::max_element(
+                sortedIndex[i].begin(), sortedIndex[i].end(),
                 [&](unsigned int& a, unsigned int& b) {
                     return radiuses->at(a) < radiuses->at(b);
                 });
-            maxRadiusParticleIds.push_back(binRadiusId);
-            searchers.push_back(new HashGridGPU(particles, radiuses, sortedIndex[i], temp_bounding, binRadiusId, inf_factor));
-        }
-        printf("   Seachers level: %d.\n", searchers.size());
 
-        // assign data to h_searchers
-        for(int i = 0; i < searchers.size(); i++){
+            maxRadiusParticleIds.push_back(binRadiusId);
+            searchers.push_back(new HashGridGPU(particles, radiuses, sortedIndex[i],
+                                                temp_bounding, binRadiusId, inf_factor));
+        }
+
+        printf("   Seachers level: %d.\n", (int)searchers.size());
+
+        for (int i = 0; i < (int)searchers.size(); i++) {
             HashGridGPU* d_searcher_ptr;
             cudaMalloc(reinterpret_cast<void**>(&d_searcher_ptr), sizeof(HashGridGPU));
             cudaMemcpy(&(d_searcher_ptr->CellSize), &(searchers[i]->CellSize), sizeof(float), cudaMemcpyHostToDevice);
@@ -103,27 +130,96 @@ struct MultiLevelSearcherGPU
             cudaMemcpy(&(d_searcher_ptr->d_IndexList), &(searchers[i]->d_IndexList), sizeof(int*), cudaMemcpyHostToDevice);
             cudaMemcpy(&(d_searcher_ptr->d_StartList), &(searchers[i]->d_StartList), sizeof(int*), cudaMemcpyHostToDevice);
             cudaMemcpy(&(d_searcher_ptr->d_EndList), &(searchers[i]->d_EndList), sizeof(int*), cudaMemcpyHostToDevice);
-            // d_searcher_ptr->CellSize = searchers[i]->CellSize;
-            // for(int i = 0; i < 5; i++){
-            //     d_searcher_ptr->Bounding[i] = searchers[i]->Bounding[i];
-            // }
-            // for(int i = 0; i < 2; i++){
-            //     d_searcher_ptr->XYZCellNum[i] = searchers[i]->XYZCellNum[i];
-            // }
-            // d_searcher_ptr->CellNum = searchers[i]->CellNum;
-            // d_searcher_ptr->particlesSize = searchers[i]->particlesSize;
-            // d_searcher_ptr->PIndexes = searchers[i]->PIndexes;
-            // d_searcher_ptr->IndexList = searchers[i]->IndexList;
-            // d_searcher_ptr->StartList = searchers[i]->StartList;
-            // d_searcher_ptr->EndList = searchers[i]->EndList;
-            // d_searcher_ptr->d_PIndexes = searchers[i]->d_PIndexes;
-            // d_searcher_ptr->d_IndexList = searchers[i]->d_IndexList;
-            // d_searcher_ptr->d_StartList = searchers[i]->d_StartList;
-            // d_searcher_ptr->d_EndList = searchers[i]->d_EndList;
-
             h_searchers.push_back(d_searcher_ptr);
         }
-    };
+    }
+
+    // HOST MultiLevelSearcherGPU(std::vector<cstoneOctree::Vec3f>* particles, float* bounding, std::vector<float>* radiuses, float inf_factor)
+    // {
+    //     maxRadius = *std::max_element(radiuses->begin(), radiuses->end());   // * 1.01
+    //     minRadius = *std::min_element(radiuses->begin(), radiuses->end());   // * 0.99
+    //     infFactor = inf_factor;
+    //     int particlesNum = particles->size();
+    //     float bin_extent = minRadius * 1.f;
+    //     int bins = std::max(int(ceil((maxRadius - minRadius) / bin_extent)), 1);
+    //     bin_extent = (maxRadius - minRadius) / bins;
+    //     std::vector<std::vector<unsigned>>sortedIndex(bins);
+    //     if (bins == 1 || bin_extent == 0.0f)
+    //     {
+    //         for (int i = 0; i < radiuses->size(); i++)
+    //         {
+    //             sortedIndex[0].push_back(i);
+    //         }
+    //     } else {
+    //         std::vector<std::pair<float, float>> bin_bounds;
+    //         for (size_t i = 0; i < bins; i++)
+    //         {
+    //             bin_bounds.push_back(
+    //                 std::pair<float, float>(
+    //                     minRadius+(i*bin_extent), 
+    //                     std::min(minRadius+((i+1)*bin_extent), maxRadius)));
+    //         }
+    //         auto whichBin = [&](const float r)
+    //         {
+    //             for (auto tit = bin_bounds.begin(); tit < bin_bounds.end(); tit++)
+    //             {
+    //                 if (r >= tit->first && r <= tit->second)
+    //                     return static_cast<int>(std::distance(bin_bounds.begin(), tit));
+    //             }
+    //             return -1;
+    //         };
+        
+    //         for (int i = 0; i < radiuses->size(); i++)
+    //         {
+    //             sortedIndex[whichBin(radiuses->at(i))].push_back(i);
+    //         }
+    //     }
+    //     for (int i = 0; i < bins; i++)
+    //     {
+    //         if (sortedIndex[i].size() == 0) continue;
+    //         float temp_bounding[6] = {0.0f};
+    //         for (size_t j = 0; j < 6; j++)
+    //         {
+    //             temp_bounding[j] = bounding[j];
+    //         }
+    //         for (auto pI: sortedIndex[i])
+    //         {
+    //             temp_bounding[0] = std::min(temp_bounding[0], particles->at(pI).x);
+    //             temp_bounding[1] = std::max(temp_bounding[1], particles->at(pI).x);
+    //             temp_bounding[2] = std::min(temp_bounding[2], particles->at(pI).y);
+    //             temp_bounding[3] = std::max(temp_bounding[3], particles->at(pI).y);
+    //             temp_bounding[4] = std::min(temp_bounding[4], particles->at(pI).z);
+    //             temp_bounding[5] = std::max(temp_bounding[5], particles->at(pI).z);
+    //         }
+    //         unsigned int binRadiusId = *std::max_element(sortedIndex[i].begin(), sortedIndex[i].end(), 
+    //             [&](unsigned int& a, unsigned int& b) {
+    //                 return radiuses->at(a) < radiuses->at(b);
+    //             });
+    //         maxRadiusParticleIds.push_back(binRadiusId);
+    //         searchers.push_back(new HashGridGPU(particles, radiuses, sortedIndex[i], temp_bounding, binRadiusId, inf_factor));
+    //     }
+    //     printf("   Seachers level: %d.\n", searchers.size());
+
+    //     // assign data to h_searchers
+    //     for(int i = 0; i < searchers.size(); i++){
+    //         HashGridGPU* d_searcher_ptr;
+    //         cudaMalloc(reinterpret_cast<void**>(&d_searcher_ptr), sizeof(HashGridGPU));
+    //         cudaMemcpy(&(d_searcher_ptr->CellSize), &(searchers[i]->CellSize), sizeof(float), cudaMemcpyHostToDevice);
+    //         cudaMemcpy(&(d_searcher_ptr->Bounding), &(searchers[i]->Bounding), sizeof(float) * 6, cudaMemcpyHostToDevice);
+    //         cudaMemcpy(&(d_searcher_ptr->XYZCellNum), &(searchers[i]->XYZCellNum), sizeof(uint64_t) * 3, cudaMemcpyHostToDevice);
+    //         cudaMemcpy(&(d_searcher_ptr->CellNum), &(searchers[i]->CellNum), sizeof(int), cudaMemcpyHostToDevice);
+    //         cudaMemcpy(&(d_searcher_ptr->particlesSize), &(searchers[i]->particlesSize), sizeof(int), cudaMemcpyHostToDevice);
+    //         cudaMemcpy(&(d_searcher_ptr->PIndexes), &(searchers[i]->PIndexes), sizeof(unsigned*), cudaMemcpyHostToDevice);
+    //         cudaMemcpy(&(d_searcher_ptr->IndexList), &(searchers[i]->IndexList), sizeof(int*), cudaMemcpyHostToDevice);
+    //         cudaMemcpy(&(d_searcher_ptr->StartList), &(searchers[i]->StartList), sizeof(int*), cudaMemcpyHostToDevice);
+    //         cudaMemcpy(&(d_searcher_ptr->EndList), &(searchers[i]->EndList), sizeof(int*), cudaMemcpyHostToDevice);
+    //         cudaMemcpy(&(d_searcher_ptr->d_PIndexes), &(searchers[i]->d_PIndexes), sizeof(unsigned*), cudaMemcpyHostToDevice);
+    //         cudaMemcpy(&(d_searcher_ptr->d_IndexList), &(searchers[i]->d_IndexList), sizeof(int*), cudaMemcpyHostToDevice);
+    //         cudaMemcpy(&(d_searcher_ptr->d_StartList), &(searchers[i]->d_StartList), sizeof(int*), cudaMemcpyHostToDevice);
+    //         cudaMemcpy(&(d_searcher_ptr->d_EndList), &(searchers[i]->d_EndList), sizeof(int*), cudaMemcpyHostToDevice);
+    //         h_searchers.push_back(d_searcher_ptr);
+    //     }
+    // };
 
     HOST ~MultiLevelSearcherGPU() 
     {

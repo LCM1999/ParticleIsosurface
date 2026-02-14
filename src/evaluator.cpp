@@ -547,7 +547,7 @@ Vec3f Evaluator::AnisotropicInterpolateGrad(const int pIdx, const Vec3f diff)
    return (grad * GlobalDeterminant[pIdx]);    //(IS_CONST_RADIUS ? Radius3 : GlobalRadius3[pIdx]) * 
 }
 
-void Evaluator::compute_xMeans(int pIdx, std::vector<int> temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Vec3f &xMean)
+void Evaluator::compute_xMeans(int pIdx, const std::vector<int>& temp_neighbors, std::vector<int> &neighbors, int &closer_neighbor, Vec3f &xMean)
 {
    float pR, pD2;
    pR = IS_CONST_RADIUS ? Radius : GlobalRadius->at(pIdx);
@@ -592,11 +592,20 @@ void Evaluator::compute_xMeans(int pIdx, std::vector<int> temp_neighbors, std::v
    }
    else
    {
-       xMean = (GlobalPoses->at(pIdx));
+    //     if (wSum > 0)
+    //    {
+    //        xMean /= wSum;
+    //        xMean = (GlobalPoses->at(pIdx)) * (1 - _XMEAN_DELTA) + xMean * _XMEAN_DELTA;
+    //    }
+    //    else
+    //    {
+    //        xMean = (GlobalPoses->at(pIdx));
+    //    }
+        xMean = (GlobalPoses->at(pIdx));
    }
 }
 
-void Evaluator::compute_G_ours(int pIdx, Vec3f xMean, std::vector<int> neighbors, Mat3f &G)
+void Evaluator::compute_G_ours(int pIdx, Vec3f xMean, const std::vector<int>& neighbors, Mat3f &G)
 {
     const float invH = 0.5;
     float wSum = 0, d, wj;

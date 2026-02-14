@@ -11,6 +11,9 @@
 #include "traverse.h"
 #include "timer.h"
 #include "iso.cuh"
+#include <algorithm>
+#include <fstream>
+#include <limits>
 #include <var.h>
 
 #include <thrust/host_vector.h>
@@ -246,6 +249,28 @@ void SurfReconstructor::afterSampleEval(
 	}
 }
 
+
+static float quantile_inplace(std::vector<float>& v, float q)
+{
+    // q in [0,1]
+    if (v.empty()) return std::numeric_limits<float>::quiet_NaN();
+    if (v.size() == 1) return v[0];
+
+    const size_t n = v.size();
+    // 采用 nearest-rank / round 到最近秩（更稳定也足够做统计图）
+    size_t k = (size_t)std::llround(q * (double)(n - 1));
+    k = std::min(k, n - 1);
+
+    std::nth_element(v.begin(), v.begin() + k, v.end());
+    return v[k];
+}
+
+struct DepthStatsBucket {
+    std::vector<float> curvs;   // 该 depth 的所有 curv 样本（有效节点）
+    uint64_t total = 0;         // 有效节点数（分母）
+    uint64_t split = 0;         // curv < 0.995 的数目（分子）
+};
+
 void SurfReconstructor::genIsoOurs()
 {
     timer t;
@@ -263,7 +288,7 @@ void SurfReconstructor::genIsoOurs()
 		//_OurRoot->node << _RootCenter[0], _RootCenter[1], _RootCenter[2], 0.0;
 		_OurRoot->nodeScalar = 0.0;
 		_OurRoot->half_length = _RootHalfLength;
-	} else if (_STATE == 1) {
+	} else if (_STATE == 1) {		
 		printf("-= Generate Surface =-\n");
 		timer t_gen_mesh;
 		_OurMesh->tris.reserve(1000000);
@@ -298,8 +323,12 @@ void SurfReconstructor::genIsoOurs()
 		printf("Time generating polygons = %f\n", t_gen_mesh.elapsed());
 		return;
 	}
-	// int depth = 0;
-	// float half = _OurRoot->half_length;
+	std::vector<DepthStatsBucket> depthBuckets;
+
+	auto ensureDepth = [&](int d) {
+		if (d < 0) return;
+		if ((size_t)(d + 1) > depthBuckets.size()) depthBuckets.resize(d + 1);
+	};
 	float* sample_points = nullptr;
 	float* sample_grads = nullptr;
 	std::vector<float> cuvrs;
@@ -332,6 +361,23 @@ void SurfReconstructor::genIsoOurs()
 				}
 			}
 		}
+		for (int i = 0; i < queue_flag; ++i)
+		{
+			// 注意：ProcessArray[i] 是 shared_ptr<TNode>* （从你用法推断）
+			TNode* node = ProcessArray[i]->get();
+			const int d = node->depth;
+			ensureDepth(d);
+
+			// 建议只统计非空节点（emptys[i]==0）——否则 curv 可能是默认值/无意义
+			if (!emptys[i]) 
+			{
+				auto& b = depthBuckets[d];
+				b.total++;
+				b.curvs.push_back(cuvrs[i]);
+				if (cuvrs[i] < 0.995f) b.split++;
+			}
+		}
+
 		if (sample_points != nullptr)
 		{
 			delete[] sample_points;
@@ -344,7 +390,6 @@ void SurfReconstructor::genIsoOurs()
 		}
 		sample_points = new float[int(pow(getOverSampleQEF()+1, 3)) * 4 * queue_flag];
 		sample_grads = new float[int(pow(getOverSampleQEF()+1, 3)) * 3 * queue_flag];
-		//TODO: Sampling
 		{
 			{
 		#pragma omp parallel for
@@ -373,8 +418,6 @@ void SurfReconstructor::genIsoOurs()
 				final_leaf_count++;
 			}
 		}
-		// depth++;
-		// half/=2;
 		count++;
 	}
 	std::cout << "Final leaf count: " << final_leaf_count << std::endl;
@@ -383,6 +426,34 @@ void SurfReconstructor::genIsoOurs()
 	delete[] sample_grads;
 	printf("Time generating tree = %f\n", t.elapsed());	
 	_STATE++;
+
+	std::ofstream csv("curv_depth_stats.csv");
+	csv << "depth,count,median,p10,p90,split_rate\n";
+
+	for (int d = 0; d < (int)depthBuckets.size(); ++d)
+	{
+		auto& b = depthBuckets[d];
+		if (b.total == 0) continue;
+
+		// 为了 nth_element 不破坏原数据顺序，复制三份（最简单且安全）
+		std::vector<float> tmp = b.curvs;
+		float med = quantile_inplace(tmp, 0.50f);
+
+		tmp = b.curvs;
+		float p10 = quantile_inplace(tmp, 0.10f);
+
+		tmp = b.curvs;
+		float p90 = quantile_inplace(tmp, 0.90f);
+
+		double split_rate = (b.total > 0) ? (double)b.split / (double)b.total : 0.0;
+
+		csv << d << "," << b.total << "," << med << "," << p10 << "," << p90 << "," << split_rate << "\n";
+
+		std::cout << "[depth " << d << "] n=" << b.total
+				<< " median=" << med << " p10=" << p10 << " p90=" << p90
+				<< " split_rate=" << split_rate << "\n";
+	}
+	csv.close();
 }
 
 void SurfReconstructor::RunCPU2(float iso_factor, float smooth_factor)
@@ -400,7 +471,7 @@ void SurfReconstructor::RunCPU2(float iso_factor, float smooth_factor)
 	// 	IS_CONST_RADIUS = false;
 		// } else {
 		useCPU = true;
-		_searcherCPU = std::make_shared<MultiLevelSearcher>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
+		_searcherCPU = std::make_shared<MultiLevelSearcher>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f, 1.5f);
 		// useCPU = false;
 		// _searcherGPU = std::make_shared<MultiLevelSearcherGPU>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
 	// }
@@ -707,7 +778,7 @@ void SurfReconstructor::Run(float iso_factor, float smooth_factor)
 	// {
     // 	_hashgrid = std::make_shared<HashGrid>(&_GlobalParticles, _BoundingBox, _RADIUS, 4.0f);
 	// } else {
-		_searcherCPU = std::make_shared<MultiLevelSearcher>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f);
+		_searcherCPU = std::make_shared<MultiLevelSearcher>(&_GlobalParticles, _BoundingBox, &_GlobalRadiuses, 4.0f, 1.5f);
 	// }
 	printf("   Build Neighbor Searcher Time = %f \n", t.elapsed());
 	t.reset();
